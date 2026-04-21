@@ -4,228 +4,95 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>SPX Ninja GPS</title>
-    
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-
     <style>
-        body {
-            background-color: #000;
-            color: #fff;
-            font-family: 'Arial', sans-serif;
-            text-align: center;
-            margin: 0;
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-            justify-content: space-between;
-        }
-
-        #painel-topo {
-            background: #111;
-            padding: 20px;
-            border-bottom: 3px solid #39FF14;
-        }
-
-        .label { font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 1px; }
-        .grande { font-size: 55px; font-weight: bold; color: #39FF14; margin: 5px 0; }
-        .medio { font-size: 24px; color: #fff; margin-bottom: 5px; }
-        #endereco { font-size: 16px; color: #aaa; height: 40px; overflow: hidden; }
-
-        #seta-container {
-            flex-grow: 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        #seta {
-            font-size: 180px;
-            transition: transform 0.1s linear;
-            display: inline-block;
-        }
-
-        #controles {
-            background: #111;
-            padding: 25px;
-            border-top: 1px solid #333;
-        }
-
-        .btn-upload {
-            background: #39FF14;
-            color: #000;
-            padding: 20px;
-            border-radius: 15px;
-            font-weight: bold;
-            font-size: 18px;
-            cursor: pointer;
-            display: block;
-            text-align: center;
-        }
-
+        body { background-color: #000; color: #fff; font-family: sans-serif; text-align: center; margin: 0; display: flex; flex-direction: column; height: 100vh; }
+        #topo { padding: 20px; background: #111; border-bottom: 2px solid #39FF14; }
+        .label { font-size: 12px; color: #888; text-transform: uppercase; }
+        .grande { font-size: 50px; font-weight: bold; color: #39FF14; margin: 5px 0; }
+        .medio { font-size: 20px; color: #fff; }
+        #seta-container { flex: 1; display: flex; align-items: center; justify-content: center; }
+        #seta { font-size: 150px; transition: transform 0.1s linear; }
+        #controles { padding: 20px; background: #111; }
+        .btn { background: #39FF14; color: #000; padding: 20px; border-radius: 15px; font-weight: bold; font-size: 18px; cursor: pointer; display: block; }
         input[type="file"] { display: none; }
-        #debug { font-size: 10px; color: #444; margin-top: 10px; }
+        #status { font-size: 12px; color: #444; margin-top: 10px; }
     </style>
 </head>
 <body>
-
-    <div id="painel-topo">
+    <div id="topo">
         <div class="label">Próxima Curva</div>
         <div id="dist-manobra" class="grande">0 m</div>
-        
         <div class="label">Destino Final</div>
         <div id="dist-total" class="medio">---</div>
-        <div id="endereco">Carregue a planilha da SPX</div>
+        <div id="endereco" style="color: #666; font-size: 14px; margin-top: 10px;">Aguardando Planilha...</div>
     </div>
-
-    <div id="seta-container">
-        <div id="seta">⬆️</div>
-    </div>
-
+    <div id="seta-container"><div id="seta">⬆️</div></div>
     <div id="controles">
-        <label class="btn-upload" id="labelBtn">
-            📂 CARREGAR PLANILHA XLSX
-            <input type="file" id="fileInput" accept=".xlsx, .xls">
-        </label>
-        <div id="debug">GPS Status: Aguardando interação...</div>
+        <label class="btn">📂 CARREGAR PLANILHA XLSX<input type="file" id="fileInput" accept=".xlsx, .xls"></label>
+        <div id="status">GPS: Aguardando...</div>
     </div>
-
     <script>
-        let destinos = [];
-        let rotaLogica = [];
-        let idxDestino = 0;
-        let idxNo = 0;
-        let minhaLat, minhaLon, meuNorte = 0;
+        let destinos = [], rotaLogica = [], idxDestino = 0, idxNo = 0, minhaLat, minhaLon, meuNorte = 0;
+        const elSeta = document.getElementById('seta'), elDistM = document.getElementById('dist-manobra'), 
+              elDistT = document.getElementById('dist-total'), elEnd = document.getElementById('endereco'), elStat = document.getElementById('status');
 
-        const elSeta = document.getElementById('seta');
-        const elDistManobra = document.getElementById('dist-manobra');
-        const elDistTotal = document.getElementById('dist-total');
-        const elEndereco = document.getElementById('endereco');
-        const elDebug = document.getElementById('debug');
-
-        // 1. LER EXCEL
         document.getElementById('fileInput').addEventListener('change', function(e) {
-            const file = e.target.files[0];
             const reader = new FileReader();
-            elDebug.innerText = "Lendo arquivo...";
-
             reader.onload = function(evt) {
-                try {
-                    const data = evt.target.result;
-                    const workbook = XLSX.read(data, { type: 'binary' });
-                    const sheet = workbook.Sheets[workbook.SheetNames[0]];
-                    const json = XLSX.utils.sheet_to_json(sheet);
-
-                    destinos = json.map(item => ({
-                        lat: parseFloat(item.Latitude || item.latitude),
-                        lon: parseFloat(item.Longitude || item.longitude),
-                        addr: item["Destination Address"] || "Ponto Desconhecido"
-                    })).filter(p => !isNaN(p.lat));
-
-                    if (destinos.length > 0) {
-                        document.getElementById('labelBtn').style.display = 'none';
-                        elDebug.innerText = "Planilha OK! Ativando GPS...";
-                        iniciarSensores();
-                    } else {
-                        alert("Não achei as colunas 'Latitude' e 'Longitude'.");
-                    }
-                } catch (err) {
-                    elDebug.innerText = "Erro ao processar XLSX.";
-                }
+                const wb = XLSX.read(evt.target.result, { type: 'binary' });
+                const json = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+                destinos = json.map(i => ({ lat: parseFloat(i.Latitude || i.latitude), lon: parseFloat(i.Longitude || i.longitude), addr: i["Destination Address"] || "Ponto" })).filter(p => !isNaN(p.lat));
+                if (destinos.length > 0) { elStat.innerText = "Planilha OK! Ativando GPS..."; iniciarGPS(); }
             };
-            reader.readAsBinaryString(file);
+            reader.readAsBinaryString(e.target.files[0]);
         });
 
-        // 2. BUSCAR ROTA NAS RUAS (OSRM)
-        async function obterRotaRua(latDest, lonDest) {
+        async function obterRota(latD, lonD) {
             try {
-                const res = await fetch(`https://router.project-osrm.org/route/v1/driving/${minhaLon},${minhaLat};${lonDest},${latDest}?overview=full&geometries=geojson`);
+                const res = await fetch(`https://router.project-osrm.org/route/v1/driving/${minhaLon},${minhaLat};${lonD},${latD}?overview=full&geometries=geojson`);
                 const data = await res.json();
-                if (data.routes && data.routes[0]) {
-                    rotaLogica = data.routes[0].geometry.coordinates.map(c => ({lat: c[1], lon: c[0]}));
-                    idxNo = 0;
-                }
-            } catch (e) {
-                rotaLogica = [{lat: latDest, lon: lonDest}];
-            }
+                rotaLogica = data.routes[0].geometry.coordinates.map(c => ({lat: c[1], lon: c[0]}));
+                idxNo = 0;
+            } catch (e) { rotaLogica = [{lat: latD, lon: lonD}]; }
         }
 
-        // 3. GPS E BÚSSOLA
-        function iniciarSensores() {
+        function iniciarGPS() {
             navigator.geolocation.watchPosition(async pos => {
-                const isPrimeira = !minhaLat;
-                minhaLat = pos.coords.latitude;
-                minhaLon = pos.coords.longitude;
-                
-                if (isPrimeira) await carregarNovoDestino();
-                atualizarInterface();
-            }, err => {
-                elDebug.innerText = "ERRO: Ative o GPS em modo Alta Precisão.";
-            }, { enableHighAccuracy: true });
-
-            if (window.DeviceOrientationEvent) {
-                window.addEventListener('deviceorientationabsolute', e => {
-                    if (e.alpha !== null) meuNorte = e.alpha;
-                }, true);
-            }
+                const isP = !minhaLat; minhaLat = pos.coords.latitude; minhaLon = pos.coords.longitude;
+                if (isP) await proximo();
+                atualizar();
+            }, null, { enableHighAccuracy: true });
+            window.addEventListener('deviceorientationabsolute', e => { if (e.alpha !== null) meuNorte = e.alpha; }, true);
         }
 
-        async function carregarNovoDestino() {
-            if (idxDestino < destinos.length) {
-                const d = destinos[idxDestino];
-                elEndereco.innerText = d.addr;
-                await obterRotaRua(d.lat, d.lon);
-            } else {
-                elEndereco.innerText = "TODAS AS ENTREGAS FEITAS!";
-            }
+        async function proximo() {
+            if (idxDestino < destinos.length) { elEnd.innerText = destinos[idxDestino].addr; await obterRota(destinos[idxDestino].lat, destinos[idxDestino].lon); }
         }
 
-        function atualizarInterface() {
+        function atualizar() {
             if (idxDestino >= destinos.length) return;
-
-            const alvoProximo = rotaLogica[idxNo];
-            const distProxCurva = calcDist(minhaLat, minhaLon, alvoProximo.lat, alvoProximo.lon);
-            
-            const alvoFinal = destinos[idxDestino];
-            const distFinal = calcDist(minhaLat, minhaLon, alvoFinal.lat, alvoFinal.lon);
-
-            // Interface
-            elDistManobra.innerText = Math.round(distProxCurva) + " m";
-            elDistTotal.innerText = distFinal > 1000 ? (distFinal/1000).toFixed(2) + " km" : Math.round(distFinal) + " m";
-
-            // Seta
-            const bearing = calcBearing(minhaLat, minhaLon, alvoProximo.lat, alvoProximo.lon);
-            const giroSeta = (bearing - meuNorte + 360) % 360;
-            elSeta.style.transform = `rotate(${giroSeta}deg)`;
-
-            // Lógica de avanço
-            if (distProxCurva < 15 && idxNo < rotaLogica.length - 1) {
-                idxNo++;
-            }
-            if (distFinal < 20) {
-                if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
-                idxDestino++;
-                carregarNovoDestino();
-            }
+            const dCurva = calc(minhaLat, minhaLon, rotaLogica[idxNo].lat, rotaLogica[idxNo].lon);
+            const dFinal = calc(minhaLat, minhaLon, destinos[idxDestino].lat, destinos[idxDestino].lon);
+            elDistM.innerText = Math.round(dCurva) + " m";
+            elDistT.innerText = dFinal > 1000 ? (dFinal/1000).toFixed(2) + " km" : Math.round(dFinal) + " m";
+            const brng = bear(minhaLat, minhaLon, rotaLogica[idxNo].lat, rotaLogica[idxNo].lon);
+            elSeta.style.transform = `rotate(${(brng - meuNorte + 360) % 360}deg)`;
+            if (dCurva < 15 && idxNo < rotaLogica.length - 1) idxNo++;
+            if (dFinal < 20) { idxDestino++; proximo(); }
         }
 
-        function calcDist(lat1, lon1, lat2, lon2) {
-            const R = 6371e3;
-            const p1 = lat1 * Math.PI/180;
-            const p2 = lat2 * Math.PI/180;
-            const dp = (lat2-lat1) * Math.PI/180;
-            const dl = (lon2-lon1) * Math.PI/180;
+        function calc(la1, lo1, la2, lo2) {
+            const R = 6371e3, p1 = la1 * Math.PI/180, p2 = la2 * Math.PI/180, dp = (la2-la1) * Math.PI/180, dl = (lo2-lo1) * Math.PI/180;
             const a = Math.sin(dp/2)**2 + Math.cos(p1)*Math.cos(p2)*Math.sin(dl/2)**2;
             return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
         }
 
-        function calcBearing(lat1, lon1, lat2, lon2) {
-            const y = Math.sin((lon2-lon1)*Math.PI/180)*Math.cos(lat2*Math.PI/180);
-            const x = Math.cos(lat1*Math.PI/180)*Math.sin(lat2*Math.PI/180)-Math.sin(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.cos((lon2-lon1)*Math.PI/180);
+        function bear(la1, lo1, la2, lo2) {
+            const y = Math.sin((lo2-lo1)*Math.PI/180)*Math.cos(la2*Math.PI/180);
+            const x = Math.cos(la1*Math.PI/180)*Math.sin(la2*Math.PI/180)-Math.sin(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)*Math.cos((lo2-lo1)*Math.PI/180);
             return (Math.atan2(y, x)*180/Math.PI + 360) % 360;
         }
-
-        // Bloquear descanso de tela
-        if ('wakeLock' in navigator) navigator.wakeLock.request('screen').catch(()=>{});
     </script>
 </body>
 </html>
