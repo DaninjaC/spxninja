@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SPX Ninja - Mapa de Calor</title>
+    <title>SPX Ninja - Status Manual</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -29,8 +29,8 @@
         .btn { background: #39FF14; color: #000; padding: 15px; border-radius: 12px; font-weight: bold; font-size: 18px; cursor: pointer; display: block; }
         input[type="file"] { display: none; }
 
-        /* Estilo para Tooltips dos stops secundários */
-        .stop-label { background: rgba(0,0,0,0.8); color: #fff; border: 1px solid #39FF14; font-weight: bold; padding: 2px 5px; border-radius: 4px; font-size: 10px; }
+        /* Estilo das etiquetas no mapa */
+        .stop-label { background: rgba(0,0,0,0.85); color: #fff; border: 1px solid #39FF14; font-weight: bold; padding: 2px 4px; border-radius: 3px; font-size: 10px; pointer-events: none; }
         .leaflet-tile-container { filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%); }
     </style>
 </head>
@@ -45,23 +45,23 @@
     <div id="map"></div>
 
     <div id="info-final">
-        <div id="rua-atual">CARREGUE A ROTA</div>
+        <div id="rua-atual">CARREGUE A PLANILHA</div>
         <div id="distancia-final">---</div>
     </div>
 
     <div id="controles">
-        <label class="btn" id="btnLabel">🚀 INICIAR COM VISÃO DE TODOS OS STOPS<input type="file" id="fileInput" accept=".xlsx, .xls"></label>
+        <label class="btn" id="btnLabel">🚀 INICIAR GPS INTERATIVO<input type="file" id="fileInput" accept=".xlsx, .xls"></label>
     </div>
 
     <script>
         let rotaSpx = [], passosNavegacao = [], idxDestino = 0, idxPasso = 0;
         let minhaLat, minhaLon, mapa, markerUser, markerDest, polylineRota;
-        let camadaTodosStops = L.layerGroup();
+        let camadaFundo = L.layerGroup();
 
         window.onload = function() {
             mapa = L.map('map', { zoomControl: false, attributionControl: false }).setView([-23.61, -46.57], 16);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(mapa);
-            camadaTodosStops.addTo(mapa);
+            camadaFundo.addTo(mapa);
             setTimeout(() => { mapa.invalidateSize(); }, 500);
         };
 
@@ -86,11 +86,12 @@
                         lon: parseFloat(i.Longitude),
                         addr: i["Destination Address"],
                         stop: i.Stop,
-                        pacotes: contagem[i.Stop]
+                        pacotes: contagem[i.Stop],
+                        status: 'neutro' // Status inicial: neutro, concluido, pendente
                     }));
 
                 if (rotaSpx.length > 0) {
-                    desenharTodosOsStops();
+                    gerarMarcadoresFundo();
                     document.getElementById('btnLabel').style.display = 'none';
                     iniciarGPS();
                 }
@@ -98,34 +99,40 @@
             reader.readAsBinaryString(e.target.files[0]);
         });
 
-        // NOVA FUNÇÃO: Desenha todos os pontos da planilha como círculos cinzas
-        function desenharTodosOsStops() {
-            camadaTodosStops.clearLayers();
-            rotaSpx.forEach(p => {
-                L.circleMarker([p.lat, p.lon], {
-                    radius: 5,
-                    color: '#666',
-                    fillColor: '#333',
-                    fillOpacity: 1,
-                    weight: 1
-                })
+        // Função para desenhar todos os stops com evento de clique
+        function gerarMarcadoresFundo() {
+            camadaFundo.clearLayers();
+            rotaSpx.forEach((p, index) => {
+                const marker = L.circleMarker([p.lat, p.lon], getEstiloStatus(p.status))
                 .bindTooltip("Stop " + p.stop, { permanent: true, direction: 'top', className: 'stop-label', offset: [0, -5] })
-                .addTo(camadaTodosStops);
+                .addTo(camadaFundo);
+
+                // Lógica de clique para mudar cor
+                marker.on('click', function() {
+                    if (p.status === 'neutro') p.status = 'concluido';
+                    else if (p.status === 'concluido') p.status = 'pendente';
+                    else p.status = 'neutro';
+
+                    this.setStyle(getEstiloStatus(p.status));
+                });
             });
+        }
+
+        function getEstiloStatus(status) {
+            if (status === 'concluido') return { radius: 7, color: '#444', fillColor: '#888', fillOpacity: 0.8, weight: 2 };
+            if (status === 'pendente') return { radius: 7, color: '#fff', fillColor: '#ff0000', fillOpacity: 1, weight: 2 };
+            return { radius: 6, color: '#666', fillColor: '#333', fillOpacity: 1, weight: 1 };
         }
 
         function iniciarGPS() {
             navigator.geolocation.watchPosition(async pos => {
-                minhaLat = pos.coords.latitude;
-                minhaLon = pos.coords.longitude;
-                
+                minhaLat = pos.coords.latitude; minhaLon = pos.coords.longitude;
                 if (!markerUser) {
                     markerUser = L.circleMarker([minhaLat, minhaLon], { color: '#007AFF', fillOpacity: 1, radius: 8, zIndexOffset: 1000 }).addTo(mapa);
                 } else {
                     markerUser.setLatLng([minhaLat, minhaLon]);
                 }
                 mapa.panTo([minhaLat, minhaLon]);
-
                 if (idxDestino < rotaSpx.length) {
                     if (passosNavegacao.length === 0) await calcularRota();
                     navegar();
@@ -136,22 +143,11 @@
         async function calcularRota() {
             const d = rotaSpx[idxDestino];
             document.getElementById('stop-badge').innerText = "STOP " + d.stop + " (" + d.pacotes + " vol)";
-            
-            // Destaca o destino ATUAL em azul brilhante
             if (markerDest) mapa.removeLayer(markerDest);
-            markerDest = L.circleMarker([d.lat, d.lon], {
-                radius: 10,
-                color: '#fff',
-                fillColor: '#007AFF',
-                fillOpacity: 1,
-                weight: 3,
-                zIndexOffset: 500
-            }).addTo(mapa);
-
+            markerDest = L.circleMarker([d.lat, d.lon], { radius: 11, color: '#fff', fillColor: '#007AFF', fillOpacity: 1, weight: 3, zIndexOffset: 500 }).addTo(mapa);
             const url = `https://router.project-osrm.org/route/v1/driving/${minhaLon},${minhaLat};${d.lon},${d.lat}?steps=true&overview=full&geometries=geojson`;
             const res = await fetch(url);
             const data = await res.json();
-            
             if (data.routes && data.routes[0]) {
                 const route = data.routes[0];
                 passosNavegacao = route.legs[0].steps.map(s => ({
@@ -159,7 +155,6 @@
                     manobra: s.maneuver.modifier, tipo: s.maneuver.type, rua: s.name || "Siga em frente"
                 }));
                 idxPasso = 0;
-
                 if (polylineRota) mapa.removeLayer(polylineRota);
                 const coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
                 polylineRota = L.polyline(coords, { color: '#007AFF', weight: 6, opacity: 0.8 }).addTo(mapa);
@@ -186,8 +181,6 @@
             else document.getElementById('seta-instrucao').innerText = "⬆️";
 
             if (dCurva < 20 && idxPasso < passosNavegacao.length - 1) idxPasso++;
-            
-            // Troca automática em 70m
             if (dFinal < 70) {
                 if (navigator.vibrate) navigator.vibrate([300, 100, 300]);
                 idxDestino++; passosNavegacao = []; calcularRota();
