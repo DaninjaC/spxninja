@@ -3,60 +3,66 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SPX Ninja - Rota Otimizada</title>
+    <title>SPX Ninja - Mapa Ativo</title>
+    
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
     <style>
         body { background-color: #000; color: #fff; font-family: sans-serif; margin: 0; text-align: center; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
-        #painel-topo { background: #007AFF; padding: 15px; min-height: 190px; transition: background 0.3s; display: flex; flex-direction: column; justify-content: center; }
+        
+        /* Painel Superior de Manobra */
+        #painel-topo { background: #007AFF; padding: 10px; min-height: 140px; display: flex; flex-direction: column; justify-content: center; z-index: 1000; }
         .chegando { background: #FFCC00 !important; color: #000 !important; }
-        #linha-status { display: flex; flex-direction: column; align-items: center; margin-bottom: 5px; gap: 5px; }
-        #stop-badge { background: #000; color: #39FF14; padding: 5px 15px; border-radius: 10px; font-weight: bold; font-size: 20px; border: 2px solid #39FF14; }
-        #pacotes-badge { background: #fff; color: #000; padding: 3px 12px; border-radius: 8px; font-weight: bold; font-size: 16px; }
-        #seta-instrucao { font-size: 85px; display: block; line-height: 1; }
-        #distancia-curva { font-size: 50px; font-weight: bold; display: block; }
-        #rua-atual { background: #222; padding: 12px; font-size: 18px; color: #39FF14; font-weight: bold; border-bottom: 2px solid #444; text-transform: uppercase; }
-        #info-final { flex-grow: 1; background: #111; display: flex; flex-direction: column; justify-content: center; padding: 10px; }
-        #distancia-final { font-size: 50px; font-weight: bold; }
-        #endereco-texto { color: #ccc; font-size: 13px; margin-top: 5px; padding: 0 15px; font-style: italic; }
+        #stop-badge { background: #000; color: #39FF14; padding: 3px 10px; border-radius: 8px; font-weight: bold; font-size: 18px; margin-bottom: 5px; display: inline-block; }
+        #seta-instrucao { font-size: 60px; line-height: 1; display: block; }
+        #distancia-curva { font-size: 40px; font-weight: bold; display: block; }
+
+        /* Estilo do MiniMapa */
+        #map { flex-grow: 1; width: 100%; background: #111; border-top: 2px solid #444; border-bottom: 2px solid #444; }
+
+        /* Painel Inferior de Status */
+        #info-final { background: #111; padding: 10px; min-height: 100px; display: flex; flex-direction: column; justify-content: center; }
+        #rua-atual { color: #39FF14; font-weight: bold; font-size: 16px; margin-bottom: 5px; text-transform: uppercase; }
+        #distancia-final { font-size: 30px; font-weight: bold; }
+        #pacotes-status { font-size: 14px; color: #888; }
+
         #controles { padding: 15px; background: #000; }
-        .btn { background: #39FF14; color: #000; padding: 18px; border-radius: 15px; font-weight: bold; font-size: 18px; cursor: pointer; display: block; }
+        .btn { background: #39FF14; color: #000; padding: 15px; border-radius: 12px; font-weight: bold; font-size: 18px; cursor: pointer; display: block; }
         input[type="file"] { display: none; }
+
+        /* Ajuste do Leaflet para modo escuro */
+        .leaflet-tile { filter: brightness(0.6) invert(1) contrast(3) hue-rotate(200deg); }
     </style>
 </head>
 <body>
 
     <div id="painel-topo">
-        <div id="linha-status">
-            <div id="stop-badge">STOP --</div>
-            <div id="pacotes-badge">0 PACOTES</div>
-        </div>
+        <div><div id="stop-badge">STOP --</div></div>
         <span id="seta-instrucao">---</span>
         <span id="distancia-curva">0 m</span>
     </div>
 
-    <div id="rua-atual">Aguardando Planilha...</div>
+    <div id="map"></div>
 
     <div id="info-final">
+        <div id="rua-atual">CARREGUE A PLANILHA</div>
         <div id="distancia-final">---</div>
-        <div id="endereco-texto">Carregue a rota SPX</div>
+        <div id="pacotes-status">0 volumes</div>
     </div>
 
     <div id="controles">
-        <label class="btn" id="btnLabel">🚀 INICIAR ROTA OTIMIZADA<input type="file" id="fileInput" accept=".xlsx, .xls"></label>
+        <label class="btn" id="btnLabel">🚀 INICIAR NAVEGAÇÃO COM MAPA<input type="file" id="fileInput" accept=".xlsx, .xls"></label>
     </div>
 
     <script>
         let rotaSpx = [], passosNavegacao = [], idxDestino = 0, idxPasso = 0;
-        let minhaLat, minhaLon, ultimaLatReq, ultimaLonReq;
+        let minhaLat, minhaLon, mapa, markerUser, markerDest, polylineRota;
 
-        const elTopo = document.getElementById('painel-topo');
-        const elSeta = document.getElementById('seta-instrucao');
-        const elDistCurva = document.getElementById('distancia-curva');
-        const elRua = document.getElementById('rua-atual');
-        const elStopBadge = document.getElementById('stop-badge');
-        const elPacotesBadge = document.getElementById('pacotes-badge');
-        const elDistFinal = document.getElementById('distancia-final');
-        const elEndereco = document.getElementById('endereco-texto');
+        // Inicializa o Mapa
+        mapa = L.map('map', { zoomControl: false, attributionControl: false }).setView([-23.61, -46.57], 15);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(mapa);
 
         document.getElementById('fileInput').addEventListener('change', function(e) {
             const reader = new FileReader();
@@ -95,70 +101,72 @@
                 minhaLat = pos.coords.latitude;
                 minhaLon = pos.coords.longitude;
                 
-                // Só pede nova rota se mover mais de 15 metros para evitar "nervosismo" do mapa
-                const moveuSuficiente = !ultimaLatReq || dist(minhaLat, minhaLon, ultimaLatReq, ultimaLonReq) > 15;
+                // Atualiza posição no mapa
+                if (!markerUser) {
+                    markerUser = L.circleMarker([minhaLat, minhaLon], { color: '#007AFF', fillOpacity: 1, radius: 8 }).addTo(mapa);
+                } else {
+                    markerUser.setLatLng([minhaLat, minhaLon]);
+                }
+                mapa.panTo([minhaLat, minhaLon]);
 
                 if (idxDestino < rotaSpx.length) {
-                    if (passosNavegacao.length === 0 || moveuSuficiente) {
-                        await calcularRota();
-                        ultimaLatReq = minhaLat;
-                        ultimaLonReq = minhaLon;
-                    }
+                    if (passosNavegacao.length === 0) await calcularRota();
                     navegar();
                 }
-            }, null, { enableHighAccuracy: true, maximumAge: 1000 });
+            }, null, { enableHighAccuracy: true });
         }
 
         async function calcularRota() {
-            if (idxDestino >= rotaSpx.length) return;
             const d = rotaSpx[idxDestino];
-            elEndereco.innerText = d.addr;
-            elStopBadge.innerText = "STOP " + d.stop;
-            elPacotesBadge.innerText = d.pacotes + (d.pacotes > 1 ? " PACOTES" : " PACOTE");
+            document.getElementById('stop-badge').innerText = "STOP " + d.stop;
+            document.getElementById('pacotes-status').innerText = d.pacotes + (d.pacotes > 1 ? " volumes" : " volume");
             
-            // OTIMIZAÇÃO: Radiuses=30 força o ponto a "colar" na rua num raio de 30m, respeitando a mão.
-            const url = `https://router.project-osrm.org/route/v1/driving/${minhaLon},${minhaLat};${d.lon},${d.lat}?steps=true&overview=full&geometries=geojson&radiuses=30;30`;
+            // Marker do Destino
+            if (markerDest) mapa.removeLayer(markerDest);
+            markerDest = L.marker([d.lat, d.lon]).addTo(mapa);
+
+            const url = `https://router.project-osrm.org/route/v1/driving/${minhaLon},${minhaLat};${d.lon},${d.lat}?steps=true&overview=full&geometries=geojson`;
+            const res = await fetch(url);
+            const data = await res.json();
             
-            try {
-                const res = await fetch(url);
-                const data = await res.json();
-                if (data.routes && data.routes[0]) {
-                    passosNavegacao = data.routes[0].legs[0].steps.map(s => ({
-                        lat: s.maneuver.location[1],
-                        lon: s.maneuver.location[0],
-                        manobra: s.maneuver.modifier,
-                        tipo: s.maneuver.type,
-                        rua: s.name || "Siga em frente"
-                    }));
-                    idxPasso = 0;
-                }
-            } catch (e) { console.log("Erro de rede"); }
+            if (data.routes && data.routes[0]) {
+                const route = data.routes[0];
+                passosNavegacao = route.legs[0].steps.map(s => ({
+                    lat: s.maneuver.location[1],
+                    lon: s.maneuver.location[0],
+                    manobra: s.maneuver.modifier,
+                    tipo: s.maneuver.type,
+                    rua: s.name || "Siga em frente"
+                }));
+                idxPasso = 0;
+
+                // Desenha a linha da rota no mapa
+                if (polylineRota) mapa.removeLayer(polylineRota);
+                const coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
+                polylineRota = L.polyline(coords, { color: '#007AFF', weight: 6, opacity: 0.7 }).addTo(mapa);
+            }
         }
 
         function navegar() {
             if (!rotaSpx[idxDestino] || !passosNavegacao[idxPasso]) return;
-
             const passo = passosNavegacao[idxPasso];
             const dCurva = dist(minhaLat, minhaLon, passo.lat, passo.lon);
             const dFinal = dist(minhaLat, minhaLon, rotaSpx[idxDestino].lat, rotaSpx[idxDestino].lon);
 
-            elDistCurva.innerText = Math.round(dCurva) + " m";
-            elDistFinal.innerText = dFinal > 1000 ? (dFinal/1000).toFixed(1) + " km" : Math.round(dFinal) + " m";
-            elRua.innerText = passo.rua;
+            document.getElementById('distancia-curva').innerText = Math.round(dCurva) + " m";
+            document.getElementById('distancia-final').innerText = dFinal > 1000 ? (dFinal/1000).toFixed(1) + " km" : Math.round(dFinal) + " m";
+            document.getElementById('rua-atual').innerText = passo.rua;
 
-            if (dFinal <= 100) elTopo.classList.add('chegando');
-            else elTopo.classList.remove('chegando');
+            if (dFinal <= 100) document.getElementById('painel-topo').classList.add('chegando');
+            else document.getElementById('painel-topo').classList.remove('chegando');
 
             const m = passo.manobra;
-            if (m && m.includes("left")) elSeta.innerText = "⬅️";
-            else if (m && m.includes("right")) elSeta.innerText = "➡️";
-            else if (passo.tipo === "arrive") elSeta.innerText = "📍";
-            else elSeta.innerText = "⬆️";
+            if (m && m.includes("left")) document.getElementById('seta-instrucao').innerText = "⬅️";
+            else if (m && m.includes("right")) document.getElementById('seta-instrucao').innerText = "➡️";
+            else if (passo.tipo === "arrive") document.getElementById('seta-instrucao').innerText = "📍";
+            else document.getElementById('seta-instrucao').innerText = "⬆️";
 
-            // Avança manobra se estiver perto da esquina
             if (dCurva < 20 && idxPasso < passosNavegacao.length - 1) idxPasso++;
-
-            // Troca automática aos 70 metros (ajustado conforme pedido anterior)
             if (dFinal < 70) {
                 if (navigator.vibrate) navigator.vibrate([300, 100, 300]);
                 idxDestino++;
@@ -174,7 +182,6 @@
             const a = Math.sin(dLat/2)**2 + Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)*Math.sin(dLon/2)**2;
             return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
         }
-        
         if ('wakeLock' in navigator) navigator.wakeLock.request('screen').catch(()=>{});
     </script>
 </body>
