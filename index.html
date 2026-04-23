@@ -3,32 +3,39 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SPX Ninja - Modo Waze</title>
+    <title>SPX Ninja - Sequência em Destaque</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         body { background-color: #000; color: #fff; font-family: sans-serif; margin: 0; text-align: center; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
         
-        /* Cabeçalho de Navegação (Estilo Waze) */
-        #painel-curva { background: #007AFF; padding: 20px; min-height: 160px; }
-        #seta-instrucao { font-size: 100px; display: block; line-height: 1; }
-        #distancia-curva { font-size: 60px; font-weight: bold; display: block; }
+        /* Painel Superior com o Stop em destaque */
+        #painel-topo { background: #007AFF; padding: 15px; min-height: 180px; transition: background 0.3s; display: flex; flex-direction: column; justify-content: center; }
+        .chegando { background: #FFCC00 !important; color: #000 !important; }
         
-        #rua-atual { background: #222; padding: 15px; font-size: 20px; color: #39FF14; font-weight: bold; border-bottom: 2px solid #444; }
+        #linha-status { display: flex; justify-content: space-around; align-items: center; margin-bottom: 5px; }
+        #stop-badge { background: #000; color: #39FF14; padding: 5px 15px; border-radius: 10px; font-weight: bold; font-size: 22px; border: 2px solid #39FF14; }
+        
+        #seta-instrucao { font-size: 90px; display: block; line-height: 1; }
+        #distancia-curva { font-size: 55px; font-weight: bold; display: block; }
+        
+        #rua-atual { background: #222; padding: 12px; font-size: 18px; color: #39FF14; font-weight: bold; border-bottom: 2px solid #444; text-transform: uppercase; }
 
-        /* Rodapé de Destino Final */
-        #info-final { flex-grow: 1; background: #111; display: flex; flex-direction: column; justify-content: center; padding: 20px; }
-        .label { color: #888; font-size: 14px; text-transform: uppercase; }
-        #distancia-final { font-size: 40px; font-weight: bold; }
-        #endereco-texto { color: #ccc; font-size: 15px; margin-top: 10px; }
+        #info-final { flex-grow: 1; background: #111; display: flex; flex-direction: column; justify-content: center; padding: 10px; }
+        .label-mini { color: #888; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; }
+        #distancia-final { font-size: 50px; font-weight: bold; color: #fff; }
+        #endereco-texto { color: #ccc; font-size: 14px; margin-top: 8px; padding: 0 15px; font-style: italic; }
 
-        #controles { padding: 20px; background: #000; }
-        .btn { background: #39FF14; color: #000; padding: 20px; border-radius: 15px; font-weight: bold; font-size: 20px; cursor: pointer; display: block; }
+        #controles { padding: 15px; background: #000; }
+        .btn { background: #39FF14; color: #000; padding: 18px; border-radius: 15px; font-weight: bold; font-size: 18px; cursor: pointer; display: block; }
         input[type="file"] { display: none; }
     </style>
 </head>
 <body>
 
-    <div id="painel-curva">
+    <div id="painel-topo">
+        <div id="linha-status">
+            <div id="stop-badge">STOP --</div>
+        </div>
         <span id="seta-instrucao">---</span>
         <span id="distancia-curva">0 m</span>
     </div>
@@ -36,131 +43,127 @@
     <div id="rua-atual">Aguardando Planilha...</div>
 
     <div id="info-final">
-        <div class="label">Destino Final</div>
+        <span class="label-mini">Distância para o Destino</span>
         <div id="distancia-final">---</div>
-        <div id="endereco-texto">Carregue o arquivo SPX</div>
+        <div id="endereco-texto">Carregue a rota do dia</div>
     </div>
 
     <div id="controles">
-        <label class="btn" id="btnLabel">
-            🚀 INICIAR ROTA
-            <input type="file" id="fileInput" accept=".xlsx, .xls">
-        </label>
+        <label class="btn" id="btnLabel">🚀 INICIAR ROTA SPX<input type="file" id="fileInput" accept=".xlsx, .xls"></label>
     </div>
 
     <script>
-        let destinosExcel = [], passosAtuais = [], idxDestino = 0, idxPasso = 0;
+        let rotaSpx = [], passosNavegacao = [], idxDestino = 0, idxPasso = 0;
         let minhaLat, minhaLon;
 
+        const elTopo = document.getElementById('painel-topo');
         const elSeta = document.getElementById('seta-instrucao');
         const elDistCurva = document.getElementById('distancia-curva');
         const elRua = document.getElementById('rua-atual');
+        const elStopBadge = document.getElementById('stop-badge');
         const elDistFinal = document.getElementById('distancia-final');
         const elEndereco = document.getElementById('endereco-texto');
 
         document.getElementById('fileInput').addEventListener('change', function(e) {
             const reader = new FileReader();
             reader.onload = function(evt) {
-                try {
-                    const wb = XLSX.read(evt.target.result, { type: 'binary' });
-                    const sheet = wb.Sheets[wb.SheetNames[0]];
-                    const json = XLSX.utils.sheet_to_json(sheet);
+                const wb = XLSX.read(evt.target.result, { type: 'binary' });
+                const json = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
 
-                    // Busca colunas independente de maiúsculas/minúsculas
-                    destinosExcel = json.map(item => {
-                        const lat = item.Latitude || item.latitude || item.LATITUDE;
-                        const lon = item.Longitude || item.longitude || item.LONGITUDE;
-                        const addr = item["Destination Address"] || item.Endereco || item.address;
-                        return { lat: parseFloat(lat), lon: parseFloat(lon), addr: addr };
-                    }).filter(p => !isNaN(p.lat));
+                // Ordenação rigorosa pela coluna "Stop"
+                rotaSpx = json.filter(i => i.Stop && !isNaN(i.Stop))
+                    .sort((a, b) => a.Stop - b.Stop)
+                    .map(i => ({
+                        lat: parseFloat(i.Latitude),
+                        lon: parseFloat(i.Longitude),
+                        addr: i["Destination Address"],
+                        stop: i.Stop
+                    }));
 
-                    if (destinosExcel.length > 0) {
-                        document.getElementById('btnLabel').style.display = 'none';
-                        elRua.innerText = "Localizando GPS...";
-                        ativarGPS();
-                    } else {
-                        alert("Não encontrei as coordenadas na planilha!");
-                    }
-                } catch(err) { alert("Erro ao ler o arquivo!"); }
+                if (rotaSpx.length > 0) {
+                    document.getElementById('btnLabel').style.display = 'none';
+                    iniciarGPS();
+                }
             };
             reader.readAsBinaryString(e.target.files[0]);
         });
 
-        function ativarGPS() {
+        function iniciarGPS() {
             navigator.geolocation.watchPosition(async pos => {
                 minhaLat = pos.coords.latitude;
                 minhaLon = pos.coords.longitude;
                 
-                if (idxDestino < destinosExcel.length) {
-                    if (passosAtuais.length === 0) await calcularNovaRota();
-                    atualizarNavegacao();
+                if (idxDestino < rotaSpx.length) {
+                    if (passosNavegacao.length === 0) await calcularRota();
+                    navegar();
                 }
             }, null, { enableHighAccuracy: true });
         }
 
-        async function calcularNovaRota() {
-            const d = destinosExcel[idxDestino];
+        async function calcularRota() {
+            if (idxDestino >= rotaSpx.length) return;
+            const d = rotaSpx[idxDestino];
             elEndereco.innerText = d.addr;
+            elStopBadge.innerText = "STOP " + d.stop;
             
-            const url = `https://router.project-osrm.org/route/v1/driving/${minhaLon},${minhaLat};${d.lon},${d.lat}?steps=true&overview=full&geometries=geojson`;
-            
-            try {
-                const res = await fetch(url);
-                const data = await res.json();
-                if (data.routes && data.routes[0]) {
-                    passosAtuais = data.routes[0].legs[0].steps.map(s => ({
-                        lat: s.maneuver.location[1],
-                        lon: s.maneuver.location[0],
-                        manobra: s.maneuver.modifier,
-                        tipo: s.maneuver.type,
-                        rua: s.name || "Siga em frente"
-                    }));
-                    idxPasso = 0;
-                }
-            } catch(e) { elRua.innerText = "Erro de conexão!"; }
+            const res = await fetch(`https://router.project-osrm.org/route/v1/driving/${minhaLon},${minhaLat};${d.lon},${d.lat}?steps=true&overview=full&geometries=geojson`);
+            const data = await res.json();
+            if (data.routes && data.routes[0]) {
+                passosNavegacao = data.routes[0].legs[0].steps.map(s => ({
+                    lat: s.maneuver.location[1],
+                    lon: s.maneuver.location[0],
+                    manobra: s.maneuver.modifier,
+                    tipo: s.maneuver.type,
+                    rua: s.name || "Siga em frente"
+                }));
+                idxPasso = 0;
+            }
         }
 
-        function atualizarNavegacao() {
-            if (idxDestino >= destinosExcel.length || !passosAtuais[idxPasso]) return;
+        function navegar() {
+            if (!rotaSpx[idxDestino] || !passosNavegacao[idxPasso]) return;
 
-            const passo = passosAtuais[idxPasso];
-            const dCurva = calcDist(minhaLat, minhaLon, passo.lat, passo.lon);
-            const dFinal = calcDist(minhaLat, minhaLon, destinosExcel[idxDestino].lat, destinosExcel[idxDestino].lon);
+            const passo = passosNavegacao[idxPasso];
+            const dCurva = dist(minhaLat, minhaLon, passo.lat, passo.lon);
+            const dFinal = dist(minhaLat, minhaLon, rotaSpx[idxDestino].lat, rotaSpx[idxDestino].lon);
 
             elDistCurva.innerText = Math.round(dCurva) + " m";
             elDistFinal.innerText = dFinal > 1000 ? (dFinal/1000).toFixed(1) + " km" : Math.round(dFinal) + " m";
             elRua.innerText = passo.rua;
 
-            // Define ícone Waze (não bússola)
+            // Feedback Visual de proximidade (70m para troca, 100m para alerta)
+            if (dFinal <= 100) {
+                elTopo.classList.add('chegando');
+            } else {
+                elTopo.classList.remove('chegando');
+            }
+
             const m = passo.manobra;
             if (m && m.includes("left")) elSeta.innerText = "⬅️";
             else if (m && m.includes("right")) elSeta.innerText = "➡️";
             else if (passo.tipo === "arrive") elSeta.innerText = "📍";
             else elSeta.innerText = "⬆️";
 
-            // Se chegar na esquina, pula pro próximo passo
-            if (dCurva < 20 && idxPasso < passosAtuais.length - 1) {
-                idxPasso++;
-            }
+            if (dCurva < 15 && idxPasso < passosNavegacao.length - 1) idxPasso++;
 
-            // Se chegar no cliente, pula pro próximo cliente
-            if (dFinal < 25) {
-                if (navigator.vibrate) navigator.vibrate(500);
+            // Troca automática em 70 metros conforme solicitado
+            if (dFinal < 70) {
+                if (navigator.vibrate) navigator.vibrate([300, 100, 300]);
                 idxDestino++;
-                passosAtuais = [];
-                calcularNovaRota();
+                passosNavegacao = [];
+                calcularRota();
             }
         }
 
-        function calcDist(la1, lo1, la2, lo2) {
+        function dist(la1, lo1, la2, lo2) {
             const R = 6371000;
             const dLat = (la2-la1) * Math.PI/180;
             const dLon = (lo2-lo1) * Math.PI/180;
             const a = Math.sin(dLat/2)**2 + Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)*Math.sin(dLon/2)**2;
             return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
         }
-
-        if ('wakeLock' in navigator) navigator.wakeLock.request('screen');
+        
+        if ('wakeLock' in navigator) navigator.wakeLock.request('screen').catch(()=>{});
     </script>
 </body>
 </html>
