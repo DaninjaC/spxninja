@@ -3,43 +3,65 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SPX Ninja - Controle de Tela</title>
+    <title>SPX Ninja - Pro v3</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <style>
-        body { background-color: #000; color: #fff; font-family: sans-serif; margin: 0; text-align: center; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+        :root { --neon-green: #39FF14; --shopee-blue: #007AFF; }
+        body { background-color: #000; color: #fff; font-family: sans-serif; margin: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
         
-        #painel-topo { background: #007AFF; padding: 10px; min-height: 140px; display: flex; flex-direction: column; justify-content: center; z-index: 1001; transition: background 0.3s; }
+        /* Painel Superior */
+        #painel-topo { background: var(--shopee-blue); padding: 10px; min-height: 120px; display: flex; flex-direction: column; justify-content: center; z-index: 1001; }
         .modo-confirmacao { background: #FFCC00 !important; color: #000 !important; }
         
-        #stop-badge { background: #000; color: #39FF14; padding: 3px 10px; border-radius: 8px; font-weight: bold; font-size: 18px; margin-bottom: 5px; display: inline-block; border: 1px solid #39FF14; }
-        #seta-instrucao { font-size: 60px; line-height: 1; display: block; }
-        #distancia-curva { font-size: 40px; font-weight: bold; display: block; }
+        #stop-badge { background: #000; color: var(--neon-green); padding: 2px 10px; border-radius: 5px; font-weight: bold; font-size: 16px; border: 1px solid var(--neon-green); margin-bottom: 5px; display: inline-block; }
+        #seta-instrucao { font-size: 50px; line-height: 1; display: block; }
+        #distancia-curva { font-size: 35px; font-weight: bold; display: block; }
 
-        #nav-ui { display: block; }
-        #painel-acoes { display: none; gap: 10px; padding: 10px; justify-content: center; }
-        .btn-status { flex: 1; padding: 20px; border: none; border-radius: 10px; font-weight: bold; font-size: 16px; cursor: pointer; color: #fff; }
+        #painel-acoes { display: none; gap: 10px; padding: 10px; }
+        .btn-status { flex: 1; padding: 15px; border-radius: 10px; font-weight: bold; border: none; color: #fff; font-size: 16px; }
         .btn-check { background: #28a745; }
         .btn-fail { background: #dc3545; }
 
+        /* Mapa */
         #map { flex: 1; width: 100%; background: #111; z-index: 1; }
 
-        #info-final { background: #111; padding: 10px; min-height: 100px; display: flex; flex-direction: column; justify-content: center; z-index: 1001; }
-        #rua-atual { color: #39FF14; font-weight: bold; font-size: 16px; text-transform: uppercase; }
-        #distancia-final { font-size: 30px; font-weight: bold; }
+        /* Rodapé com Endereço em Destaque */
+        #info-final { background: #111; padding: 15px; border-top: 2px solid #444; z-index: 1001; }
+        #rua-texto { color: var(--neon-green); font-weight: bold; font-size: 22px; text-transform: uppercase; display: block; margin-bottom: 5px; }
+        #distancia-final { font-size: 28px; font-weight: bold; }
 
-        #controles { padding: 15px; background: #000; z-index: 1001; }
-        .btn-ini { background: #39FF14; color: #000; padding: 15px; border-radius: 12px; font-weight: bold; font-size: 18px; cursor: pointer; display: block; text-align: center; }
-        input[type="file"] { display: none; }
+        /* Sidebar / Guia Lateral */
+        #sidebar { position: fixed; right: -280px; top: 0; width: 260px; height: 100%; background: rgba(0,0,0,0.95); z-index: 2000; transition: 0.3s; padding: 20px; border-left: 2px solid var(--neon-green); overflow-y: auto; }
+        #sidebar.open { right: 0; }
+        .prox-item { background: #222; padding: 10px; margin-bottom: 10px; border-radius: 5px; border-left: 4px solid var(--shopee-blue); font-size: 13px; cursor: pointer; }
+        
+        #btn-sidebar { position: fixed; right: 10px; top: 150px; z-index: 1002; background: var(--neon-green); color: #000; width: 50px; height: 50px; border-radius: 25px; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: bold; box-shadow: 0 0 15px var(--neon-green); }
 
-        .stop-label { background: rgba(0,0,0,0.8); color: #fff; border: 1px solid #39FF14; font-weight: bold; padding: 2px 4px; border-radius: 3px; font-size: 10px; }
+        /* Modal de Início */
+        #modal-inicio { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 3000; display: none; flex-direction: column; padding: 20px; box-sizing: border-box; }
+        #lista-stops-inicio { flex: 1; overflow-y: auto; margin: 20px 0; }
+        .item-selecao { padding: 15px; border-bottom: 1px solid #333; font-size: 18px; }
+
         .leaflet-tile-container { filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%); }
     </style>
 </head>
 <body>
+
+    <div id="modal-inicio">
+        <h2>Selecione o Stop de Início</h2>
+        <div id="lista-stops-inicio"></div>
+    </div>
+
+    <div id="btn-sidebar" onclick="toggleSidebar()">📍</div>
+    <div id="sidebar">
+        <h3 style="color: var(--neon-green)">Sugestões Próximas</h3>
+        <div id="lista-proximos"></div>
+        <button onclick="toggleSidebar()" style="width:100%; padding:10px; background:#444; color:#fff; border:none; margin-top:10px;">FECHAR</button>
+    </div>
 
     <div id="painel-topo">
         <div><div id="stop-badge">STOP --</div></div>
@@ -56,54 +78,31 @@
     <div id="map"></div>
 
     <div id="info-final">
-        <div id="rua-atual">AGUARDANDO PLANILHA</div>
+        <span id="rua-texto">CARREGUE A PLANILHA</span>
         <div id="distancia-final">---</div>
     </div>
 
-    <div id="controles">
-        <label class="btn-ini" id="btnLabel" onclick="ativarEIniciar()">🚀 INICIAR EXPEDIENTE SPX<input type="file" id="fileInput" accept=".xlsx, .xls"></label>
+    <div id="controles" style="padding:15px; background:#000;">
+        <label style="background:var(--neon-green); color:#000; padding:18px; border-radius:15px; font-weight:bold; display:block; text-align:center;" id="btnLabel">
+            🚀 CARREGAR ROTA
+            <input type="file" id="fileInput" accept=".xlsx, .xls" style="display:none">
+        </label>
     </div>
 
     <script>
         let rotaSpx = [], passosNavegacao = [], idxDestino = 0, idxPasso = 0;
         let minhaLat, minhaLon, mapa, markerUser, markerDest, polylineRota;
-        let camadaFundo = L.layerGroup(), aguardandoConfirmacao = false, ultimaLatReq, ultimaLonReq;
-        let wakeLock = null;
-
-        // --- GESTÃO DE TELA (WAKE LOCK) ---
-        async function requestWakeLock() {
-            try {
-                if ('wakeLock' in navigator) {
-                    wakeLock = await navigator.wakeLock.request('screen');
-                    console.log("Tela Travada: Ativa");
-                }
-            } catch (err) { console.error(`${err.name}, ${err.message}`); }
-        }
-
-        function releaseWakeLock() {
-            if (wakeLock !== null) {
-                wakeLock.release();
-                wakeLock = null;
-                console.log("Tela Solta: Pode apagar");
-            }
-        }
-
-        // Reativar se voltar para a aba
-        document.addEventListener('visibilitychange', async () => {
-            if (wakeLock !== null && document.visibilityState === 'visible') {
-                await requestWakeLock();
-            }
-        });
+        let camadaFundo = L.layerGroup(), aguardandoConfirmacao = false, wakeLock = null;
 
         window.onload = function() {
-            mapa = L.map('map', { zoomControl: false, attributionControl: false }).setView([-23.61, -46.57], 16);
+            mapa = L.map('map', { zoomControl: false, attributionControl: false }).setView([-23.61, -46.57], 18); // Zoom inicial maior
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(mapa);
             camadaFundo.addTo(mapa);
             setTimeout(() => { mapa.invalidateSize(); }, 500);
         };
 
-        function ativarEIniciar() {
-            requestWakeLock(); // Ativa a tela no primeiro clique
+        async function requestWakeLock() {
+            try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch (err) {}
         }
 
         document.getElementById('fileInput').addEventListener('change', function(e) {
@@ -119,29 +118,71 @@
                     .sort((a, b) => a.Stop - b.Stop)
                     .filter(i => {
                         if (paradasVistas.has(i.Stop)) return false;
-                        paradasVistas.add(i.Stop);
-                        return true;
+                        paradasVistas.add(i.Stop); return true;
                     })
                     .map(i => ({
                         lat: parseFloat(i.Latitude), lon: parseFloat(i.Longitude),
                         addr: i["Destination Address"], stop: i.Stop,
-                        pacotes: contagem[i.Stop], status: 'neutro', marker: null
+                        pacotes: contagem[i.Stop], status: 'neutro'
                     }));
 
-                if (rotaSpx.length > 0) {
-                    desenharStopsFundo();
-                    document.getElementById('btnLabel').style.display = 'none';
-                    iniciarGPS();
-                }
+                // Abre modal de seleção de início
+                abrirSelecaoInicio();
             };
             reader.readAsBinaryString(e.target.files[0]);
         });
 
+        function abrirSelecaoInicio() {
+            const modal = document.getElementById('modal-inicio');
+            const lista = document.getElementById('modal-inicio');
+            const container = document.getElementById('lista-stops-inicio');
+            container.innerHTML = "";
+            modal.style.display = "flex";
+
+            rotaSpx.forEach((p, index) => {
+                const div = document.createElement('div');
+                div.className = "item-selecao";
+                div.innerText = `STOP ${p.stop} - ${p.addr}`;
+                div.onclick = () => {
+                    idxDestino = index;
+                    modal.style.display = "none";
+                    document.getElementById('btnLabel').style.display = 'none';
+                    desenharStopsFundo();
+                    iniciarGPS();
+                    requestWakeLock();
+                };
+                container.appendChild(div);
+            });
+        }
+
+        function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); atualizarSugestoes(); }
+
+        function atualizarSugestoes() {
+            const container = document.getElementById('lista-proximos');
+            container.innerHTML = "";
+            const proximos = rotaSpx.map((p, i) => ({ ...p, index: i, d: dist(minhaLat, minhaLon, p.lat, p.lon) }))
+                .filter(p => p.d < 1000 && p.status === 'neutro' && p.index !== idxDestino)
+                .sort((a, b) => a.d - b.d);
+
+            proximos.forEach(p => {
+                const div = document.createElement('div');
+                div.className = "prox-item";
+                div.innerHTML = `<b>STOP ${p.stop}</b> (${Math.round(p.d)}m)<br>${p.addr}`;
+                div.onclick = () => { 
+                    idxDestino = p.index; 
+                    passosNavegacao = []; 
+                    toggleSidebar(); 
+                    calcularRota(); 
+                };
+                container.appendChild(div);
+            });
+        }
+
         function desenharStopsFundo() {
             camadaFundo.clearLayers();
             rotaSpx.forEach((p) => {
-                p.marker = L.circleMarker([p.lat, p.lon], { radius: 6, color: '#666', fillColor: '#333', fillOpacity: 1, weight: 1 })
-                .bindTooltip("Stop " + p.stop, { permanent: true, direction: 'top', className: 'stop-label', offset: [0, -5] })
+                L.circleMarker([p.lat, p.lon], { radius: 8, color: '#666', fillColor: '#333', fillOpacity: 1, weight: 2 })
+                .bindTooltip(p.stop.toString(), { permanent: true, direction: 'center', className: 'stop-label' })
                 .addTo(camadaFundo);
             });
         }
@@ -149,37 +190,31 @@
         function iniciarGPS() {
             navigator.geolocation.watchPosition(async pos => {
                 minhaLat = pos.coords.latitude; minhaLon = pos.coords.longitude;
-                
-                if (!markerUser) {
-                    markerUser = L.circleMarker([minhaLat, minhaLon], { color: '#007AFF', fillOpacity: 1, radius: 8, zIndexOffset: 1000 }).addTo(mapa);
-                } else {
-                    markerUser.setLatLng([minhaLat, minhaLon]);
-                }
-
-                // RECÁLCULO SE DESVIAR 25m
-                const desviou = ultimaLatReq && dist(minhaLat, minhaLon, ultimaLatReq, ultimaLonReq) > 25;
+                if (!markerUser) markerUser = L.circleMarker([minhaLat, minhaLon], { color: '#007AFF', fillOpacity: 1, radius: 10 }).addTo(mapa);
+                else markerUser.setLatLng([minhaLat, minhaLon]);
 
                 if (idxDestino < rotaSpx.length && !aguardandoConfirmacao) {
-                    if (passosNavegacao.length === 0 || desviou) {
+                    if (passosNavegacao.length === 0 || dist(minhaLat, minhaLon, ultimaLatReq, ultimaLonReq) > 20) {
                         await calcularRota();
                         ultimaLatReq = minhaLat; ultimaLonReq = minhaLon;
                     }
                     navegar();
                 }
-                mapa.panTo([minhaLat, minhaLon]);
+                mapa.setView([minhaLat, minhaLon], 19); // Zoom máximo na navegação
             }, null, { enableHighAccuracy: true });
         }
 
         async function calcularRota() {
             const d = rotaSpx[idxDestino];
-            document.getElementById('stop-badge').innerText = "STOP " + d.stop + " (" + d.pacotes + " vol)";
+            document.getElementById('stop-badge').innerText = `STOP ${d.stop} (${d.pacotes} VOL)`;
+            document.getElementById('rua-texto').innerText = d.addr;
+            
             if (markerDest) mapa.removeLayer(markerDest);
-            markerDest = L.circleMarker([d.lat, d.lon], { radius: 11, color: '#fff', fillColor: '#007AFF', fillOpacity: 1, weight: 3 }).addTo(mapa);
+            markerDest = L.marker([d.lat, d.lon]).addTo(mapa);
 
             const url = `https://router.project-osrm.org/route/v1/driving/${minhaLon},${minhaLat};${d.lon},${d.lat}?steps=true&overview=full&geometries=geojson`;
             const res = await fetch(url);
             const data = await res.json();
-            
             if (data.routes && data.routes[0]) {
                 const route = data.routes[0];
                 passosNavegacao = route.legs[0].steps.map(s => ({
@@ -188,56 +223,43 @@
                 }));
                 idxPasso = 0;
                 if (polylineRota) mapa.removeLayer(polylineRota);
-                polylineRota = L.polyline(route.geometry.coordinates.map(c => [c[1], c[0]]), { color: '#007AFF', weight: 6, opacity: 0.8 }).addTo(mapa);
+                polylineRota = L.polyline(route.geometry.coordinates.map(c => [c[1], c[0]]), { color: '#007AFF', weight: 8, opacity: 0.8 }).addTo(mapa);
             }
         }
 
         function navegar() {
             const dFinal = dist(minhaLat, minhaLon, rotaSpx[idxDestino].lat, rotaSpx[idxDestino].lon);
-            
             if (dFinal < 70) {
                 aguardandoConfirmacao = true;
-                releaseWakeLock(); // LIBERA A TELA PARA APAGAR NA CHEGADA
+                if (wakeLock) wakeLock.release();
                 document.getElementById('nav-ui').style.display = 'none';
                 document.getElementById('painel-acoes').style.display = 'flex';
                 document.getElementById('painel-topo').classList.add('modo-confirmacao');
-                document.getElementById('rua-atual').innerText = "VOCÊ CHEGOU!";
-                if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+                document.getElementById('rua-texto').innerText = "CHEGOU: " + rotaSpx[idxDestino].addr;
                 return;
             }
-
             const passo = passosNavegacao[idxPasso];
             if (!passo) return;
             const dCurva = dist(minhaLat, minhaLon, passo.lat, passo.lon);
-
             document.getElementById('distancia-curva').innerText = Math.round(dCurva) + " m";
             document.getElementById('distancia-final').innerText = dFinal > 1000 ? (dFinal/1000).toFixed(1) + " km" : Math.round(dFinal) + " m";
-            document.getElementById('rua-atual').innerText = passo.rua;
-
             const m = passo.manobra;
             if (m && m.includes("left")) document.getElementById('seta-instrucao').innerText = "⬅️";
             else if (m && m.includes("right")) document.getElementById('seta-instrucao').innerText = "➡️";
             else document.getElementById('seta-instrucao').innerText = "⬆️";
-
-            if (dCurva < 20 && idxPasso < passosNavegacao.length - 1) idxPasso++;
+            if (dCurva < 15 && idxPasso < passosNavegacao.length - 1) idxPasso++;
         }
 
         function finalizarParada(status) {
-            const p = rotaSpx[idxDestino];
-            p.status = status;
-            p.marker.setStyle({ fillColor: status === 'concluido' ? '#888' : '#ff0000', color: '#fff', weight: 2 });
-
+            rotaSpx[idxDestino].status = status;
             aguardandoConfirmacao = false;
-            requestWakeLock(); // REATIVA A TELA ACESA PARA O PRÓXIMO TRAJETO
-            
+            requestWakeLock();
             idxDestino++;
             passosNavegacao = [];
             document.getElementById('nav-ui').style.display = 'block';
             document.getElementById('painel-acoes').style.display = 'none';
             document.getElementById('painel-topo').classList.remove('modo-confirmacao');
-            
             if (idxDestino < rotaSpx.length) calcularRota();
-            else { releaseWakeLock(); document.getElementById('rua-atual').innerText = "FIM DA ROTA"; }
         }
 
         function dist(la1, lo1, la2, lo2) {
