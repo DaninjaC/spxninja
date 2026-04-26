@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SPX Ninja - v13 Navegação Estável</title>
+    <title>SPX Ninja - v15 Navegação Final</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -27,25 +27,24 @@
         #col-km { text-align: center; font-size: 11px; }
         #km-restante { font-size: 18px; font-weight: bold; color: var(--neon); display: block; }
 
-        /* BOX DO MAPA COM OFFSET PARA VOCÊ FICAR EMBAIXO */
+        /* MAPA COM PERSPECTIVA - VOCÊ NA BASE */
         #map-box { flex: 1; position: relative; background: #111; overflow: hidden; }
         #map { 
-            width: 100%; height: 100%; 
-            transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-            transform-origin: center 75%; /* Gira em torno de onde você está (embaixo) */
+            width: 100%; height: 150%; 
+            position: absolute; top: -25%; 
+            transition: transform 0.4s ease-out;
+            transform-origin: center center;
         }
 
         #painel-rodape { background: #111; display: grid; grid-template-columns: 1fr 1fr; height: 170px; border-top: 2px solid #333; z-index: 1001; }
         .col-log { padding: 10px; overflow-y: auto; font-size: 13px; text-align: left; }
         .col-log:first-child { border-right: 1px solid #222; }
-        
-        .label-rodape { font-size: 10px; color: #777; text-transform: uppercase; margin-bottom: 5px; font-weight: bold; }
         .linha-pacote { margin-bottom: 6px; border-bottom: 1px solid #222; padding-bottom: 2px; }
         b { color: var(--neon); }
 
         #safe-area { height: 40px; background: #000; }
 
-        #init-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 4000; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; }
+        #init-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 4000; display: flex; flex-direction: column; justify-content: center; align-items: center; }
         .btn-load { background: var(--neon); color: #000; padding: 20px 40px; border-radius: 15px; font-weight: bold; font-size: 22px; cursor: pointer; }
 
         #modal-stops { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 5000; display: none; flex-direction: column; padding: 20px; }
@@ -55,31 +54,27 @@
         #painel-acoes { display: none; grid-template-columns: 1fr 1fr; gap: 10px; padding: 15px; background: var(--yellow); position: absolute; bottom: 170px; width: 100%; box-sizing: border-box; z-index: 2000; }
         .btn-status { padding: 20px; border: none; border-radius: 10px; font-weight: bold; font-size: 16px; color: #fff; text-transform: uppercase; }
 
-        .leaflet-tile-container { filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%); }
-        
-        /* QUADRADO DO STOP - COM CONTRA-ROTAÇÃO */
         .stop-marker-ui {
             background: #000; color: #fff; border: 2px solid var(--neon); border-radius: 8px;
             font-weight: bold; font-size: 18px; display: flex; align-items: center; justify-content: center;
-            width: 45px !important; height: 45px !important; box-shadow: 0 0 10px rgba(0,0,0,0.5);
-            transition: transform 0.5s linear; /* Para o número girar junto e ficar reto */
+            width: 45px !important; height: 45px !important;
         }
         .stop-marker-ui.concluido { background: var(--red) !important; border-color: #fff !important; }
-        .stop-marker-ui.atual { background: var(--blue) !important; border-color: #fff !important; transform: scale(1.15); z-index: 9999 !important; }
+        .stop-marker-ui.atual { background: var(--blue) !important; border-color: #fff !important; transform: scale(1.1); z-index: 9999 !important; }
     </style>
 </head>
 <body>
 
     <div id="init-layer">
-        <h1 style="color:var(--neon); margin-bottom: 30px;">SPX NINJA v13</h1>
+        <h1 style="color:var(--neon); margin-bottom: 30px;">SPX NINJA v15</h1>
         <label class="btn-load" onclick="ativarSom()">
-            📂 INICIAR EXPEDIENTE
+            📂 CARREGAR ROTA
             <input type="file" id="fileInput" accept=".xlsx, .xls, .csv" style="display:none">
         </label>
     </div>
 
     <div id="modal-stops">
-        <h3 style="color:var(--neon)">Em qual parada você está?</h3>
+        <h3 style="color:var(--neon)">Ponto de partida:</h3>
         <div id="lista-selecao"></div>
     </div>
 
@@ -90,7 +85,7 @@
         </div>
         <div id="col-info">
             <div id="stop-badge">STOP --</div>
-            <span id="rua-topo">Aguardando GPS...</span>
+            <span id="rua-topo">Aguardando...</span>
         </div>
         <div id="col-km">
             KM TOTAL
@@ -107,11 +102,9 @@
 
     <div id="painel-rodape">
         <div class="col-log">
-            <div class="label-rodape">📦 Conferência</div>
             <div id="log-pacotes">---</div>
         </div>
         <div class="col-log">
-            <div class="label-rodape">📍 Radar (120m)</div>
             <div id="log-radar">---</div>
         </div>
     </div>
@@ -122,7 +115,7 @@
         let rotaSpx = [], passosNav = [], idxDestino = 0, idxPasso = 0;
         let minhaLat, minhaLon, mapa, markerUser, polylineRota;
         let camadaFundo = L.layerGroup(), aguardandoConf = false, jaFalouVoz = false;
-        let ultimaLat, ultimaLon, currentHeading = 0;
+        let lastLat, lastLon, currentHeading = 0;
 
         function falar(texto) {
             if ('speechSynthesis' in window) {
@@ -130,7 +123,7 @@
                 msg.lang = 'pt-BR'; msg.rate = 1.1; window.speechSynthesis.speak(msg);
             }
         }
-        function ativarSom() { falar("Modo navegação ativa."); }
+        function ativarSom() { falar("Navegação v15 pronta."); }
 
         window.onload = function() {
             mapa = L.map('map', { zoomControl: false, attributionControl: false }).setView([-23.61, -46.57], 19);
@@ -212,22 +205,27 @@
             navigator.geolocation.watchPosition(async pos => {
                 let nLat = pos.coords.latitude, nLon = pos.coords.longitude;
                 
-                // SÓ ATUALIZA ROTAÇÃO SE ANDAR MAIS DE 7 METROS (ESTABILIDADE)
-                if (ultimaLat && dist(ultimaLat, ultimaLon, nLat, nLon) > 7) {
-                    let targetHeading = calcularHeading(ultimaLat, ultimaLon, nLat, nLon);
-                    // Suavização simples de ângulo
-                    currentHeading = targetHeading;
-                    document.getElementById('map').style.transform = `translateY(25%) rotate(${-currentHeading}deg)`;
-                    desenharMarcadores(); // Repinta para desentortar os números
+                // ROTAÇÃO POR MOVIMENTO REAL (MÍNIMO 5 METROS)
+                if (lastLat && dist(lastLat, lastLon, nLat, nLon) > 5) {
+                    currentHeading = calcularHeading(lastLat, lastLon, nLat, nLon);
+                    lastLat = nLat; lastLon = nLon;
+                } else if (!lastLat) {
+                    lastLat = nLat; lastLon = nLon;
                 }
 
-                ultimaLat = minhaLat = nLat; ultimaLon = minhaLon = nLon;
+                minhaLat = nLat; minhaLon = nLon;
 
                 if (!markerUser) markerUser = L.circleMarker([minhaLat, minhaLon], { color: '#fff', fillColor: '#007AFF', fillOpacity: 1, radius: 10, weight: 3, zIndexOffset: 1000 }).addTo(mapa);
                 else markerUser.setLatLng([minhaLat, minhaLon]);
 
-                // CENTRO DESLOCADO: Coloca você no 75% da altura da tela (parte de baixo)
-                mapa.setView([minhaLat, minhaLon], 19, { animate: true });
+                // LÓGICA DE OFFSET: Centraliza o mapa em um ponto 60 metros À FRENTE de onde você está
+                // Isso força o seu ícone para a base do celular.
+                let latOffset = minhaLat + (Math.cos(currentHeading * Math.PI/180) * 0.0006);
+                let lonOffset = minhaLon + (Math.sin(currentHeading * Math.PI/180) * 0.0006);
+                
+                mapa.setView([latOffset, lonOffset], 19, { animate: true });
+                document.getElementById('map').style.transform = `rotate(${-currentHeading}deg)`;
+                desenharMarcadores();
                 atualizarRadar();
 
                 if (idxDestino < rotaSpx.length && !aguardandoConf) {
@@ -242,7 +240,6 @@
             document.getElementById('stop-badge').innerText = "STOP " + d.stop;
             document.getElementById('rua-topo').innerText = d.rua;
             document.getElementById('log-pacotes').innerHTML = d.htmlLista;
-            desenharMarcadores();
 
             const res = await fetch(`https://router.project-osrm.org/route/v1/driving/${minhaLon},${minhaLat};${d.lon},${d.lat}?steps=true&overview=full&geometries=geojson`);
             const data = await res.json();
@@ -253,6 +250,11 @@
                 document.getElementById('km-restante').innerText = (r.distance / 1000).toFixed(1) + " km";
                 if (polylineRota) mapa.removeLayer(polylineRota);
                 polylineRota = L.polyline(r.geometry.coordinates.map(c => [c[1], c[0]]), { color: '#007AFF', weight: 8, opacity: 0.8 }).addTo(mapa);
+
+                // GIRO IMEDIATO: Aponta para a direção da primeira manobra da nova rota
+                if (passosNav.length > 0) {
+                    currentHeading = calcularHeading(minhaLat, minhaLon, passosNav[0].lat, passosNav[0].lon);
+                }
             }
         }
 
@@ -284,15 +286,12 @@
             aguardandoConf = false; idxDestino++; passosNav = [];
             document.getElementById('painel-acoes').style.display = 'none';
             document.getElementById('painel-topo').classList.remove('modo-confirmacao');
-            desenharMarcadores(); if (idxDestino < rotaSpx.length) calcularRota();
+            if (idxDestino < rotaSpx.length) calcularRota();
         }
 
         function atualizarRadar() {
             const proximos = rotaSpx.filter((p, i) => i !== idxDestino && p.status === 'neutro' && dist(minhaLat, minhaLon, p.lat, p.lon) < 120);
-            const container = document.getElementById('log-radar');
-            if (proximos.length > 0) {
-                container.innerHTML = proximos.map(p => `<div><b>STOP ${p.stop}</b> (${Math.round(dist(minhaLat, minhaLon, p.lat, p.lon))}m)</div>`).join('');
-            } else { container.innerText = "Nenhum"; }
+            document.getElementById('log-radar').innerHTML = proximos.length > 0 ? proximos.map(p => `<div><b>STOP ${p.stop}</b> (${Math.round(dist(minhaLat, minhaLon, p.lat, p.lon))}m)</div>`).join('') : "Nenhum";
         }
 
         function dist(la1, lo1, la2, lo2) {
