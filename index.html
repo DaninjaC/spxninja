@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SPX Ninja - v9 Marcadores Grandes</title>
+    <title>SPX Ninja - v10 Final Design</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -44,38 +44,54 @@
         #safe-area { height: 40px; background: #000; }
 
         /* INTERFACE INICIAL */
-        #init-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 4000; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; }
+        #init-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 4000; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; }
         .btn-load { background: var(--neon); color: #000; padding: 20px 40px; border-radius: 15px; font-weight: bold; font-size: 22px; cursor: pointer; }
 
         #modal-stops { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 5000; display: none; flex-direction: column; padding: 20px; }
         #lista-selecao { flex: 1; overflow-y: auto; margin-top: 20px; }
-        .item-stop { padding: 15px; border-bottom: 1px solid #333; color: #fff; font-size: 18px; }
+        .item-stop { padding: 18px; border-bottom: 1px solid #333; color: #fff; font-size: 18px; }
 
         #painel-acoes { display: none; grid-template-columns: 1fr 1fr; gap: 10px; padding: 15px; background: var(--yellow); position: absolute; bottom: 170px; width: 100%; box-sizing: border-box; z-index: 2000; }
         .btn-status { padding: 20px; border: none; border-radius: 10px; font-weight: bold; font-size: 18px; color: #fff; text-transform: uppercase; }
 
         .leaflet-tile-container { filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%); }
         
-        /* ESTILO DOS NÚMEROS NO MAPA (MAIORES) */
-        .stop-label { 
-            background: rgba(0,0,0,0.9); 
-            color: #fff; 
-            border: 2px solid var(--neon); 
-            font-weight: bold; 
-            padding: 4px 8px; 
-            border-radius: 6px; 
-            font-size: 16px; /* Números maiores */
-            pointer-events: none; 
+        /* NOVO DESIGN DO MARCADOR (QUADRADO) */
+        .stop-marker-ui {
+            background: #000;
+            color: #fff;
+            border: 2px solid var(--neon);
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 45px !important;
+            height: 45px !important;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+        }
+
+        .stop-marker-ui.concluido {
+            background: var(--red) !important;
+            border-color: #fff !important;
+        }
+
+        .stop-marker-ui.atual {
+            background: var(--blue) !important;
+            border-color: #fff !important;
+            transform: scale(1.2);
+            z-index: 9999 !important;
         }
         
-        .leaflet-popup-content-wrapper { background: #111; color: #fff; border: 2px solid var(--neon); border-radius: 12px; }
+        .leaflet-popup-content-wrapper { background: #111; color: #fff; border: 2px solid var(--neon); }
         .popup-btn { display: block; width: 100%; margin: 8px 0; padding: 15px; border: none; border-radius: 8px; color: #fff; font-weight: bold; font-size: 16px; cursor: pointer; }
     </style>
 </head>
 <body>
 
     <div id="init-layer">
-        <h1 style="color:var(--neon); margin-bottom: 30px;">SPX NINJA v9</h1>
+        <h1 style="color:var(--neon); margin-bottom: 30px;">SPX NINJA v10</h1>
         <label class="btn-load" onclick="ativarSom()">
             📂 CARREGAR ROTA
             <input type="file" id="fileInput" accept=".xlsx, .xls, .csv" style="display:none">
@@ -104,7 +120,7 @@
 
     <div id="painel-acoes">
         <button class="btn-status" style="background:#28a745" onclick="finalizarParada('concluido')">CONCLUÍDO</button>
-        <button class="btn-status" style="background:#444" onclick="finalizarParada('pendente')">PULAR</button>
+        <button class="btn-status" style="background:#555" onclick="finalizarParada('pendente')">PENDENTE</button>
     </div>
 
     <div id="map-box"><div id="map"></div></div>
@@ -124,7 +140,7 @@
 
     <script>
         let rotaSpx = [], passosNav = [], idxDestino = 0, idxPasso = 0;
-        let minhaLat, minhaLon, mapa, markerUser, markerDest, polylineRota;
+        let minhaLat, minhaLon, mapa, markerUser, polylineRota;
         let camadaFundo = L.layerGroup(), aguardandoConf = false, wakeLock = null;
         let heading = 0, jaFalouVoz = false;
 
@@ -137,7 +153,7 @@
             }
         }
 
-        function ativarSom() { falar("Áudio ativo"); }
+        function ativarSom() { falar("Áudio pronto"); }
 
         window.onload = function() {
             mapa = L.map('map', { zoomControl: false, attributionControl: false }).setView([-23.61, -46.57], 18);
@@ -196,13 +212,20 @@
         function desenharMarcadores() {
             camadaFundo.clearLayers();
             rotaSpx.forEach((p, index) => {
-                // Marcador maior (Radius 15) para facilitar o clique
-                p.marker = L.circleMarker([p.lat, p.lon], getEstilo(p.status))
-                .bindTooltip(p.stop.toString(), { permanent: true, direction: 'center', className: 'stop-label' })
-                .addTo(camadaFundo);
+                let cssClass = "stop-marker-ui";
+                if (p.status === 'concluido') cssClass += " concluido";
+                if (index === idxDestino) cssClass += " atual";
+
+                const icon = L.divIcon({
+                    className: cssClass,
+                    html: p.stop.toString(),
+                    iconSize: [45, 45],
+                    iconAnchor: [22, 22]
+                });
+
+                p.marker = L.marker([p.lat, p.lon], { icon: icon }).addTo(camadaFundo);
 
                 p.marker.on('click', (e) => {
-                    L.DomEvent.stopPropagation(e);
                     const pop = `
                         <div style="text-align:center; min-width:150px;">
                             <b style="font-size:18px">STOP ${p.stop}</b><br>${p.rua}<hr>
@@ -215,15 +238,9 @@
             });
         }
 
-        function getEstilo(status) {
-            // Se concluído, fica VERMELHO. Se neutro, fica PRETO/CINZA.
-            if (status === 'concluido') return { radius: 14, color: '#fff', fillColor: '#FF0000', fillOpacity: 1, weight: 3 };
-            return { radius: 12, color: '#666', fillColor: '#222', fillOpacity: 1, weight: 2 };
-        }
-
         function setStatusManual(idx, status) {
             rotaSpx[idx].status = status;
-            rotaSpx[idx].marker.setStyle(getEstilo(status));
+            desenharMarcadores(); // Recarrega visual para aplicar cores
             mapa.closePopup();
             if (idx === idxDestino) finalizarParada(status);
         }
@@ -255,6 +272,7 @@
             document.getElementById('stop-badge').innerText = "STOP " + d.stop;
             document.getElementById('rua-topo').innerText = d.rua;
             document.getElementById('log-pacotes').innerHTML = d.htmlLista;
+            desenharMarcadores(); // Atualiza destaque azul
 
             const res = await fetch(`https://router.project-osrm.org/route/v1/driving/${minhaLon},${minhaLat};${d.lon},${d.lat}?steps=true&overview=full&geometries=geojson`);
             const data = await res.json();
@@ -296,10 +314,10 @@
 
         function finalizarParada(st) {
             rotaSpx[idxDestino].status = st;
-            rotaSpx[idxDestino].marker.setStyle(getEstilo(st));
             aguardandoConf = false; idxDestino++; passosNav = [];
             document.getElementById('painel-acoes').style.display = 'none';
             document.getElementById('painel-topo').classList.remove('modo-confirmacao');
+            desenharMarcadores();
             if (idxDestino < rotaSpx.length) calcularRota();
         }
 
