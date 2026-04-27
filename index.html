@@ -6,9 +6,8 @@
     
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#007AFF">
-    <title>SPX Ninja - v20 Fullscreen</title>
+    <title>SPX Ninja - v21 Fixed Flow</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -18,19 +17,22 @@
         :root { --neon: #39FF14; --blue: #007AFF; --yellow: #FFCC00; --red: #FF0000; --bg: #000; }
         body { background-color: var(--bg); color: #fff; font-family: sans-serif; margin: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
         
+        /* CABEÇALHO */
         #painel-topo { background: var(--blue); display: grid; grid-template-columns: 110px 1fr 90px; align-items: center; height: 130px; z-index: 2001; }
         .modo-confirmacao { background: var(--yellow) !important; color: #000 !important; }
         #col-seta { text-align: center; border-right: 1px solid rgba(255,255,255,0.2); }
         #seta-instrucao { font-size: 75px; line-height: 1; display: block; }
-        #metros-curva { font-size: 24px; font-weight: bold; }
+        #metros-curva { font-size: 26px; font-weight: bold; }
         #col-info { padding-left: 12px; text-align: left; }
         #stop-badge { background: #000; color: var(--neon); padding: 4px 12px; border-radius: 6px; font-weight: bold; font-size: 18px; border: 1px solid var(--neon); margin-bottom: 5px; display: inline-block; }
         #rua-topo { font-size: 18px; font-weight: bold; text-transform: uppercase; display: block; }
         #km-restante { font-size: 20px; font-weight: bold; color: var(--neon); display: block; text-align: center;}
 
+        /* MAPA */
         #map-box { flex: 1; position: relative; background: #111; overflow: hidden; z-index: 1000; }
         #map { width: 400%; height: 400%; position: absolute; top: -150%; left: -150%; transition: transform 0.6s ease-in-out; transform-origin: center center; }
 
+        /* RODAPÉ */
         #painel-rodape { background: #111; display: grid; grid-template-columns: 1fr 1fr; height: 190px; border-top: 3px solid #333; z-index: 2001; }
         .col-log { padding: 12px; overflow-y: auto; text-align: left; }
         .col-log:first-child { border-right: 2px solid #222; }
@@ -39,9 +41,13 @@
         b { color: var(--neon); }
         #safe-area { height: 40px; background: #000; z-index: 2001; }
 
-        #init-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 5000; display: flex; flex-direction: column; justify-content: center; align-items: center; }
-        .btn-load { background: var(--neon); color: #000; padding: 25px 50px; border-radius: 15px; font-weight: bold; font-size: 24px; cursor: pointer; text-align: center; }
+        /* TELA INICIAL (FIXED) */
+        #init-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 5000; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; text-align: center; }
+        .btn-main { background: var(--neon); color: #000; padding: 25px 40px; border-radius: 15px; font-weight: bold; font-size: 22px; cursor: pointer; border: none; width: 80%; }
+        
+        #btn-upload-container { display: none; margin-top: 20px; width: 100%; }
 
+        /* MODAIS */
         #modal-stops { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 6000; display: none; flex-direction: column; padding: 20px; }
         #lista-selecao { flex: 1; overflow-y: auto; margin-top: 20px; }
         .item-stop { padding: 20px; border-bottom: 1px solid #333; color: #fff; font-size: 20px; }
@@ -49,22 +55,30 @@
         #painel-acoes { display: none; grid-template-columns: 1fr 1fr; gap: 12px; padding: 15px; background: var(--yellow); position: absolute; bottom: 190px; width: 100%; box-sizing: border-box; z-index: 3000; }
         .btn-status { padding: 22px; border: none; border-radius: 12px; font-weight: bold; font-size: 20px; color: #fff; text-transform: uppercase; }
 
-        .stop-marker-ui { background: #000; color: #fff; border: 2px solid var(--neon); border-radius: 8px; font-weight: bold; font-size: 20px; display: flex; align-items: center; justify-content: center; width: 50px !important; height: 50px !important; box-shadow: 0 4px 8px rgba(0,0,0,0.6); pointer-events: auto !important; }
+        .stop-marker-ui { background: #000; color: #fff; border: 2px solid var(--neon); border-radius: 8px; font-weight: bold; font-size: 20px; display: flex; align-items: center; justify-content: center; width: 50px !important; height: 50px !important; pointer-events: auto !important; }
         .stop-marker-ui.concluido { background: var(--red) !important; border-color: #fff !important; }
         .stop-marker-ui.atual { background: var(--blue) !important; border-color: #fff !important; transform: scale(1.1); z-index: 9999 !important; }
-        .leaflet-popup-content-wrapper { background: #111; color: #fff; border: 2px solid var(--neon); border-radius: 10px; }
     </style>
 </head>
 <body>
 
     <div id="init-layer">
-        <h1 style="color:var(--neon)">SPX NINJA v20</h1>
-        <label class="btn-load" onclick="entrarEmModoApp()">🚀 INICIAR EXPEDIENTE<input type="file" id="fileInput" accept=".xlsx, .xls, .csv" style="display:none"></label>
-        <p style="color:#444; margin-top:15px;">Toque para tela cheia</p>
+        <h1 style="color:var(--neon); margin-bottom: 40px;">SPX NINJA v21</h1>
+        
+        <button id="btn-ativar" class="btn-main" onclick="ativarModoApp()">🚀 INICIAR EXPEDIENTE</button>
+
+        <div id="btn-upload-container">
+            <label class="btn-main" style="background: #fff; display: block;">
+                📂 SELECIONAR PLANILHA
+                <input type="file" id="fileInput" accept=".xlsx, .xls, .csv" style="display:none">
+            </label>
+        </div>
+        
+        <p id="msg-status" style="color:#444; margin-top: 20px;">v21.0 - Modo FullScreen</p>
     </div>
 
     <div id="modal-stops">
-        <h3 style="color:var(--neon)">Ponto de partida:</h3>
+        <h3 style="color:var(--neon)">Escolha por onde começar:</h3>
         <div id="lista-selecao"></div>
     </div>
 
@@ -94,18 +108,25 @@
         let camadaFundo = L.layerGroup(), aguardandoConf = false, currentHeading = 0;
         let jaFalouVoz = false, wakeLock = null, lastMoveTime = Date.now();
 
-        // FUNÇÃO PARA TELA CHEIA (FULLSCREEN)
-        function entrarEmModoApp() {
+        // 1. ATIVA FULLSCREEN E SOM
+        async function ativarModoApp() {
             const doc = document.documentElement;
-            if (doc.requestFullscreen) doc.requestFullscreen();
-            else if (doc.webkitRequestFullscreen) doc.webkitRequestFullscreen();
-            else if (doc.msRequestFullscreen) doc.msRequestFullscreen();
-            
-            ativarSom(); // Chama a função de áudio que já existia
+            try {
+                if (doc.requestFullscreen) await doc.requestFullscreen();
+                else if (doc.webkitRequestFullscreen) await doc.webkitRequestFullscreen();
+            } catch (e) { console.log("Fullscreen negado ou já ativo"); }
+
+            // Ativa Áudio
+            falar("Modo Ninja Ativado.");
+            try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch(e){}
+
+            // Troca os botões na tela
+            document.getElementById('btn-ativar').style.display = 'none';
+            document.getElementById('btn-upload-container').style.display = 'block';
+            document.getElementById('msg-status').innerText = "Modo FullScreen Ativo. Selecione o arquivo.";
         }
 
         function falar(t) { if ('speechSynthesis' in window) { window.speechSynthesis.cancel(); const m = new SpeechSynthesisUtterance(t); m.lang = 'pt-BR'; window.speechSynthesis.speak(m); } }
-        async function ativarSom() { falar("Modo Ninja Ativado."); try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch(e){} }
 
         window.onload = function() {
             mapa = L.map('map', { zoomControl: false, attributionControl: false }).setView([-23.61, -46.57], 19);
@@ -113,6 +134,7 @@
             camadaFundo.addTo(mapa);
         };
 
+        // 2. LEITURA DO ARQUIVO
         document.getElementById('fileInput').addEventListener('change', function(e) {
             const r = new FileReader();
             r.onload = function(evt) {
@@ -121,7 +143,9 @@
                 const stopsMap = {};
                 raw.filter(i => i.Stop || i.Parada).forEach(i => {
                     const sNum = i.Stop || i.Parada;
-                    if (!stopsMap[sNum]) stopsMap[sNum] = { stop: sNum, lat: parseFloat(String(i.Latitude).replace(',', '.')), lon: parseFloat(String(i.Longitude).replace(',', '.')), rua: i["Destination Address"].split(',')[0], ends: [] };
+                    if (!stopsMap[sNum]) {
+                        stopsMap[sNum] = { stop: sNum, lat: parseFloat(String(i.Latitude).replace(',', '.')), lon: parseFloat(String(i.Longitude).replace(',', '.')), rua: i["Destination Address"].split(',')[0], ends: [] };
+                    }
                     stopsMap[sNum].ends.push(i["Destination Address"]);
                 });
                 rotaSpx = Object.values(stopsMap).sort((a, b) => a.stop - b.stop).map(s => {
@@ -134,8 +158,22 @@
         });
 
         function mostrarModal() {
-            const c = document.getElementById('lista-selecao'); c.innerHTML = ""; document.getElementById('modal-stops').style.display = "flex";
-            rotaSpx.forEach((p, i) => { const d = document.createElement('div'); d.className = "item-stop"; d.innerHTML = `<b>${p.stop}</b> ${p.rua}`; d.onclick = () => { idxDestino = i; document.getElementById('modal-stops').style.display = "none"; document.getElementById('init-layer').style.display = 'none'; desenharMarcadores(); iniciarGPS(); }; c.appendChild(d); });
+            const container = document.getElementById('lista-selecao');
+            container.innerHTML = "";
+            document.getElementById('modal-stops').style.display = "flex";
+            rotaSpx.forEach((p, i) => {
+                const d = document.createElement('div');
+                d.className = "item-stop";
+                d.innerHTML = `<b>${p.stop}</b> ${p.rua}`;
+                d.onclick = () => {
+                    idxDestino = i;
+                    document.getElementById('modal-stops').style.display = "none";
+                    document.getElementById('init-layer').style.display = 'none';
+                    desenharMarcadores();
+                    iniciarGPS();
+                };
+                container.appendChild(d);
+            });
         }
 
         function desenharMarcadores() {
@@ -157,8 +195,7 @@
         function iniciarGPS() {
             navigator.geolocation.watchPosition(async pos => {
                 let nLat = pos.coords.latitude, nLon = pos.coords.longitude;
-                if (minhaLat && dist(minhaLat, minhaLon, nLat, nLon) > 2) { lastMoveTime = Date.now(); if(!wakeLock) entrarEmModoApp(); } 
-                else if (Date.now() - lastMoveTime > 15000 && wakeLock) { if(wakeLock.release) wakeLock.release(); wakeLock = null; }
+                if (minhaLat && dist(minhaLat, minhaLon, nLat, nLon) > 2) { lastMoveTime = Date.now(); } 
 
                 if (linhaRetaPts.length > 0 && distParaLinha(nLat, nLon, linhaRetaPts) > 25) await calcularRota();
 
