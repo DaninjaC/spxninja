@@ -1,0 +1,16 @@
+{
+  "name": "SPX NINJA",
+  "short_name": "SPX Ninja",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#007AFF",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/714/714424.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
