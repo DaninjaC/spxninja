@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SPX Ninja - v15 Navegação Final</title>
+    <title>SPX Ninja - v16 Estabilidade Final</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -13,51 +13,57 @@
         :root { --neon: #39FF14; --blue: #007AFF; --yellow: #FFCC00; --red: #FF0000; --bg: #000; }
         body { background-color: var(--bg); color: #fff; font-family: sans-serif; margin: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
         
-        #painel-topo { background: var(--blue); display: grid; grid-template-columns: 110px 1fr 90px; align-items: center; height: 130px; z-index: 1001; transition: background 0.3s; }
+        /* CABEÇALHO */
+        #painel-topo { background: var(--blue); display: grid; grid-template-columns: 110px 1fr 90px; align-items: center; height: 130px; z-index: 1001; }
         .modo-confirmacao { background: var(--yellow) !important; color: #000 !important; }
         
         #col-seta { text-align: center; border-right: 1px solid rgba(255,255,255,0.2); }
-        #seta-instrucao { font-size: 70px; line-height: 1; display: block; }
-        #metros-curva { font-size: 24px; font-weight: bold; }
+        #seta-instrucao { font-size: 75px; line-height: 1; display: block; }
+        #metros-curva { font-size: 26px; font-weight: bold; }
 
-        #col-info { padding-left: 10px; text-align: left; }
-        #stop-badge { background: #000; color: var(--neon); padding: 4px 10px; border-radius: 5px; font-weight: bold; font-size: 16px; border: 1px solid var(--neon); margin-bottom: 5px; display: inline-block; }
-        #rua-topo { font-size: 16px; font-weight: bold; text-transform: uppercase; display: block; line-height: 1.2; }
+        #col-info { padding-left: 12px; text-align: left; }
+        #stop-badge { background: #000; color: var(--neon); padding: 4px 12px; border-radius: 6px; font-weight: bold; font-size: 18px; border: 1px solid var(--neon); margin-bottom: 5px; display: inline-block; }
+        #rua-topo { font-size: 18px; font-weight: bold; text-transform: uppercase; display: block; line-height: 1.2; }
 
-        #col-km { text-align: center; font-size: 11px; }
-        #km-restante { font-size: 18px; font-weight: bold; color: var(--neon); display: block; }
+        #col-km { text-align: center; }
+        #km-restante { font-size: 20px; font-weight: bold; color: var(--neon); display: block; }
 
-        /* MAPA COM PERSPECTIVA - VOCÊ NA BASE */
+        /* MAPA ULTRA DIMENSIONADO PARA NÃO APARECER FUNDO PRETO NO GIRO */
         #map-box { flex: 1; position: relative; background: #111; overflow: hidden; }
         #map { 
-            width: 100%; height: 150%; 
-            position: absolute; top: -25%; 
-            transition: transform 0.4s ease-out;
+            width: 300%; height: 300%; 
+            position: absolute; top: -100%; left: -100%; 
+            transition: transform 0.5s cubic-bezier(0.1, 0.7, 0.1, 1);
             transform-origin: center center;
         }
 
-        #painel-rodape { background: #111; display: grid; grid-template-columns: 1fr 1fr; height: 170px; border-top: 2px solid #333; z-index: 1001; }
-        .col-log { padding: 10px; overflow-y: auto; font-size: 13px; text-align: left; }
-        .col-log:first-child { border-right: 1px solid #222; }
-        .linha-pacote { margin-bottom: 6px; border-bottom: 1px solid #222; padding-bottom: 2px; }
+        /* RODAPÉ LOGÍSTICO - FONTES AMPLIADAS */
+        #painel-rodape { background: #111; display: grid; grid-template-columns: 1fr 1fr; height: 190px; border-top: 3px solid #333; z-index: 1001; }
+        .col-log { padding: 12px; overflow-y: auto; text-align: left; }
+        .col-log:first-child { border-right: 2px solid #222; }
+        
+        .label-rodape { font-size: 12px; color: #888; text-transform: uppercase; margin-bottom: 8px; font-weight: bold; letter-spacing: 1px; }
+        .linha-pacote { font-size: 18px; margin-bottom: 10px; border-bottom: 1px solid #222; padding-bottom: 5px; line-height: 1.4; }
+        .linha-radar { font-size: 18px; margin-bottom: 8px; font-weight: bold; }
         b { color: var(--neon); }
 
         #safe-area { height: 40px; background: #000; }
 
         #init-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 4000; display: flex; flex-direction: column; justify-content: center; align-items: center; }
-        .btn-load { background: var(--neon); color: #000; padding: 20px 40px; border-radius: 15px; font-weight: bold; font-size: 22px; cursor: pointer; }
+        .btn-load { background: var(--neon); color: #000; padding: 25px 50px; border-radius: 15px; font-weight: bold; font-size: 24px; cursor: pointer; }
 
         #modal-stops { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 5000; display: none; flex-direction: column; padding: 20px; }
         #lista-selecao { flex: 1; overflow-y: auto; margin-top: 20px; }
-        .item-stop { padding: 18px; border-bottom: 1px solid #333; color: #fff; font-size: 18px; }
+        .item-stop { padding: 20px; border-bottom: 1px solid #333; color: #fff; font-size: 20px; }
 
-        #painel-acoes { display: none; grid-template-columns: 1fr 1fr; gap: 10px; padding: 15px; background: var(--yellow); position: absolute; bottom: 170px; width: 100%; box-sizing: border-box; z-index: 2000; }
-        .btn-status { padding: 20px; border: none; border-radius: 10px; font-weight: bold; font-size: 16px; color: #fff; text-transform: uppercase; }
+        #painel-acoes { display: none; grid-template-columns: 1fr 1fr; gap: 12px; padding: 15px; background: var(--yellow); position: absolute; bottom: 190px; width: 100%; box-sizing: border-box; z-index: 2000; }
+        .btn-status { padding: 22px; border: none; border-radius: 12px; font-weight: bold; font-size: 20px; color: #fff; text-transform: uppercase; }
 
+        /* MARCADOR SQUARE */
         .stop-marker-ui {
             background: #000; color: #fff; border: 2px solid var(--neon); border-radius: 8px;
-            font-weight: bold; font-size: 18px; display: flex; align-items: center; justify-content: center;
-            width: 45px !important; height: 45px !important;
+            font-weight: bold; font-size: 20px; display: flex; align-items: center; justify-content: center;
+            width: 50px !important; height: 50px !important; box-shadow: 0 4px 8px rgba(0,0,0,0.6);
         }
         .stop-marker-ui.concluido { background: var(--red) !important; border-color: #fff !important; }
         .stop-marker-ui.atual { background: var(--blue) !important; border-color: #fff !important; transform: scale(1.1); z-index: 9999 !important; }
@@ -66,15 +72,15 @@
 <body>
 
     <div id="init-layer">
-        <h1 style="color:var(--neon); margin-bottom: 30px;">SPX NINJA v15</h1>
+        <h1 style="color:var(--neon); margin-bottom: 30px; letter-spacing: 2px;">SPX NINJA v16</h1>
         <label class="btn-load" onclick="ativarSom()">
-            📂 CARREGAR ROTA
+            🚀 INICIAR ROTA
             <input type="file" id="fileInput" accept=".xlsx, .xls, .csv" style="display:none">
         </label>
     </div>
 
     <div id="modal-stops">
-        <h3 style="color:var(--neon)">Ponto de partida:</h3>
+        <h3 style="color:var(--neon)">Em qual Stop começar?</h3>
         <div id="lista-selecao"></div>
     </div>
 
@@ -88,7 +94,7 @@
             <span id="rua-topo">Aguardando...</span>
         </div>
         <div id="col-km">
-            KM TOTAL
+            <span style="font-size: 10px; color: #ddd;">KM TOTAL</span>
             <span id="km-restante">0.0</span>
         </div>
     </div>
@@ -102,9 +108,11 @@
 
     <div id="painel-rodape">
         <div class="col-log">
+            <div class="label-rodape">📦 Pacotes</div>
             <div id="log-pacotes">---</div>
         </div>
         <div class="col-log">
+            <div class="label-rodape">📍 Radar (120m)</div>
             <div id="log-radar">---</div>
         </div>
     </div>
@@ -123,7 +131,7 @@
                 msg.lang = 'pt-BR'; msg.rate = 1.1; window.speechSynthesis.speak(msg);
             }
         }
-        function ativarSom() { falar("Navegação v15 pronta."); }
+        function ativarSom() { falar("Sistema Ninja iniciado."); }
 
         window.onload = function() {
             mapa = L.map('map', { zoomControl: false, attributionControl: false }).setView([-23.61, -46.57], 19);
@@ -156,7 +164,7 @@
                         const num = e.split(',')[1] ? e.split(',')[1].trim() : "S/N";
                         contagem[num] = (contagem[num] || 0) + 1;
                     });
-                    return { ...s, htmlLista: Object.entries(contagem).map(([n, q]) => `<div class="linha-pacote"><b>${q}</b> pac no nº <b>${n}</b></div>`).join(''), status: 'neutro' };
+                    return { ...s, htmlLista: Object.entries(contagem).map(([n, q]) => `<div class="linha-pacote"><b>${q}</b> vols no nº <b>${n}</b></div>`).join(''), status: 'neutro' };
                 });
                 if (rotaSpx.length > 0) mostrarModal();
             };
@@ -182,15 +190,10 @@
                 let cssClass = "stop-marker-ui";
                 if (p.status === 'concluido') cssClass += " concluido";
                 if (index === idxDestino) cssClass += " atual";
-
-                const icon = L.divIcon({ 
-                    className: cssClass, 
-                    html: `<div style="transform: rotate(${currentHeading}deg)">${p.stop}</div>`, 
-                    iconSize: [45, 45], iconAnchor: [22, 22] 
-                });
+                const icon = L.divIcon({ className: cssClass, html: `<div style="transform: rotate(${currentHeading}deg)">${p.stop}</div>`, iconSize: [50, 50], iconAnchor: [25, 25] });
                 p.marker = L.marker([p.lat, p.lon], { icon: icon }).addTo(camadaFundo);
                 p.marker.on('click', () => {
-                    p.marker.bindPopup(`<div style="text-align:center"><b style="font-size:18px">STOP ${p.stop}</b><hr><button class="popup-btn" style="background:var(--red)" onclick="setStatusManual(${index}, 'concluido')">ENTREGUE</button></div>`).openPopup();
+                    p.marker.bindPopup(`<div style="text-align:center"><b style="font-size:20px">STOP ${p.stop}</b><hr><button class="popup-btn" style="background:var(--red)" onclick="setStatusManual(${index}, 'concluido')">ENTREGUE</button></div>`).openPopup();
                 });
             });
         }
@@ -204,28 +207,16 @@
         function iniciarGPS() {
             navigator.geolocation.watchPosition(async pos => {
                 let nLat = pos.coords.latitude, nLon = pos.coords.longitude;
-                
-                // ROTAÇÃO POR MOVIMENTO REAL (MÍNIMO 5 METROS)
                 if (lastLat && dist(lastLat, lastLon, nLat, nLon) > 5) {
                     currentHeading = calcularHeading(lastLat, lastLon, nLat, nLon);
                     lastLat = nLat; lastLon = nLon;
-                } else if (!lastLat) {
-                    lastLat = nLat; lastLon = nLon;
-                }
-
+                } else if (!lastLat) { lastLat = nLat; lastLon = nLon; }
                 minhaLat = nLat; minhaLon = nLon;
 
-                if (!markerUser) markerUser = L.circleMarker([minhaLat, minhaLon], { color: '#fff', fillColor: '#007AFF', fillOpacity: 1, radius: 10, weight: 3, zIndexOffset: 1000 }).addTo(mapa);
+                if (!markerUser) markerUser = L.circleMarker([minhaLat, minhaLon], { color: '#fff', fillColor: '#007AFF', fillOpacity: 1, radius: 12, weight: 4, zIndexOffset: 1000 }).addTo(mapa);
                 else markerUser.setLatLng([minhaLat, minhaLon]);
 
-                // LÓGICA DE OFFSET: Centraliza o mapa em um ponto 60 metros À FRENTE de onde você está
-                // Isso força o seu ícone para a base do celular.
-                let latOffset = minhaLat + (Math.cos(currentHeading * Math.PI/180) * 0.0006);
-                let lonOffset = minhaLon + (Math.sin(currentHeading * Math.PI/180) * 0.0006);
-                
-                mapa.setView([latOffset, lonOffset], 19, { animate: true });
-                document.getElementById('map').style.transform = `rotate(${-currentHeading}deg)`;
-                desenharMarcadores();
+                atualizarVisualMapa();
                 atualizarRadar();
 
                 if (idxDestino < rotaSpx.length && !aguardandoConf) {
@@ -233,6 +224,17 @@
                     navegar();
                 }
             }, null, { enableHighAccuracy: true });
+        }
+
+        function atualizarVisualMapa() {
+            // CENTRALIZAÇÃO COM OFFSET: Joga o mapa 50 metros à frente para você ficar na base
+            let rad = currentHeading * Math.PI / 180;
+            let offsetLat = minhaLat + Math.cos(rad) * 0.0006;
+            let offsetLon = minhaLon + Math.sin(rad) * 0.0006;
+            
+            mapa.setView([offsetLat, offsetLon], 19, { animate: false });
+            document.getElementById('map').style.transform = `rotate(${-currentHeading}deg)`;
+            desenharMarcadores();
         }
 
         async function calcularRota() {
@@ -249,12 +251,10 @@
                 idxPasso = 0; jaFalouVoz = false;
                 document.getElementById('km-restante').innerText = (r.distance / 1000).toFixed(1) + " km";
                 if (polylineRota) mapa.removeLayer(polylineRota);
-                polylineRota = L.polyline(r.geometry.coordinates.map(c => [c[1], c[0]]), { color: '#007AFF', weight: 8, opacity: 0.8 }).addTo(mapa);
-
-                // GIRO IMEDIATO: Aponta para a direção da primeira manobra da nova rota
-                if (passosNav.length > 0) {
-                    currentHeading = calcularHeading(minhaLat, minhaLon, passosNav[0].lat, passosNav[0].lon);
-                }
+                polylineRota = L.polyline(r.geometry.coordinates.map(c => [c[1], c[0]]), { color: '#007AFF', weight: 10, opacity: 0.85 }).addTo(mapa);
+                
+                // GIRO PREVENTIVO
+                if (passosNav.length > 0) { currentHeading = calcularHeading(minhaLat, minhaLon, passosNav[0].lat, passosNav[0].lon); atualizarVisualMapa(); }
             }
         }
 
@@ -270,7 +270,7 @@
             const dCurva = dist(minhaLat, minhaLon, p.lat, p.lon);
             document.getElementById('metros-curva').innerText = Math.round(dCurva) + "m";
             
-            if (dCurva < 18 && !jaFalouVoz) {
+            if (dCurva < 15 && !jaFalouVoz) {
                 if (p.m && p.m.includes("left")) falar("Vire à esquerda");
                 else if (p.m && p.m.includes("right")) falar("Vire à direita");
                 jaFalouVoz = true;
@@ -291,7 +291,7 @@
 
         function atualizarRadar() {
             const proximos = rotaSpx.filter((p, i) => i !== idxDestino && p.status === 'neutro' && dist(minhaLat, minhaLon, p.lat, p.lon) < 120);
-            document.getElementById('log-radar').innerHTML = proximos.length > 0 ? proximos.map(p => `<div><b>STOP ${p.stop}</b> (${Math.round(dist(minhaLat, minhaLon, p.lat, p.lon))}m)</div>`).join('') : "Nenhum";
+            document.getElementById('log-radar').innerHTML = proximos.length > 0 ? proximos.map(p => `<div class="linha-radar"><b>STOP ${p.stop}</b> (${Math.round(dist(minhaLat, minhaLon, p.lat, p.lon))}m)</div>`).join('') : "Nenhum";
         }
 
         function dist(la1, lo1, la2, lo2) {
