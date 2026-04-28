@@ -1,25 +1,96 @@
 <!DOCTYPE html>
-<html>
+<html lang="pt-br">
 <head>
-    <title>Scanner de Entregas</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scanner de Rotas</title>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <style>
-        #video { width: 100%; max-width: 400px; border: 2px solid #000; }
-        .lista-enderecos { margin-top: 20px; }
+        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; padding: 20px; }
+        #video { width: 100%; max-width: 500px; border-radius: 8px; background: #000; }
+        canvas { display: none; }
+        .controls { margin: 15px 0; }
+        button { padding: 12px; font-size: 16px; cursor: pointer; border-radius: 5px; border: none; background: #007bff; color: white; }
+        #lista { width: 100%; list-style: none; padding: 0; }
+        li { background: #f4f4f4; margin: 5px 0; padding: 10px; border-radius: 4px; border-left: 5px solid #007bff; }
     </style>
 </head>
 <body>
-    <video id="video" autoplay playsinline></video>
-    <button onclick="capturarEScanear()">Escanear Endereço</button>
-    <button onclick="gerarRota()">Concluir e Abrir Rota</button>
 
-    <div class="lista-enderecos">
-        <h3>Endereços Capturados:</h3>
+    <h2>Scanner de Entregas</h2>
+    <video id="video" autoplay playsinline></video>
+    <canvas id="canvas"></canvas>
+
+    <div class="controls">
+        <button onclick="capturarEScanear()">Escanear Endereço</button>
+        <button onclick="gerarRota()" style="background: #28a745;">Gerar Rota</button>
+    </div>
+
+    <div id="status">Status: Câmera pronta</div>
+    
+    <div style="width: 100%;">
+        <strong>Endereços Capturados:</strong>
         <ul id="lista"></ul>
     </div>
 
     <script>
-        // Lógica para acessar câmera e processar imagem com Tesseract.js viria aqui
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const listaUl = document.getElementById('lista');
+        const status = document.getElementById('status');
+        let enderecos = [];
+
+        // 1. Liga a câmera automaticamente ao carregar
+        async function iniciarCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: "environment" } // Tenta usar a câmera de trás
+                });
+                video.srcObject = stream;
+            } catch (err) {
+                status.innerText = "Erro ao acessar câmera: " + err;
+            }
+        }
+
+        // 2. Tira uma foto e manda pro Tesseract (OCR)
+        async function capturarEScanear() {
+            status.innerText = "Lendo endereço... aguarde.";
+            const context = canvas.getContext('2d');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            const imageData = canvas.toDataURL('image/png');
+
+            // Processamento do OCR
+            Tesseract.recognize(imageData, 'por') // 'por' para Português
+                .then(({ data: { text } }) => {
+                    const enderecoLimpo = text.trim();
+                    if (enderecoLimpo.length > 5) {
+                        enderecos.push(enderecoLimpo);
+                        const li = document.createElement('li');
+                        li.innerText = enderecoLimpo;
+                        listaUl.appendChild(li);
+                        status.innerText = "Endereço adicionado!";
+                    } else {
+                        status.innerText = "Não consegui ler o endereço. Tente novamente.";
+                    }
+                });
+        }
+
+        // 3. Abre o Google Maps com os endereços
+        function gerarRota() {
+            if (enderecos.length === 0) return alert("Nenhum endereço escaneado!");
+            const origem = "Meu Local";
+            const destino = enderecos[enderecos.length - 1];
+            const paradas = enderecos.slice(0, -1).join('|');
+            
+            // Link que abre o Google Maps com várias paradas
+            const url = `https://www.google.com/maps/dir/?api=1&origin=${origem}&destination=${destino}&waypoints=${paradas}&travelmode=driving`;
+            window.open(url, '_blank');
+        }
+
+        iniciarCamera();
     </script>
 </body>
 </html>
