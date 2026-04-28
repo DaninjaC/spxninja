@@ -1,118 +1,105 @@
-// ... (mantenha o resto do HTML e CSS do código anterior, substitua apenas a tag <script>)
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Roteirizador Capi Roots</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/papaparse/5.3.0/papaparse.min.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; background: #f0f2f5; }
+        .container { max-width: 600px; margin: auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        h2 { color: #333; text-align: center; }
+        input[type="file"] { margin-bottom: 20px; width: 100%; }
+        .entrega-item { display: flex; align-items: center; padding: 10px; border-bottom: 1px solid #eee; }
+        .entrega-item:last-child { border-bottom: none; }
+        .stop-badge { background: #007bff; color: white; padding: 2px 8px; border-radius: 12px; font-size: 12px; margin-right: 10px; }
+        .info { flex-grow: 1; font-size: 14px; }
+        .btn-rota { width: 100%; padding: 15px; background: #28a745; color: white; border: none; border-radius: 5px; font-size: 18px; font-weight: bold; margin-top: 20px; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Capi Roots - Roteirizador</h2>
+    <p>Selecione a planilha da Shopee (CSV):</p>
+    <input type="file" id="csvFile" accept=".csv">
+    
+    <div id="listaEntregas"></div>
+    
+    <button class="btn-rota" onclick="gerarRota()">Criar Rota no Maps</button>
+</div>
 
 <script>
-    const video = document.getElementById('video');
-    const canvas = document.getElementById('canvas');
-    const listaUl = document.getElementById('lista');
-    const status = document.getElementById('status');
-    let enderecos = [];
+    let dadosEntregas = [];
 
-    // Inicializa a câmera (código anterior mantido)
-    async function iniciarCamera() {
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ 
-                video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } } 
-            });
-            video.srcObject = stream;
-        } catch (err) {
-            status.innerText = "Erro na câmera. Use HTTPS.";
-        }
+    document.getElementById('csvFile').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        Papa.parse(file, {
+            header: true,
+            skipEmptyLines: true,
+            complete: function(results) {
+                processarDados(results.data);
+            }
+        });
+    });
+
+    function processarDados(data) {
+        // 1. Limpeza e extração do número do endereço para ordenação
+        dadosEntregas = data.map(item => {
+            // Tenta pegar o número da rua (assume que é o primeiro conjunto de dígitos após o nome da rua)
+            const numMatch = item.Endereco ? item.Endereco.match(/\d+/) : [0];
+            return {
+                ...item,
+                numeroParaOrdem: parseInt(numMatch[0]) || 0,
+                stop: parseInt(item.Stop) || 999
+            };
+        });
+
+        // 2. Ordenação: Primeiro por Stop, depois pelo número da casa
+        dadosEntregas.sort((a, b) => {
+            if (a.stop !== b.stop) return a.stop - b.stop;
+            return a.numeroParaOrdem - b.numeroParaOrdem;
+        });
+
+        renderizarLista();
     }
 
-    // NOVA FUNÇÃO DE CAPTURA INTELIGENTE
-    async function capturarEScanear() {
-        status.innerText = "Processando imagem... segure firme.";
-        const context = canvas.getContext('2d');
-        
-        // Define resolução alta para melhor OCR
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        
-        // Desenha a imagem da câmera no canvas
-        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    function renderizarLista() {
+        const container = document.getElementById('listaEntregas');
+        container.innerHTML = "";
 
-        // --- PRÉ-PROCESSAMENTO: Binarização (Preto e Branco Puro) ---
-        // Isso ajuda MUITO a remover sombras e amassados
-        let imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-        let data = imageData.data;
-        for (let i = 0; i < data.length; i += 4) {
-            // Calcula luminosidade média
-            let avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
-            // Define limiar (threshold): se for escuro vira preto, se for claro vira branco
-            let threshold = 120; // Ajuste este número se a etiqueta for muito escura
-            let v = (avg < threshold) ? 0 : 255;
-            data[i] = data[i+1] = data[i+2] = v; // Atribui V para R, G e B
-        }
-        context.putImageData(imageData, 0, 0);
-
-        // Converte o canvas pré-processado em imagem para o Tesseract
-        const imagemParaOCR = canvas.toDataURL('image/png');
-
-        // --- CHAMADA DO TESSERACT OPTIMIZADA ---
-        status.innerText = "Lendo texto... aguarde.";
-        Tesseract.recognize(imagemParaOCR, 'por+eng') // Tenta ler em Português e Inglês (melhor para números)
-            .then(({ data: { text } }) => {
-                
-                status.innerText = "Analizando dados da etiqueta...";
-                
-                // --- FILTRAGEM INTELIGENTE (O pulo do gato!) ---
-                
-                // 1. Regex para CEP (procura 5 números, hífen opcional, 3 números)
-                const regexCEP = /\b\d{5}[-\s]?\d{3}\b/g;
-                const matchCEP = text.match(regexCEP);
-
-                // 2. Regex para Número da Casa (procura "Nº" ou "No" seguido de números, ou números isolados pequenos)
-                // Vamos focar no CEP primeiro que é mais garantido, mas tentamos o número
-                const regexNumero = /(?:N[º°o]\s*|,\s*)(\d+)\b/i;
-                const matchNumero = text.match(regexNumero);
-
-                let enderecoFinal = "";
-
-                if (matchCEP) {
-                    // Se achou o CEP, já temos 90% da rota.
-                    const cepEncontrado = matchCEP[0].replace(/\s/g, ''); // Remove espaços se houver
-                    
-                    if (matchNumero) {
-                        const numeroEncontrado = matchNumero[1];
-                        enderecoFinal = `${cepEncontrado}, No ${numeroEncontrado}, São Caetano do Sul, SP`; // Adiciona cidade padrão
-                    } else {
-                        // Se não achou número, usa só o CEP (o Google Maps vai pro centro da rua)
-                        enderecoFinal = `${cepEncontrado}, São Caetano do Sul, SP`;
-                    }
-                }
-
-                // --- VALIDAÇÃO E ADIÇÃO À LISTA ---
-                if (enderecoFinal) {
-                    // Evita adicionar o mesmo endereço duplicado
-                    if (!enderecos.includes(enderecoFinal)) {
-                        enderecos.push(enderecoFinal);
-                        const li = document.createElement('li');
-                        li.style.borderLeft = "5px solid #28a745"; // Cor verde para sucesso
-                        li.innerText = enderecoFinal;
-                        listaUl.appendChild(li);
-                        status.innerText = "CEP identificado com sucesso!";
-                    } else {
-                        status.innerText = "Este CEP já foi adicionado.";
-                    }
-                } else {
-                    status.innerText = "Não consegui isolar um CEP válido. Tente focar apenas no texto do endereço.";
-                    console.log("Texto bruto lido (para debug):", text); // Mostra o texto ruim no console do navegador
-                }
-            });
+        dadosEntregas.forEach((item, index) => {
+            const div = document.createElement('div');
+            div.className = 'entrega-item';
+            div.innerHTML = `
+                <input type="checkbox" id="item-${index}" value="${item.Endereco}" checked>
+                <span class="stop-badge">Stop ${item.stop}</span>
+                <div class="info">
+                    <strong>${item.Nome || 'Cliente'}</strong><br>
+                    ${item.Endereco}
+                </div>
+            `;
+            container.appendChild(div);
+        });
     }
 
-    // Função de gerar rota (código anterior mantido)
     function gerarRota() {
-        if (enderecos.length === 0) return alert("Nenhum endereço válido escaneado!");
+        const selecionados = [];
+        document.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
+            selecionados.push(cb.value);
+        });
+
+        if (selecionados.length === 0) return alert("Selecione ao menos um endereço!");
+
+        // Google Maps suporta até ~9 paradas + destino no link direto
+        const destino = selecionados[selecionados.length - 1];
+        const paradas = selecionados.slice(0, -1).join('|');
         
-        // Formata a URL para o Google Maps App
-        // NOTA: Para muitas paradas, o formato correto é origin/destination/waypoints
-        const destino = enderecos[enderecos.length - 1];
-        const paradas = enderecos.slice(0, -1).join('|');
-        const url = `https://www.google.com/maps/dir/?api=1&origin=Current+Location&destination=${encodeURIComponent(destino)}&waypoints=${encodeURIComponent(paradas)}&travelmode=driving`;
+        const url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destino)}&waypoints=${encodeURIComponent(paradas)}&travelmode=driving`;
         
         window.open(url, '_blank');
     }
-
-    iniciarCamera();
 </script>
+
+</body>
+</html>
