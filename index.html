@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rotas Ninja V22 - Google Integrado</title>
+    <title>Rotas Ninja V22 - Painel Híbrido</title>
     
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
@@ -15,21 +15,33 @@
         #main-container { display: flex; flex: 1; overflow: hidden; }
         #lista-container { width: 350px; overflow-y: auto; padding: 10px; background: #111; z-index: 10; border-right: 1px solid #333; }
         
-        /* Área onde o Google vai rodar */
-        #map-container { flex: 1; background: #222; display: flex; justify-content: center; align-items: center; flex-direction: column; }
-        #googleFrame { width: 100%; height: 100%; border: none; display: none; }
+        #map-container { flex: 1; background: #222; display: flex; flex-direction: column; }
+        #googleFrame { width: 100%; flex: 1; border: none; display: none; }
         
+        /* Botão para iniciar o GPS nativo caso você queira a rota guiada */
+        #btn-iniciar-gps {
+            display: none;
+            background: #27ae60;
+            color: #fff;
+            text-align: center;
+            padding: 20px;
+            font-size: 18px;
+            font-weight: bold;
+            text-decoration: none;
+            border-top: 2px solid #2ecc71;
+        }
+        #btn-iniciar-gps:active { background: #2ecc71; }
+
         .item-entrega { 
             background: #1a1a1a; margin-bottom: 10px; padding: 15px; border-radius: 8px; 
             border-left: 4px solid #f1c40f; cursor: pointer; display: flex; align-items: center;
         }
-        .item-entrega:hover { background: #2a2a2a; }
         .item-entrega.active { background: #f1c40f; color: #000; font-weight: bold; }
         .stop-num { font-size: 20px; color: #f1c40f; margin-right: 15px; font-weight: bold; }
         .active .stop-num { color: #000; }
         
         #status { font-size: 13px; color: #aaa; margin-bottom: 15px; text-align: center; }
-        #loading-msg { color: #f1c40f; font-weight: bold; display: none; text-align: center; padding: 20px;}
+        #loading-msg { color: #f1c40f; font-weight: bold; display: none; text-align: center; padding: 20px; margin-top: 50px;}
 
         @media (max-width: 768px) {
             #main-container { flex-direction: column; }
@@ -51,8 +63,9 @@
         <div id="listaEntregas"></div>
     </div>
     <div id="map-container">
-        <div id="loading-msg">Buscando sua localização e traçando rota exata no Google...</div>
+        <div id="loading-msg">Traçando rota exata no Google...</div>
         <iframe id="googleFrame" allowfullscreen></iframe>
+        <a href="#" id="btn-iniciar-gps" target="_blank">🚀 INICIAR NAVEGAÇÃO 3D (GPS)</a>
     </div>
 </div>
 
@@ -72,7 +85,6 @@
             container.innerHTML = "";
             
             dados.forEach((item) => {
-                // Pega o endereço cru da planilha
                 const enderecoRaw = item["Destination Address"] || item["Endereco"] || item["Endereço"] || "";
                 if (!enderecoRaw) return;
 
@@ -83,7 +95,6 @@
                     <div style="font-size: 14px;">${enderecoRaw}</div>
                 `;
                 
-                // Ao clicar, envia o endereço do jeito que veio, o Google se vira para entender
                 div.onclick = () => iniciarRotaGoogle(enderecoRaw, div);
                 container.appendChild(div);
             });
@@ -98,8 +109,10 @@
         
         const frame = document.getElementById('googleFrame');
         const loading = document.getElementById('loading-msg');
+        const btnGps = document.getElementById('btn-iniciar-gps');
         
         frame.style.display = 'none';
+        btnGps.style.display = 'none';
         loading.style.display = 'block';
 
         if ("geolocation" in navigator) {
@@ -107,22 +120,27 @@
                 const latOrigem = position.coords.latitude;
                 const lngOrigem = position.coords.longitude;
 
-                // Garante que a busca seja em São Caetano do Sul para não ter erro
                 const destinoFormatado = `${destino}, São Caetano do Sul, SP`;
                 
-                // TRUQUE: O parâmetro 'output=embed' força o Google Maps a abrir em formato de painel dentro do seu site
-                const urlGoogle = `https://maps.google.com/maps?saddr=${latOrigem},${lngOrigem}&daddr=${encodeURIComponent(destinoFormatado)}&hl=pt-BR&output=embed`;
-
-                frame.src = urlGoogle;
+                // URL do Frame (Interno)
+                const urlFrame = `https://maps.google.com/maps?saddr=${latOrigem},${lngOrigem}&daddr=${encodeURIComponent(destinoFormatado)}&hl=pt-BR&output=embed`;
                 
-                // Mostra o frame após carregar a URL
+                // URL do Botão de Navegação (Abre o App Nativo)
+                // travelmode=driving garante que abra a rota de carro já pronta para iniciar
+                const urlNativa = `https://www.google.com/maps/dir/?api=1&origin=${latOrigem},${lngOrigem}&destination=${encodeURIComponent(destinoFormatado)}&travelmode=driving`;
+
+                frame.src = urlFrame;
+                btnGps.href = urlNativa;
+                
                 setTimeout(() => {
                     loading.style.display = 'none';
                     frame.style.display = 'block';
+                    // Opcional: Se quiser que o botão verde de abrir o GPS nativo apareça, mantenha a linha abaixo.
+                    btnGps.style.display = 'block'; 
                 }, 1000);
 
             }, error => {
-                alert("Você precisa permitir o acesso ao GPS (Localização) no seu navegador para calcular a rota.");
+                alert("Ative o GPS (Localização) do seu navegador para calcular a rota.");
                 loading.style.display = 'none';
             });
         } else {
