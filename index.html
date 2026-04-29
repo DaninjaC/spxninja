@@ -2,127 +2,85 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Rotas Ninja V18</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rotas Ninja V19 - Fluxo Real</title>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
-        body { font-family: sans-serif; margin: 0; background: #000; color: #fff; height: 100vh; display: flex; flex-direction: column; }
-        #topo { background: #1a1a1a; padding: 10px; border-bottom: 2px solid #f1c40f; text-align: center; }
-        #status { font-size: 13px; color: #f1c40f; background: #222; padding: 10px; text-align: center; font-weight: bold; }
-        #lista { flex: 1; overflow-y: auto; max-height: 25vh; background: #111; }
-        .item { display: flex; align-items: center; background: #222; margin: 4px; padding: 12px; border-radius: 8px; border: 1px solid #333; }
-        .stop-badge { background: #f1c40f; color: #000; padding: 3px 6px; border-radius: 4px; font-weight: bold; margin-right: 12px; }
-        #map { flex: 3; width: 100%; }
-        .footer { padding: 12px; background: #1a1a1a; }
-        .btn-calc { width: 100%; padding: 18px; background: #f1c40f; color: #000; border: none; border-radius: 12px; font-size: 16px; font-weight: bold; }
-        .marker-ninja { background: #f1c40f; border: 2px solid #000; border-radius: 50%; color: #000; font-weight: bold; text-align: center; line-height: 26px; font-size: 14px; box-shadow: 0 0 10px rgba(241,196,15,0.5); }
+        body { font-family: sans-serif; margin: 0; background: #0b0e11; color: #e9eaeb; padding: 15px; }
+        .card { background: #15191c; border-radius: 12px; padding: 20px; border: 1px solid #2b2f36; margin-bottom: 20px; }
+        h2 { color: #f1c40f; text-align: center; margin-top: 0; }
+        input[type="file"] { width: 100%; padding: 15px; background: #2b2f36; color: #fff; border: none; border-radius: 8px; cursor: pointer; }
+        .entrega-item { display: flex; align-items: center; background: #1e2329; padding: 15px; margin-bottom: 8px; border-radius: 8px; border-left: 5px solid #f1c40f; }
+        .stop-info { flex: 1; margin-left: 10px; }
+        .stop-number { font-size: 20px; font-weight: bold; color: #f1c40f; min-width: 35px; }
+        .btn-go { background: #f1c40f; color: #000; border: none; padding: 12px 20px; border-radius: 8px; font-weight: bold; cursor: pointer; text-decoration: none; display: inline-block; }
+        .btn-check { width: 25px; height: 25px; cursor: pointer; }
+        #listaStatus { font-size: 12px; color: #848e9c; text-align: center; margin-bottom: 10px; }
     </style>
 </head>
 <body>
 
-<div id="topo"><strong>ROTAS NINJA V18</strong><br><input type="file" id="fileInput" style="margin-top:5px; width:90%"></div>
-<div id="status">Aguardando GPS e Planilha...</div>
-<div id="lista"></div>
-<div id="map"></div>
-<div class="footer"><button class="btn-calc" onclick="gerarRotaNinja()">GERAR ROTA LINEAR</button></div>
+<div class="card">
+    <h2>ROTAS NINJA V19</h2>
+    <input type="file" id="fileInput" accept=".xlsx, .xls">
+</div>
+
+<div id="listaStatus">Aguardando planilha de São Caetano...</div>
+<div id="containerEntregas"></div>
 
 <script>
-    var map = L.map('map', { zoomControl: false }).setView([-23.6192, -46.5627], 15);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-    var markerGPS = L.circleMarker([0,0], {color: '#00ffff', radius: 10, fillOpacity: 1}).addTo(map);
-    var camadaMarcadores = L.featureGroup().addTo(map);
-    var camadaRota = null;
-    var minhaPosicao = null;
-
-    navigator.geolocation.watchPosition(pos => {
-        minhaPosicao = [pos.coords.latitude, pos.coords.longitude];
-        markerGPS.setLatLng(minhaPosicao);
-    }, null, { enableHighAccuracy: true });
-
     document.getElementById('fileInput').addEventListener('change', function(e) {
+        const file = e.target.files[0];
         const reader = new FileReader();
+        
         reader.onload = function(event) {
-            const wb = XLSX.read(new Uint8Array(event.target.result), { type: 'array' });
-            const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
-            const lista = document.getElementById('lista');
-            lista.innerHTML = "";
-            data.forEach((item, index) => {
-                let endRaw = item["Destination Address"] || item["Endereco"] || "";
-                let stop = item["Stop"] || (index + 1);
-                let cep = String(item["CEP"] || "").replace(/\D/g, '');
-                if(endRaw) {
-                    const div = document.createElement('div');
-                    div.className = 'item';
-                    div.innerHTML = `<input type="checkbox" class="check-ninja" data-stop="${stop}" data-cep="${cep}" data-orig="${endRaw}" style="transform:scale(1.8); margin-right:20px;"><span class="stop-badge">${stop}</span><div style="flex:1; font-size:14px;">${endRaw}</div>`;
-                    lista.appendChild(div);
-                }
-            });
-            document.getElementById('status').innerText = "Planilha carregada.";
+            const data = new Uint8Array(event.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const sheet = workbook.Sheets[workbook.SheetNames[0]];
+            const jsonData = XLSX.utils.sheet_to_json(sheet);
+            
+            exibirEntregas(jsonData);
         };
-        reader.readAsArrayBuffer(e.target.files[0]);
+        reader.readAsArrayBuffer(file);
     });
 
-    // Função para limpar e isolar o endereço
-    function prepararBusca(texto) {
-        let match = texto.match(/(Rua|Av|Avenida|Al|Alameda|Pca|Praça)\s+[^,0-9]+,\s*\d+/i);
-        let limpo = match ? match[0] : texto.split('-')[0].split(',')[0];
-        return encodeURIComponent(limpo + ", São Caetano do Sul, SP");
-    }
-
-    async function buscarCoordenada(item) {
-        const queryEndereco = prepararBusca(item.dataset.orig);
-        const queryCEP = item.dataset.cep;
-
-        // TENTATIVA 1: Endereço Limpo
-        let res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${queryEndereco}`);
-        let data = await res.json();
-        if (data && data[0]) return [parseFloat(data[0].lat), parseFloat(data[0].lon)];
-
-        // TENTATIVA 2: Apenas CEP (Se a rua falhar)
-        if (queryCEP.length >= 8) {
-            res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&postalcode=${queryCEP}&country=Brazil`);
-            data = await res.json();
-            if (data && data[0]) return [parseFloat(data[0].lat), parseFloat(data[0].lon)];
-        }
-        return null;
-    }
-
-    async function gerarRotaNinja() {
-        if (!minhaPosicao) return alert("Aguarde o sinal do GPS.");
-        const selecionados = Array.from(document.querySelectorAll('.check-ninja:checked'));
-        if (selecionados.length === 0) return alert("Selecione os pacotes!");
-
-        camadaMarcadores.clearLayers();
-        if (camadaRota) map.removeLayer(camadaRota);
-        let coordenadas = [ minhaPosicao ];
-        const statusDiv = document.getElementById('status');
-
-        for (let i = 0; i < selecionados.length; i++) {
-            statusDiv.innerText = `Processando: ${i+1}/${selecionados.length}`;
-            let pos = await buscarCoordenada(selecionados[i]);
-            if (pos) {
-                coordenadas.push(pos);
-                L.marker(pos, {icon: L.divIcon({className: 'marker-ninja', html: selecionados[i].dataset.stop, iconSize: [30, 30], iconAnchor: [15, 15]})}).addTo(camadaMarcadores);
-            }
-            await new Promise(r => setTimeout(r, 1000));
+    function exibirEntregas(dados) {
+        const container = document.getElementById('containerEntregas');
+        const status = document.getElementById('listaStatus');
+        container.innerHTML = "";
+        
+        if (dados.length === 0) {
+            status.innerText = "Nenhuma entrega encontrada.";
+            return;
         }
 
-        const coordsStr = coordenadas.map(c => `${c[1]},${c[0]}`).join(';');
-        // Motor ROUTE para garantir ordem linear de ida
-        const url = `https://router.project-osrm.org/route/v1/driving/${coordsStr}?overview=full&geometries=geojson`;
-        try {
-            const resp = await fetch(url);
-            const rData = await resp.json();
-            if (rData.routes && rData.routes[0]) {
-                camadaRota = L.polyline(rData.routes[0].geometry.coordinates.map(c => [c[1], c[0]]), {color: '#f1c40f', weight: 8}).addTo(map);
-                map.fitBounds(camadaMarcadores.getBounds(), {padding: [50, 50]});
-                statusDiv.innerText = "ROTA PRONTA!";
-                document.getElementById('lista').style.display = 'none';
-            }
-        } catch (e) { statusDiv.innerText = "Erro ao traçar rota."; }
+        // Ordenação por Stop
+        dados.sort((a, b) => (a.Stop || 0) - (b.Stop || 0));
+
+        dados.forEach((item) => {
+            const enderecoOriginal = item["Destination Address"] || item["Endereco"] || "";
+            if (!enderecoOriginal) return;
+
+            // Limpeza Ninja do endereço para o Google Maps
+            const enderecoLimpo = enderecoOriginal.split('-')[0].split('(')[0].trim() + ", São Caetano do Sul, SP";
+            const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(enderecoLimpo)}&travelmode=driving`;
+
+            const div = document.createElement('div');
+            div.className = 'entrega-item';
+            div.innerHTML = `
+                <div class="stop-number">${item.Stop || '?'}</div>
+                <div class="stop-info">
+                    <div style="font-size: 14px; font-weight: bold;">${enderecoOriginal.split(',')[0]}</div>
+                    <div style="font-size: 12px; color: #848e9c;">${item.Nome || 'Cliente'}</div>
+                </div>
+                <a href="${mapsUrl}" target="_blank" class="btn-go">NAV</a>
+            `;
+            container.appendChild(div);
+        });
+
+        status.innerText = `${dados.length} entregas carregadas em ordem linear.`;
     }
 </script>
+
 </body>
 </html>
