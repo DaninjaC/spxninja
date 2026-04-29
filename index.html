@@ -3,28 +3,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rotas Ninja</title>
+    <title>Rotas Ninja - SCS</title>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
-        body { font-family: sans-serif; padding: 15px; background: #1a1a1a; color: #eee; }
-        .container { max-width: 500px; margin: auto; background: #2d2d2d; padding: 20px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
-        h2 { text-align: center; color: #f1c40f; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 2px; }
-        .subtitle { text-align: center; font-size: 10px; color: #888; margin-bottom: 20px; }
-        input[type="file"] { width: 100%; padding: 12px; background: #3d3d3d; border: 1px dashed #555; color: #ccc; border-radius: 8px; margin-bottom: 15px; }
-        .entrega-item { display: flex; align-items: center; padding: 12px; border-bottom: 1px solid #3d3d3d; }
-        .stop-badge { background: #f1c40f; color: #000; padding: 4px 8px; border-radius: 4px; font-weight: bold; margin-right: 12px; font-size: 11px; min-width: 50px; text-align: center; }
-        .info { flex: 1; font-size: 13px; color: #ccc; }
-        .btn-container { position: sticky; bottom: 0; background: #2d2d2d; padding: 15px 0; border-top: 1px solid #444; }
-        .btn-rota { width: 100%; padding: 18px; background: #f1c40f; color: #000; border: none; border-radius: 10px; font-size: 16px; font-weight: bold; cursor: pointer; }
-        .btn-rota:disabled { background: #555; color: #888; cursor: not-allowed; }
-        #contador { text-align: center; font-weight: bold; margin-bottom: 10px; color: #f1c40f; }
+        body { font-family: sans-serif; padding: 15px; background: #121212; color: #eee; }
+        .container { max-width: 500px; margin: auto; background: #1e1e1e; padding: 20px; border-radius: 15px; border: 1px solid #333; }
+        h2 { text-align: center; color: #f1c40f; margin-bottom: 5px; }
+        .subtitle { text-align: center; font-size: 11px; color: #777; margin-bottom: 20px; }
+        input[type="file"] { width: 100%; padding: 12px; background: #2a2a2a; border: 1px solid #444; color: #fff; border-radius: 8px; margin-bottom: 15px; }
+        .entrega-item { display: flex; align-items: center; padding: 15px; border-bottom: 1px solid #333; }
+        .stop-badge { background: #f1c40f; color: #000; padding: 5px 10px; border-radius: 5px; font-weight: bold; margin-right: 15px; font-size: 12px; min-width: 60px; text-align: center; }
+        .info { flex: 1; font-size: 14px; }
+        .btn-container { position: sticky; bottom: 0; background: #1e1e1e; padding: 15px 0; }
+        .btn-rota { width: 100%; padding: 20px; background: #f1c40f; color: #000; border: none; border-radius: 12px; font-size: 18px; font-weight: bold; cursor: pointer; box-shadow: 0 5px 15px rgba(241, 196, 15, 0.2); }
+        #contador { text-align: center; margin-bottom: 10px; color: #f1c40f; font-weight: bold; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2>Rotas Ninja</h2>
-    <div class="subtitle">Logística de Precisão</div>
+    <h2>ROTAS NINJA</h2>
+    <div class="subtitle">SÃO CAETANO DO SUL - SP</div>
     
     <input type="file" id="fileInput" accept="*">
     <div id="contador">Selecionados: 0 / 10</div>
@@ -32,7 +31,7 @@
     <div id="listaEntregas"></div>
     
     <div class="btn-container">
-        <button id="btnGerar" class="btn-rota" onclick="gerarRota()" disabled>INICIAR ROTA (GPS)</button>
+        <button id="btnGerar" class="btn-rota" onclick="gerarRota()" disabled>TRAÇAR MELHOR CAMINHO</button>
     </div>
 </div>
 
@@ -53,7 +52,7 @@
                 const jsonData = XLSX.utils.sheet_to_json(worksheet);
                 processarDados(jsonData);
             } catch (err) {
-                alert("Erro ao ler planilha. Verifique se o arquivo está correto.");
+                alert("Erro ao ler arquivo. Baixe para o celular antes de selecionar.");
             }
         };
         reader.readAsArrayBuffer(file);
@@ -61,18 +60,20 @@
 
     function processarDados(data) {
         dadosEntregas = data.map(item => {
-            const endereco = item["Destination Address"] || item["Endereco"] || "";
+            let endereco = item["Destination Address"] || item["Endereco"] || "";
+            // Garante que o endereço tenha a cidade e estado para não sair de SCS
+            if (!endereco.toLowerCase().includes("são caetano")) {
+                endereco += ", São Caetano do Sul, SP";
+            }
+            
             const stop = parseInt(String(item["Stop"]).replace(/\D/g, '')) || 0;
             const numMatch = endereco.match(/\d+/);
             const numero = numMatch ? parseInt(numMatch[0]) : 0;
             return { endereco, stop, numero };
         });
 
-        // Ordenação Ninja: Stop e depois número da casa
-        dadosEntregas.sort((a, b) => {
-            if (a.stop !== b.stop) return a.stop - b.stop;
-            return a.numero - b.numero;
-        });
+        // Ordenação Inicial por Stop da Planilha
+        dadosEntregas.sort((a, b) => a.stop - b.stop || a.numero - b.numero);
 
         renderizarLista();
     }
@@ -87,10 +88,10 @@
             const div = document.createElement('div');
             div.className = 'entrega-item';
             div.innerHTML = `
-                <input type="checkbox" class="addr-check" value="${item.endereco}" onchange="validarLimite(this)" style="transform: scale(1.6); margin-right: 15px;">
+                <input type="checkbox" class="addr-check" value="${item.endereco}" onchange="validarLimite(this)" style="transform: scale(1.7); margin-right: 20px;">
                 <span class="stop-badge">STOP ${item.stop}</span>
                 <div class="info">
-                    <strong>Nº ${item.numero}</strong><br>${item.endereco}
+                    <strong>Nº ${item.numero}</strong><br>${item.endereco.split(',')[0]}
                 </div>
             `;
             container.appendChild(div);
@@ -101,7 +102,7 @@
         const checkboxes = document.querySelectorAll('.addr-check:checked');
         if (checkboxes.length > 10) {
             checkbox.checked = false;
-            alert("Limite máximo de 10 pacotes por rota atingido!");
+            alert("O Google Maps limita em 10 paradas por vez para garantir a melhor rota.");
         }
         selecionadosCount = document.querySelectorAll('.addr-check:checked').length;
         atualizarBotao();
@@ -116,23 +117,14 @@
         const checkboxes = document.querySelectorAll('.addr-check:checked');
         const enderecos = Array.from(checkboxes).map(cb => cb.value);
 
-        if (enderecos.length === 0) return;
-
-        // A mágica do GPS: a origem é vazia ou 'My+Location'
-        // O destino final é o último endereço da sua lista de 10
-        // As paradas (waypoints) são os endereços do 1 ao 9
+        // A 'origem' vazia faz o Maps usar o seu GPS ATUAL
+        // Usamos o Google Maps Directions URL (mais moderno e preciso para rotas)
+        const origin = "current+location";
+        const destination = encodeURIComponent(enderecos[enderecos.length - 1]);
+        const waypoints = enderecos.slice(0, -1).map(addr => encodeURIComponent(addr)).join('|');
         
-        const destinoFinal = encodeURIComponent(enderecos[enderecos.length - 1]);
-        const paradasIntermediarias = enderecos.slice(0, -1).map(addr => encodeURIComponent(addr)).join('|');
-        
-        // URL otimizada para usar sua localização atual como ponto de partida
-        let url = `https://www.google.com/maps/dir/?api=1&origin=My+Location&destination=${destinoFinal}`;
-        
-        if (paradasIntermediarias) {
-            url += `&waypoints=${paradasIntermediarias}`;
-        }
-        
-        url += `&travelmode=driving`;
+        // Parâmetro 'optimize:true' faz o Google encontrar a melhor ordem entre as paradas
+        const url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&waypoints=${waypoints}&waypoint_optimization=true&travelmode=driving`;
         
         window.open(url, '_blank');
     }
