@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rotas Ninja V20 - Rota Expressa</title>
+    <title>Rotas Ninja V21 - Express</title>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
         body { font-family: sans-serif; margin: 0; background: #000; color: #fff; height: 100vh; display: flex; flex-direction: column; }
@@ -16,16 +16,16 @@
         }
         .stop-n { background: #f1c40f; color: #000; padding: 5px 10px; border-radius: 5px; font-weight: bold; margin-right: 15px; }
         
-        /* Container do Mapa */
         #map-frame-container { 
-            display: none; flex: 1; width: 100%; position: relative; background: #000;
+            display: none; flex: 1; width: 100%; position: relative;
         }
         iframe { width: 100%; height: 100%; border: none; }
         
         .btn-voltar {
-            position: absolute; top: 10px; right: 10px; z-index: 10;
-            background: #f1c40f; color: #000; border: none; padding: 12px 20px;
-            border-radius: 8px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            position: absolute; top: 15px; right: 15px; z-index: 100;
+            background: #f1c40f; color: #000; border: none; padding: 12px 25px;
+            border-radius: 8px; font-weight: bold; cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.8);
         }
         .oculto { display: none !important; }
     </style>
@@ -33,16 +33,16 @@
 <body>
 
 <div id="header">
-    <strong style="color:#f1c40f">ROTAS NINJA V20</strong>
-    <input type="file" id="fileInput" style="margin-top:10px; width:100%">
+    <strong style="color:#f1c40f">ROTAS NINJA V21</strong>
+    <input type="file" id="fileInput" style="margin-top:10px; width:90%">
 </div>
 
 <div id="lista-container">
-    <p style="text-align:center; color:#666;">Carregue a planilha para listar as entregas.</p>
+    <p style="text-align:center; color:#666;">Selecione a planilha para listar as entregas.</p>
 </div>
 
 <div id="map-frame-container">
-    <button class="btn-voltar" onclick="fecharMapa()">LISTA</button>
+    <button class="btn-voltar" onclick="fecharMapa()">VOLTAR</button>
     <iframe id="googleMapsFrame" allow="geolocation" src=""></iframe>
 </div>
 
@@ -65,16 +65,16 @@
         dadosPlanilha.sort((a, b) => (a.Stop || 0) - (b.Stop || 0));
 
         dadosPlanilha.forEach((item) => {
-            const enderecoRaw = item["Destination Address"] || item["Endereco"] || "";
-            if (!enderecoRaw) return;
+            const end = item["Destination Address"] || item["Endereco"] || "";
+            if (!end) return;
 
             const div = document.createElement('div');
             div.className = 'item-rota';
-            div.onclick = () => abrirRotaExpressa(enderecoRaw);
+            div.onclick = () => iniciarNavegacao(end);
             div.innerHTML = `
                 <div class="stop-n">${item.Stop || '?'}</div>
                 <div style="flex:1">
-                    <div style="font-weight:bold">${enderecoRaw.split(',')[0]}</div>
+                    <div style="font-weight:bold">${end.split(',')[0]}</div>
                     <div style="font-size:12px; color:#aaa">${item.CEP || ''}</div>
                 </div>
             `;
@@ -82,27 +82,18 @@
         });
     }
 
-    function abrirRotaExpressa(endereco) {
+    function iniciarNavegacao(endereco) {
         const lista = document.getElementById('lista-container');
         const mapaContainer = document.getElementById('map-frame-container');
         const frame = document.getElementById('googleMapsFrame');
 
-        // Limpeza do endereço para o Google não se perder
         const destino = encodeURIComponent(endereco.split('-')[0].split('(')[0].trim() + ", São Caetano do Sul, SP");
         
-        /* URL de Direções Estruturada:
-           - origin: Vazio para o Google usar o GPS do seu celular.
-           - destination: O endereço da planilha.
-           - travelmode: driving (força rota de carro/moto).
-        */
-        const url = `https://www.google.com/maps/embed/v1/directions?key=SUA_CHAVE_AQUI&origin=Current+Location&destination=${destino}&mode=driving`;
-        
-        // Versão sem API Key (Embed direto via Search modificado para Directions)
-        const urlFinal = `https://maps.google.com/maps?q=${destino}&output=embed&dg=oo`;
-        
-        // Para garantir que ele mostre a ROTA e não só o ponto, usamos a URL de visualização de tráfego/direção
-        frame.src = `https://maps.google.com/maps?saddr=My+Location&daddr=${destino}&ie=UTF8&t=&z=14&iwloc=B&output=embed`;
-        
+        // URL NINJA: Força Origem no seu GPS, Destino na Planilha e modo Direção de Carro
+        // O parâmetro 'saddr=My+Location' é o segredo para ele não pegar o centro da cidade
+        const url = `https://maps.google.com/maps?saddr=My+Location&daddr=${destino}&directionsmode=driving&output=embed`;
+
+        frame.src = url;
         lista.classList.add('oculto');
         mapaContainer.style.display = 'block';
     }
