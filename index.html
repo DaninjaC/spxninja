@@ -3,37 +3,42 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Roteirizador Capi Roots V3</title>
+    <title>Rotas Ninja</title>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 15px; background: #f8f9fa; }
-        .container { max-width: 500px; margin: auto; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-        h2 { text-align: center; color: #2c3e50; margin-bottom: 20px; }
-        input[type="file"] { width: 100%; padding: 12px; border: 2px dashed #bdc3c7; border-radius: 8px; margin-bottom: 15px; }
-        .entrega-item { display: flex; align-items: center; padding: 12px; border-bottom: 1px solid #edf2f7; transition: background 0.2s; }
-        .entrega-item:active { background: #f1f5f9; }
-        .stop-badge { background: #e67e22; color: white; padding: 4px 10px; border-radius: 6px; font-weight: bold; margin-right: 12px; font-size: 12px; min-width: 55px; text-align: center; }
-        .info { flex: 1; font-size: 14px; line-height: 1.4; }
-        .btn-container { position: sticky; bottom: 0; background: white; padding: 10px 0; }
-        .btn-rota { width: 100%; padding: 18px; background: #2ecc71; color: white; border: none; border-radius: 10px; font-size: 18px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 6px rgba(46, 204, 113, 0.3); }
-        #status { font-size: 12px; color: #7f8c8d; text-align: center; margin-bottom: 10px; }
+        body { font-family: sans-serif; padding: 15px; background: #1a1a1a; color: #eee; }
+        .container { max-width: 500px; margin: auto; background: #2d2d2d; padding: 20px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+        h2 { text-align: center; color: #f1c40f; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 2px; }
+        .subtitle { text-align: center; font-size: 10px; color: #888; margin-bottom: 20px; }
+        input[type="file"] { width: 100%; padding: 12px; background: #3d3d3d; border: 1px dashed #555; color: #ccc; border-radius: 8px; margin-bottom: 15px; }
+        .entrega-item { display: flex; align-items: center; padding: 12px; border-bottom: 1px solid #3d3d3d; }
+        .stop-badge { background: #f1c40f; color: #000; padding: 4px 8px; border-radius: 4px; font-weight: bold; margin-right: 12px; font-size: 11px; min-width: 50px; text-align: center; }
+        .info { flex: 1; font-size: 13px; color: #ccc; }
+        .btn-container { position: sticky; bottom: 0; background: #2d2d2d; padding: 15px 0; border-top: 1px solid #444; }
+        .btn-rota { width: 100%; padding: 18px; background: #f1c40f; color: #000; border: none; border-radius: 10px; font-size: 16px; font-weight: bold; cursor: pointer; }
+        .btn-rota:disabled { background: #555; color: #888; cursor: not-allowed; }
+        #contador { text-align: center; font-weight: bold; margin-bottom: 10px; color: #f1c40f; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2>Capi Roots - Rotas</h2>
+    <h2>Rotas Ninja</h2>
+    <div class="subtitle">Logística de Precisão</div>
+    
     <input type="file" id="fileInput" accept="*">
-    <div id="status">Carregue a planilha da Shopee</div>
+    <div id="contador">Selecionados: 0 / 10</div>
+    
     <div id="listaEntregas"></div>
     
     <div class="btn-container">
-        <button class="btn-rota" onclick="gerarRota()">INICIAR ROTA SELECIONADA</button>
+        <button id="btnGerar" class="btn-rota" onclick="gerarRota()" disabled>INICIAR ROTA (GPS)</button>
     </div>
 </div>
 
 <script>
     let dadosEntregas = [];
+    let selecionadosCount = 0;
 
     document.getElementById('fileInput').addEventListener('change', function(e) {
         const file = e.target.files[0];
@@ -48,7 +53,7 @@
                 const jsonData = XLSX.utils.sheet_to_json(worksheet);
                 processarDados(jsonData);
             } catch (err) {
-                alert("Erro ao ler Excel. Tente baixar o arquivo para o celular primeiro.");
+                alert("Erro ao ler planilha. Verifique se o arquivo está correto.");
             }
         };
         reader.readAsArrayBuffer(file);
@@ -57,17 +62,13 @@
     function processarDados(data) {
         dadosEntregas = data.map(item => {
             const endereco = item["Destination Address"] || item["Endereco"] || "";
-            const stopStr = String(item["Stop"] || "0");
-            const stop = parseInt(stopStr.replace(/\D/g, '')) || 0; // Remove letras se houver
-            
-            // Pega o número da casa para ordenar dentro do Stop
+            const stop = parseInt(String(item["Stop"]).replace(/\D/g, '')) || 0;
             const numMatch = endereco.match(/\d+/);
             const numero = numMatch ? parseInt(numMatch[0]) : 0;
-            
-            return { endereco, stop, numero, nome: item["Nome"] || "Cliente" };
+            return { endereco, stop, numero };
         });
 
-        // Ordenação rigorosa: Stop crescente, depois número da casa crescente
+        // Ordenação Ninja: Stop e depois número da casa
         dadosEntregas.sort((a, b) => {
             if (a.stop !== b.stop) return a.stop - b.stop;
             return a.numero - b.numero;
@@ -79,45 +80,56 @@
     function renderizarLista() {
         const container = document.getElementById('listaEntregas');
         container.innerHTML = "";
-        
+        selecionadosCount = 0;
+        atualizarBotao();
+
         dadosEntregas.forEach((item, index) => {
             const div = document.createElement('div');
             div.className = 'entrega-item';
-            // REMOVIDO O 'checked' para começar desmarcado
             div.innerHTML = `
-                <input type="checkbox" class="addr-check" value="${item.endereco}" style="transform: scale(1.5); margin-right: 15px;">
+                <input type="checkbox" class="addr-check" value="${item.endereco}" onchange="validarLimite(this)" style="transform: scale(1.6); margin-right: 15px;">
                 <span class="stop-badge">STOP ${item.stop}</span>
                 <div class="info">
-                    <strong>Nº ${item.numero}</strong> - ${item.endereco}
+                    <strong>Nº ${item.numero}</strong><br>${item.endereco}
                 </div>
             `;
             container.appendChild(div);
         });
-        document.getElementById('status').innerText = dadosEntregas.length + " pacotes carregados. Selecione as paradas:";
+    }
+
+    function validarLimite(checkbox) {
+        const checkboxes = document.querySelectorAll('.addr-check:checked');
+        if (checkboxes.length > 10) {
+            checkbox.checked = false;
+            alert("Limite máximo de 10 pacotes por rota atingido!");
+        }
+        selecionadosCount = document.querySelectorAll('.addr-check:checked').length;
+        atualizarBotao();
+    }
+
+    function atualizarBotao() {
+        document.getElementById('contador').innerText = `Selecionados: ${selecionadosCount} / 10`;
+        document.getElementById('btnGerar').disabled = selecionadosCount === 0;
     }
 
     function gerarRota() {
-        const selecionados = [];
-        document.querySelectorAll('.addr-check:checked').forEach(cb => {
-            selecionados.push(cb.value);
-        });
+        const checkboxes = document.querySelectorAll('.addr-check:checked');
+        const enderecos = Array.from(checkboxes).map(cb => cb.value);
 
-        if (selecionados.length === 0) return alert("Selecione os pacotes que deseja entregar agora.");
-        if (selecionados.length > 11) alert("Atenção: O Google Maps pode ignorar algumas paradas se selecionar mais de 10 endereços de uma vez.");
+        if (enderecos.length === 0) return;
 
-        // Lógica de construção da URL do Google Maps
-        // Origem: Primeiro selecionado
-        // Destino: Último selecionado
-        // Waypoints: Todos os outros no meio
+        // A mágica do GPS: a origem é vazia ou 'My+Location'
+        // O destino final é o último endereço da sua lista de 10
+        // As paradas (waypoints) são os endereços do 1 ao 9
         
-        const origin = encodeURIComponent(selecionados[0]);
-        const destination = encodeURIComponent(selecionados[selecionados.length - 1]);
+        const destinoFinal = encodeURIComponent(enderecos[enderecos.length - 1]);
+        const paradasIntermediarias = enderecos.slice(0, -1).map(addr => encodeURIComponent(addr)).join('|');
         
-        let url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}`;
+        // URL otimizada para usar sua localização atual como ponto de partida
+        let url = `https://www.google.com/maps/dir/?api=1&origin=My+Location&destination=${destinoFinal}`;
         
-        if (selecionados.length > 2) {
-            const waypoints = selecionados.slice(1, -1).map(addr => encodeURIComponent(addr)).join('|');
-            url += `&waypoints=${waypoints}`;
+        if (paradasIntermediarias) {
+            url += `&waypoints=${paradasIntermediarias}`;
         }
         
         url += `&travelmode=driving`;
