@@ -3,35 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rotas Ninja V22 - Painel Híbrido</title>
+    <title>Rotas Ninja V22 - Rastreador GPS Integrado</title>
     
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
+    <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
 
     <style>
         body { font-family: sans-serif; margin: 0; background: #000; color: #fff; height: 100vh; display: flex; flex-direction: column; }
         .header { background: #111; padding: 15px; border-bottom: 2px solid #f1c40f; text-align: center; }
-        .btn-arquivo { background: #222; color: #f1c40f; border: 1px dashed #f1c40f; padding: 10px; border-radius: 5px; width: 90%; max-width: 300px; margin-top: 10px; cursor: pointer; }
+        .btn-arquivo { background: #222; color: #f1c40f; border: 1px dashed #f1c40f; padding: 10px; border-radius: 5px; width: 90%; max-width: 300px; margin-top: 10px; }
         
         #main-container { display: flex; flex: 1; overflow: hidden; }
         #lista-container { width: 350px; overflow-y: auto; padding: 10px; background: #111; z-index: 10; border-right: 1px solid #333; }
         
-        #map-container { flex: 1; background: #222; display: flex; flex-direction: column; }
-        #googleFrame { width: 100%; flex: 1; border: none; display: none; }
+        #map-container { flex: 1; background: #222; position: relative; }
+        #map { height: 100%; width: 100%; }
         
-        /* Botão para iniciar o GPS nativo caso você queira a rota guiada */
-        #btn-iniciar-gps {
-            display: none;
-            background: #27ae60;
-            color: #fff;
-            text-align: center;
-            padding: 20px;
-            font-size: 18px;
-            font-weight: bold;
-            text-decoration: none;
-            border-top: 2px solid #2ecc71;
-        }
-        #btn-iniciar-gps:active { background: #2ecc71; }
-
         .item-entrega { 
             background: #1a1a1a; margin-bottom: 10px; padding: 15px; border-radius: 8px; 
             border-left: 4px solid #f1c40f; cursor: pointer; display: flex; align-items: center;
@@ -41,7 +31,9 @@
         .active .stop-num { color: #000; }
         
         #status { font-size: 13px; color: #aaa; margin-bottom: 15px; text-align: center; }
-        #loading-msg { color: #f1c40f; font-weight: bold; display: none; text-align: center; padding: 20px; margin-top: 50px;}
+
+        /* Ocultar a caixa de texto de instruções para deixar o mapa mais limpo */
+        .leaflet-routing-container { display: none !important; }
 
         @media (max-width: 768px) {
             #main-container { flex-direction: column; }
@@ -63,17 +55,38 @@
         <div id="listaEntregas"></div>
     </div>
     <div id="map-container">
-        <div id="loading-msg">Traçando rota exata no Google...</div>
-        <iframe id="googleFrame" allowfullscreen></iframe>
-        <a href="#" id="btn-iniciar-gps" target="_blank">🚀 INICIAR NAVEGAÇÃO 3D (GPS)</a>
+        <div id="map"></div>
     </div>
 </div>
 
 <script>
-    document.getElementById('fileInput').addEventListener('change', function(e) {
-        const file = e.target.files[0];
-        if (!file) return;
+    let map, routingControl;
+    let gpsWatcher = null; 
+    let marcadorUsuario = null; // A "Bolinha" que vai se mexer com você
 
+    // 1. Inicializa o mapa focado em São Caetano
+    map = L.map('map').setView([-23.617, -46.551], 14);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+
+    // Ícone da sua localização atual (Bolinha Azul)
+    const iconeCarro = L.divIcon({
+        className: 'custom-div-icon',
+        html: "<div style='background-color:#3498db; height:20px; width:20px; border-radius:50%; border:3px solid #fff; box-shadow: 0 0 10px rgba(0,0,0,0.5);'></div>",
+        iconSize: [26, 26],
+        iconAnchor: [13, 13]
+    });
+
+    // Função Ninja para limpar sujeira da planilha e evitar erros de endereço
+    function limparEndereco(enderecoBruto) {
+        let partes = enderecoBruto.split(',');
+        let rua = partes[0] ? partes[0].trim() : '';
+        let numero = partes[1] ? partes[1].split('-')[0].replace(/\D/g, '').trim() : '';
+        
+        rua = rua.replace(/\bMte\b/gi, 'Monte').replace(/\bCel\b/gi, 'Coronel');
+        return `${rua}, ${numero}`;
+    }
+
+    document.getElementById('fileInput').addEventListener('change', function(e) {
         const reader = new FileReader();
         reader.onload = function(event) {
             const data = new Uint8Array(event.target.result);
@@ -85,68 +98,100 @@
             container.innerHTML = "";
             
             dados.forEach((item) => {
-                const enderecoRaw = item["Destination Address"] || item["Endereco"] || item["Endereço"] || "";
+                const enderecoRaw = item["Destination Address"] || item["Endereco"] || "";
                 if (!enderecoRaw) return;
 
                 const div = document.createElement('div');
                 div.className = 'item-entrega';
                 div.innerHTML = `
                     <div class="stop-num">${item.Stop || '?'}</div>
-                    <div style="font-size: 14px;">${enderecoRaw}</div>
+                    <div style="font-size: 14px;">${enderecoRaw.split('-')[0].trim()}</div>
                 `;
                 
-                div.onclick = () => iniciarRotaGoogle(enderecoRaw, div);
+                div.onclick = () => iniciarNavegacao2D(enderecoRaw, div);
                 container.appendChild(div);
             });
-            document.getElementById('status').innerText = `${dados.length} entregas prontas!`;
+            document.getElementById('status').innerText = `${dados.length} entregas carregadas!`;
         };
-        reader.readAsArrayBuffer(file);
+        reader.readAsArrayBuffer(e.target.files[0]);
     });
 
-    function iniciarRotaGoogle(destino, elementoClicado) {
+    async function iniciarNavegacao2D(enderecoBruto, elementoClicado) {
         document.querySelectorAll('.item-entrega').forEach(el => el.classList.remove('active'));
         elementoClicado.classList.add('active');
-        
-        const frame = document.getElementById('googleFrame');
-        const loading = document.getElementById('loading-msg');
-        const btnGps = document.getElementById('btn-iniciar-gps');
-        
-        frame.style.display = 'none';
-        btnGps.style.display = 'none';
-        loading.style.display = 'block';
+        document.getElementById('status').innerText = "Buscando localização e traçando rota...";
 
-        if ("geolocation" in navigator) {
-            navigator.geolocation.getCurrentPosition(position => {
-                const latOrigem = position.coords.latitude;
-                const lngOrigem = position.coords.longitude;
-
-                const destinoFormatado = `${destino}, São Caetano do Sul, SP`;
-                
-                // URL do Frame (Interno)
-                const urlFrame = `https://maps.google.com/maps?saddr=${latOrigem},${lngOrigem}&daddr=${encodeURIComponent(destinoFormatado)}&hl=pt-BR&output=embed`;
-                
-                // URL do Botão de Navegação (Abre o App Nativo)
-                // travelmode=driving garante que abra a rota de carro já pronta para iniciar
-                const urlNativa = `https://www.google.com/maps/dir/?api=1&origin=${latOrigem},${lngOrigem}&destination=${encodeURIComponent(destinoFormatado)}&travelmode=driving`;
-
-                frame.src = urlFrame;
-                btnGps.href = urlNativa;
-                
-                setTimeout(() => {
-                    loading.style.display = 'none';
-                    frame.style.display = 'block';
-                    // Opcional: Se quiser que o botão verde de abrir o GPS nativo apareça, mantenha a linha abaixo.
-                    btnGps.style.display = 'block'; 
-                }, 1000);
-
-            }, error => {
-                alert("Ative o GPS (Localização) do seu navegador para calcular a rota.");
-                loading.style.display = 'none';
-            });
-        } else {
+        if (!navigator.geolocation) {
             alert("Seu navegador não suporta GPS.");
-            loading.style.display = 'none';
+            return;
         }
+
+        // 1. Pega sua posição inicial UMA vez para traçar a linha
+        navigator.geolocation.getCurrentPosition(async (position) => {
+            let latOrigem = position.coords.latitude;
+            let lngOrigem = position.coords.longitude;
+
+            // 2. Transforma o endereço do Excel em coordenadas
+            let enderecoLimpo = limparEndereco(enderecoBruto);
+            let urlBusca = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(enderecoLimpo + ", São Caetano do Sul, SP")}&limit=1`;
+            
+            let res = await fetch(urlBusca);
+            let data = await res.json();
+
+            // Se falhar por causa do número complexo, busca apenas a RUA para não te deixar na mão
+            if (data.length === 0) {
+                let ruaApenas = enderecoLimpo.split(',')[0];
+                urlBusca = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(ruaApenas + ", São Caetano do Sul, SP")}&limit=1`;
+                res = await fetch(urlBusca);
+                data = await res.json();
+            }
+
+            if (data.length > 0) {
+                let latDestino = data[0].lat;
+                let lngDestino = data[0].lon;
+
+                // Limpa rotas e GPS antigos
+                if (routingControl) { map.removeControl(routingControl); }
+                if (gpsWatcher) { navigator.geolocation.clearWatch(gpsWatcher); }
+                if (marcadorUsuario) { map.removeLayer(marcadorUsuario); }
+
+                // 3. Desenha a linha da rota
+                routingControl = L.Routing.control({
+                    waypoints: [ L.latLng(latOrigem, lngOrigem), L.latLng(latDestino, lngDestino) ],
+                    routeWhileDragging: false,
+                    showAlternatives: false,
+                    fitSelectedRoutes: true,
+                    router: L.Routing.osrmv1({ profile: 'driving' })
+                }).addTo(map);
+
+                document.getElementById('status').innerHTML = "<span style='color:#2ecc71; font-weight:bold;'>GPS ATIVADO. Siga a linha azul!</span>";
+
+                // 4. A MÁGICA DO RASTREAMENTO AO VIVO (A bolinha andando na tela)
+                marcadorUsuario = L.marker([latOrigem, lngOrigem], {icon: iconeCarro}).addTo(map);
+
+                gpsWatcher = navigator.geolocation.watchPosition((posAtual) => {
+                    let novaLat = posAtual.coords.latitude;
+                    let novaLng = posAtual.coords.longitude;
+                    
+                    // Move a bolinha para a nova posição do seu carro
+                    marcadorUsuario.setLatLng([novaLat, novaLng]);
+                    
+                    // Opcional: Faz a tela seguir você automaticamente
+                    // map.setView([novaLat, novaLng], 16); 
+                }, (err) => {
+                    console.log("Erro no GPS:", err);
+                }, { 
+                    enableHighAccuracy: true, // Força a precisão máxima do celular
+                    maximumAge: 1000, 
+                    timeout: 5000 
+                });
+
+            } else {
+                document.getElementById('status').innerText = "Erro: Endereço não encontrado.";
+            }
+        }, (err) => {
+            alert("Permita o uso da sua localização (GPS) no navegador.");
+        });
     }
 </script>
 
