@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Rotas Ninja V17</title>
+    <title>Rotas Ninja V18</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -22,16 +22,15 @@
 </head>
 <body>
 
-<div id="topo"><strong>ROTAS NINJA V17</strong><br><input type="file" id="fileInput" style="margin-top:5px; width:90%"></div>
+<div id="topo"><strong>ROTAS NINJA V18</strong><br><input type="file" id="fileInput" style="margin-top:5px; width:90%"></div>
 <div id="status">Aguardando GPS e Planilha...</div>
 <div id="lista"></div>
 <div id="map"></div>
-<div class="footer"><button class="btn-calc" onclick="gerarRotaLinear()">GERAR ROTA LINEAR (IDA)</button></div>
+<div class="footer"><button class="btn-calc" onclick="gerarRotaNinja()">GERAR ROTA LINEAR</button></div>
 
 <script>
     var map = L.map('map', { zoomControl: false }).setView([-23.6192, -46.5627], 15);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-    
     var markerGPS = L.circleMarker([0,0], {color: '#00ffff', radius: 10, fillOpacity: 1}).addTo(map);
     var camadaMarcadores = L.featureGroup().addTo(map);
     var camadaRota = null;
@@ -49,99 +48,80 @@
             const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
             const lista = document.getElementById('lista');
             lista.innerHTML = "";
-            
             data.forEach((item, index) => {
                 let endRaw = item["Destination Address"] || item["Endereco"] || "";
                 let stop = item["Stop"] || (index + 1);
-                let cep = item["CEP"] || "";
-                
+                let cep = String(item["CEP"] || "").replace(/\D/g, '');
                 if(endRaw) {
                     const div = document.createElement('div');
                     div.className = 'item';
-                    div.innerHTML = `
-                        <input type="checkbox" class="check-ninja" 
-                               data-stop="${stop}" 
-                               data-cep="${cep}" 
-                               data-orig="${endRaw}" 
-                               value="${limparParaBusca(endRaw)}" 
-                               style="transform:scale(1.8); margin-right:20px;">
-                        <span class="stop-badge">${stop}</span>
-                        <div style="flex:1; font-size:14px;">${endRaw}</div>
-                    `;
+                    div.innerHTML = `<input type="checkbox" class="check-ninja" data-stop="${stop}" data-cep="${cep}" data-orig="${endRaw}" style="transform:scale(1.8); margin-right:20px;"><span class="stop-badge">${stop}</span><div style="flex:1; font-size:14px;">${endRaw}</div>`;
                     lista.appendChild(div);
                 }
             });
-            document.getElementById('status').innerText = "Planilha carregada. Selecione a ordem das paradas.";
+            document.getElementById('status').innerText = "Planilha carregada.";
         };
         reader.readAsArrayBuffer(e.target.files[0]);
     });
 
-    function limparParaBusca(texto) {
-        let t = texto.split('-')[0].split('(')[0];
-        t = t.replace(/R\./g, "Rua").replace(/Av\./g, "Avenida").trim();
-        return t + ", São Caetano do Sul, SP";
+    // Função para limpar e isolar o endereço
+    function prepararBusca(texto) {
+        let match = texto.match(/(Rua|Av|Avenida|Al|Alameda|Pca|Praça)\s+[^,0-9]+,\s*\d+/i);
+        let limpo = match ? match[0] : texto.split('-')[0].split(',')[0];
+        return encodeURIComponent(limpo + ", São Caetano do Sul, SP");
     }
 
-    async function buscarPonto(item) {
-        const query = encodeURIComponent(item.value);
-        const url = `https://nominatim.openstreetmap.org/search?format=json&q=${query}&viewbox=-46.59,-23.64,-46.53,-23.59&bounded=1`;
-        try {
-            const res = await fetch(url);
-            const data = await res.json();
-            return (data && data[0]) ? [parseFloat(data[0].lat), parseFloat(data[0].lon)] : null;
-        } catch (e) { return null; }
+    async function buscarCoordenada(item) {
+        const queryEndereco = prepararBusca(item.dataset.orig);
+        const queryCEP = item.dataset.cep;
+
+        // TENTATIVA 1: Endereço Limpo
+        let res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${queryEndereco}`);
+        let data = await res.json();
+        if (data && data[0]) return [parseFloat(data[0].lat), parseFloat(data[0].lon)];
+
+        // TENTATIVA 2: Apenas CEP (Se a rua falhar)
+        if (queryCEP.length >= 8) {
+            res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&postalcode=${queryCEP}&country=Brazil`);
+            data = await res.json();
+            if (data && data[0]) return [parseFloat(data[0].lat), parseFloat(data[0].lon)];
+        }
+        return null;
     }
 
-    async function gerarRotaLinear() {
+    async function gerarRotaNinja() {
         if (!minhaPosicao) return alert("Aguarde o sinal do GPS.");
         const selecionados = Array.from(document.querySelectorAll('.check-ninja:checked'));
-        if (selecionados.length === 0) return alert("Selecione os destinos!");
+        if (selecionados.length === 0) return alert("Selecione os pacotes!");
 
         camadaMarcadores.clearLayers();
         if (camadaRota) map.removeLayer(camadaRota);
-        
         let coordenadas = [ minhaPosicao ];
         const statusDiv = document.getElementById('status');
 
         for (let i = 0; i < selecionados.length; i++) {
-            statusDiv.innerText = `Localizando Stop ${selecionados[i].dataset.stop}...`;
-            let pos = await buscarPonto(selecionados[i]);
-
+            statusDiv.innerText = `Processando: ${i+1}/${selecionados.length}`;
+            let pos = await buscarCoordenada(selecionados[i]);
             if (pos) {
                 coordenadas.push(pos);
-                const icon = L.divIcon({
-                    className: 'marker-ninja',
-                    html: selecionados[i].dataset.stop,
-                    iconSize: [30, 30], iconAnchor: [15, 15]
-                });
-                L.marker(pos, {icon: icon}).addTo(camadaMarcadores);
-            } else {
-                alert(`Não foi possível localizar: ${selecionados[i].dataset.orig}. Verifique o endereço.`);
-                statusDiv.innerText = "Erro em um dos endereços.";
-                return;
+                L.marker(pos, {icon: L.divIcon({className: 'marker-ninja', html: selecionados[i].dataset.stop, iconSize: [30, 30], iconAnchor: [15, 15]})}).addTo(camadaMarcadores);
             }
-            await new Promise(r => setTimeout(r, 1100));
+            await new Promise(r => setTimeout(r, 1000));
         }
 
-        statusDiv.innerText = "Calculando rota de ida (sem voltas)...";
         const coordsStr = coordenadas.map(c => `${c[1]},${c[0]}`).join(';');
-        
-        // MOTOR 'ROUTE' (Segue a ordem exata da sua seleção, ponto a ponto)
-        const url = `https://router.project-osrm.org/route/v1/driving/${coordsStr}?overview=full&geometries=geojson&continue_straight=true`;
-
+        // Motor ROUTE para garantir ordem linear de ida
+        const url = `https://router.project-osrm.org/route/v1/driving/${coordsStr}?overview=full&geometries=geojson`;
         try {
             const resp = await fetch(url);
             const rData = await resp.json();
             if (rData.routes && rData.routes[0]) {
-                const routeLine = rData.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
-                camadaRota = L.polyline(routeLine, {color: '#f1c40f', weight: 8, opacity: 0.8}).addTo(map);
+                camadaRota = L.polyline(rData.routes[0].geometry.coordinates.map(c => [c[1], c[0]]), {color: '#f1c40f', weight: 8}).addTo(map);
                 map.fitBounds(camadaMarcadores.getBounds(), {padding: [50, 50]});
-                statusDiv.innerText = "ROTA LINEAR CRIADA!";
+                statusDiv.innerText = "ROTA PRONTA!";
                 document.getElementById('lista').style.display = 'none';
             }
-        } catch (e) {
-            statusDiv.innerText = "Erro ao traçar linha.";
-        }
+        } catch (e) { statusDiv.innerText = "Erro ao traçar rota."; }
     }
 </script>
 </body>
