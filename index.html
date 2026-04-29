@@ -3,41 +3,38 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rotas Ninja V22 - Rastreador GPS Integrado</title>
+    <title>Rotas Ninja V22 - Google Real</title>
     
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
-    <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
 
     <style>
-        body { font-family: sans-serif; margin: 0; background: #000; color: #fff; height: 100vh; display: flex; flex-direction: column; }
-        .header { background: #111; padding: 15px; border-bottom: 2px solid #f1c40f; text-align: center; }
-        .btn-arquivo { background: #222; color: #f1c40f; border: 1px dashed #f1c40f; padding: 10px; border-radius: 5px; width: 90%; max-width: 300px; margin-top: 10px; }
+        body { font-family: sans-serif; margin: 0; background: #000; color: #fff; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+        .header { background: #111; padding: 10px; border-bottom: 2px solid #f1c40f; text-align: center; }
+        .btn-arquivo { background: #222; color: #f1c40f; border: 1px dashed #f1c40f; padding: 8px; border-radius: 5px; width: 90%; max-width: 300px; cursor: pointer; font-size: 12px; }
         
         #main-container { display: flex; flex: 1; overflow: hidden; }
-        #lista-container { width: 350px; overflow-y: auto; padding: 10px; background: #111; z-index: 10; border-right: 1px solid #333; }
         
-        #map-container { flex: 1; background: #222; position: relative; }
-        #map { height: 100%; width: 100%; }
-        
+        /* Lista de Entregas */
+        #lista-container { width: 320px; overflow-y: auto; padding: 10px; background: #111; border-right: 1px solid #333; }
         .item-entrega { 
-            background: #1a1a1a; margin-bottom: 10px; padding: 15px; border-radius: 8px; 
-            border-left: 4px solid #f1c40f; cursor: pointer; display: flex; align-items: center;
+            background: #1a1a1a; margin-bottom: 8px; padding: 12px; border-radius: 8px; 
+            border-left: 4px solid #f1c40f; cursor: pointer; transition: 0.2s;
         }
+        .item-entrega:hover { background: #252525; }
         .item-entrega.active { background: #f1c40f; color: #000; font-weight: bold; }
-        .stop-num { font-size: 20px; color: #f1c40f; margin-right: 15px; font-weight: bold; }
+        .stop-num { font-weight: bold; color: #f1c40f; margin-right: 10px; }
         .active .stop-num { color: #000; }
-        
-        #status { font-size: 13px; color: #aaa; margin-bottom: 15px; text-align: center; }
 
-        /* Ocultar a caixa de texto de instruções para deixar o mapa mais limpo */
-        .leaflet-routing-container { display: none !important; }
+        /* Área do Mapa (Google) */
+        #map-container { flex: 1; position: relative; background: #222; }
+        iframe { width: 100%; height: 100%; border: none; }
 
+        #status { font-size: 12px; color: #888; margin-bottom: 10px; text-align: center; }
+
+        /* Ajuste para Celular */
         @media (max-width: 768px) {
             #main-container { flex-direction: column; }
-            #lista-container { width: 100%; height: 35%; border-bottom: 2px solid #f1c40f; border-right: none; }
+            #lista-container { width: 100%; height: 35%; border-right: none; border-bottom: 2px solid #f1c40f; }
             #map-container { height: 65%; }
         }
     </style>
@@ -51,147 +48,62 @@
 
 <div id="main-container">
     <div id="lista-container">
-        <div id="status">Carregue sua planilha...</div>
+        <div id="status">Selecione a planilha de hoje</div>
         <div id="listaEntregas"></div>
     </div>
+    
     <div id="map-container">
-        <div id="map"></div>
+        <iframe id="googleMapsIframe" src="about:blank"></iframe>
     </div>
 </div>
 
 <script>
-    let map, routingControl;
-    let gpsWatcher = null; 
-    let marcadorUsuario = null; // A "Bolinha" que vai se mexer com você
-
-    // 1. Inicializa o mapa focado em São Caetano
-    map = L.map('map').setView([-23.617, -46.551], 14);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
-
-    // Ícone da sua localização atual (Bolinha Azul)
-    const iconeCarro = L.divIcon({
-        className: 'custom-div-icon',
-        html: "<div style='background-color:#3498db; height:20px; width:20px; border-radius:50%; border:3px solid #fff; box-shadow: 0 0 10px rgba(0,0,0,0.5);'></div>",
-        iconSize: [26, 26],
-        iconAnchor: [13, 13]
-    });
-
-    // Função Ninja para limpar sujeira da planilha e evitar erros de endereço
-    function limparEndereco(enderecoBruto) {
-        let partes = enderecoBruto.split(',');
-        let rua = partes[0] ? partes[0].trim() : '';
-        let numero = partes[1] ? partes[1].split('-')[0].replace(/\D/g, '').trim() : '';
-        
-        rua = rua.replace(/\bMte\b/gi, 'Monte').replace(/\bCel\b/gi, 'Coronel');
-        return `${rua}, ${numero}`;
-    }
+    const iframe = document.getElementById('googleMapsIframe');
+    const status = document.getElementById('status');
 
     document.getElementById('fileInput').addEventListener('change', function(e) {
         const reader = new FileReader();
         reader.onload = function(event) {
             const data = new Uint8Array(event.target.result);
             const wb = XLSX.read(data, { type: 'array' });
-            const dados = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+            const planilha = wb.Sheets[wb.SheetNames[0]];
+            const dados = XLSX.utils.sheet_to_json(planilha);
             
+            // Ordena pelos Stops
             dados.sort((a, b) => (Number(a.Stop) || 0) - (Number(b.Stop) || 0));
+            
             const container = document.getElementById('listaEntregas');
             container.innerHTML = "";
             
             dados.forEach((item) => {
-                const enderecoRaw = item["Destination Address"] || item["Endereco"] || "";
-                if (!enderecoRaw) return;
+                const endereco = item["Destination Address"] || item["Endereco"] || item["Endereço"] || "";
+                if (!endereco) return;
 
                 const div = document.createElement('div');
                 div.className = 'item-entrega';
-                div.innerHTML = `
-                    <div class="stop-num">${item.Stop || '?'}</div>
-                    <div style="font-size: 14px;">${enderecoRaw.split('-')[0].trim()}</div>
-                `;
+                div.innerHTML = `<span class="stop-num">${item.Stop || '?'}</span><span>${endereco}</span>`;
                 
-                div.onclick = () => iniciarNavegacao2D(enderecoRaw, div);
+                div.onclick = () => carregarRotaNoGoogle(endereco, div);
                 container.appendChild(div);
             });
-            document.getElementById('status').innerText = `${dados.length} entregas carregadas!`;
+            status.innerText = `${dados.length} entregas carregadas.`;
         };
         reader.readAsArrayBuffer(e.target.files[0]);
     });
 
-    async function iniciarNavegacao2D(enderecoBruto, elementoClicado) {
+    function carregarRotaNoGoogle(destino, elemento) {
+        // Marca o item como selecionado
         document.querySelectorAll('.item-entrega').forEach(el => el.classList.remove('active'));
-        elementoClicado.classList.add('active');
-        document.getElementById('status').innerText = "Buscando localização e traçando rota...";
+        elemento.classList.add('active');
 
-        if (!navigator.geolocation) {
-            alert("Seu navegador não suporta GPS.");
-            return;
-        }
-
-        // 1. Pega sua posição inicial UMA vez para traçar a linha
-        navigator.geolocation.getCurrentPosition(async (position) => {
-            let latOrigem = position.coords.latitude;
-            let lngOrigem = position.coords.longitude;
-
-            // 2. Transforma o endereço do Excel em coordenadas
-            let enderecoLimpo = limparEndereco(enderecoBruto);
-            let urlBusca = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(enderecoLimpo + ", São Caetano do Sul, SP")}&limit=1`;
-            
-            let res = await fetch(urlBusca);
-            let data = await res.json();
-
-            // Se falhar por causa do número complexo, busca apenas a RUA para não te deixar na mão
-            if (data.length === 0) {
-                let ruaApenas = enderecoLimpo.split(',')[0];
-                urlBusca = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(ruaApenas + ", São Caetano do Sul, SP")}&limit=1`;
-                res = await fetch(urlBusca);
-                data = await res.json();
-            }
-
-            if (data.length > 0) {
-                let latDestino = data[0].lat;
-                let lngDestino = data[0].lon;
-
-                // Limpa rotas e GPS antigos
-                if (routingControl) { map.removeControl(routingControl); }
-                if (gpsWatcher) { navigator.geolocation.clearWatch(gpsWatcher); }
-                if (marcadorUsuario) { map.removeLayer(marcadorUsuario); }
-
-                // 3. Desenha a linha da rota
-                routingControl = L.Routing.control({
-                    waypoints: [ L.latLng(latOrigem, lngOrigem), L.latLng(latDestino, lngDestino) ],
-                    routeWhileDragging: false,
-                    showAlternatives: false,
-                    fitSelectedRoutes: true,
-                    router: L.Routing.osrmv1({ profile: 'driving' })
-                }).addTo(map);
-
-                document.getElementById('status').innerHTML = "<span style='color:#2ecc71; font-weight:bold;'>GPS ATIVADO. Siga a linha azul!</span>";
-
-                // 4. A MÁGICA DO RASTREAMENTO AO VIVO (A bolinha andando na tela)
-                marcadorUsuario = L.marker([latOrigem, lngOrigem], {icon: iconeCarro}).addTo(map);
-
-                gpsWatcher = navigator.geolocation.watchPosition((posAtual) => {
-                    let novaLat = posAtual.coords.latitude;
-                    let novaLng = posAtual.coords.longitude;
-                    
-                    // Move a bolinha para a nova posição do seu carro
-                    marcadorUsuario.setLatLng([novaLat, novaLng]);
-                    
-                    // Opcional: Faz a tela seguir você automaticamente
-                    // map.setView([novaLat, novaLng], 16); 
-                }, (err) => {
-                    console.log("Erro no GPS:", err);
-                }, { 
-                    enableHighAccuracy: true, // Força a precisão máxima do celular
-                    maximumAge: 1000, 
-                    timeout: 5000 
-                });
-
-            } else {
-                document.getElementById('status').innerText = "Erro: Endereço não encontrado.";
-            }
-        }, (err) => {
-            alert("Permita o uso da sua localização (GPS) no navegador.");
-        });
+        // URL MESTRE DO GOOGLE:
+        // saddr=My+Location (Origem: Minha Localização Atual)
+        // daddr= (Destino: Endereço da planilha)
+        // output=embed (Faz abrir dentro do seu aplicativo)
+        const url = `https://maps.google.com/maps?saddr=My+Location&daddr=${encodeURIComponent(destino + ", São Caetano do Sul, SP")}&output=embed`;
+        
+        iframe.src = url;
+        status.innerText = "Rota traçada no Google!";
     }
 </script>
 
