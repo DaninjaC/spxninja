@@ -4,61 +4,83 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Roteirizador Capi Roots</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/papaparse/5.3.0/papaparse.min.js"></script>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; background: #f0f2f5; }
-        .container { max-width: 600px; margin: auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        h2 { color: #333; text-align: center; }
-        input[type="file"] { margin-bottom: 20px; width: 100%; }
-        .entrega-item { display: flex; align-items: center; padding: 10px; border-bottom: 1px solid #eee; }
-        .entrega-item:last-child { border-bottom: none; }
-        .stop-badge { background: #007bff; color: white; padding: 2px 8px; border-radius: 12px; font-size: 12px; margin-right: 10px; }
-        .info { flex-grow: 1; font-size: 14px; }
-        .btn-rota { width: 100%; padding: 15px; background: #28a745; color: white; border: none; border-radius: 5px; font-size: 18px; font-weight: bold; margin-top: 20px; cursor: pointer; }
+        body { font-family: sans-serif; padding: 15px; background: #f4f4f9; color: #333; }
+        .container { max-width: 500px; margin: auto; background: white; padding: 20px; border-radius: 12px; shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h2 { text-align: center; color: #e67e22; }
+        input[type="file"] { width: 100%; padding: 10px; margin: 15px 0; border: 2px dashed #ddd; border-radius: 8px; }
+        .entrega-item { display: flex; align-items: center; padding: 12px; border-bottom: 1px solid #eee; font-size: 14px; }
+        .stop-badge { background: #3498db; color: white; padding: 3px 8px; border-radius: 10px; font-weight: bold; margin-right: 10px; font-size: 11px; min-width: 50px; text-align: center; }
+        .info { flex: 1; }
+        .btn-rota { width: 100%; padding: 15px; background: #27ae60; color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 15px; }
+        .count { text-align: center; font-size: 12px; color: #666; margin-bottom: 10px; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2>Capi Roots - Roteirizador</h2>
-    <p>Selecione a planilha da Shopee (CSV):</p>
-    <input type="file" id="csvFile" accept=".csv">
-    
+    <h2>Capi Roots - Rotas</h2>
+    <input type="file" id="fileInput" accept=".xlsx, .xls, .csv">
+    <div id="count" class="count">Aguardando arquivo...</div>
     <div id="listaEntregas"></div>
-    
-    <button class="btn-rota" onclick="gerarRota()">Criar Rota no Maps</button>
+    <button class="btn-rota" onclick="gerarRota()">Abrir Rota no Google Maps</button>
 </div>
 
 <script>
     let dadosEntregas = [];
 
-    document.getElementById('csvFile').addEventListener('change', function(e) {
+    document.getElementById('fileInput').addEventListener('change', function(e) {
         const file = e.target.files[0];
-        Papa.parse(file, {
-            header: true,
-            skipEmptyLines: true,
-            complete: function(results) {
-                processarDados(results.data);
-            }
-        });
+        if (!file) return;
+
+        const reader = new FileReader();
+        
+        if (file.name.endsWith('.csv')) {
+            reader.onload = (event) => {
+                Papa.parse(event.target.result, {
+                    header: true,
+                    skipEmptyLines: true,
+                    complete: (results) => processarDados(results.data)
+                });
+            };
+            reader.readAsText(file);
+        } else {
+            // Lógica para Excel (.xlsx ou .xls)
+            reader.onload = (event) => {
+                const data = new Uint8Array(event.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+                processarDados(jsonData);
+            };
+            reader.readAsArrayBuffer(file);
+        }
     });
 
     function processarDados(data) {
-        // 1. Limpeza e extração do número do endereço para ordenação
+        document.getElementById('count').innerText = `${data.length} pacotes encontrados.`;
+        
         dadosEntregas = data.map(item => {
-            // Tenta pegar o número da rua (assume que é o primeiro conjunto de dígitos após o nome da rua)
-            const numMatch = item.Endereco ? item.Endereco.match(/\d+/) : [0];
+            // Pega o endereço da coluna correta (ajuste o nome se necessário)
+            const enderecoRaw = item["Destination Address"] || item["Endereco"] || "";
+            // Extrai o número para ordenação crescente
+            const numMatch = enderecoRaw.match(/\d+/);
+            const numero = numMatch ? parseInt(numMatch[0]) : 0;
+            
             return {
-                ...item,
-                numeroParaOrdem: parseInt(numMatch[0]) || 0,
-                stop: parseInt(item.Stop) || 999
+                nome: item["Nome"] || "Cliente",
+                endereco: enderecoRaw,
+                stop: parseInt(item["Stop"]) || 0,
+                numero: numero
             };
         });
 
-        // 2. Ordenação: Primeiro por Stop, depois pelo número da casa
+        // ORDENAÇÃO: Primeiro por Stop, depois pelo número da casa (Crescente)
         dadosEntregas.sort((a, b) => {
             if (a.stop !== b.stop) return a.stop - b.stop;
-            return a.numeroParaOrdem - b.numeroParaOrdem;
+            return a.numero - b.numero;
         });
 
         renderizarLista();
@@ -67,16 +89,14 @@
     function renderizarLista() {
         const container = document.getElementById('listaEntregas');
         container.innerHTML = "";
-
         dadosEntregas.forEach((item, index) => {
             const div = document.createElement('div');
             div.className = 'entrega-item';
             div.innerHTML = `
-                <input type="checkbox" id="item-${index}" value="${item.Endereco}" checked>
-                <span class="stop-badge">Stop ${item.stop}</span>
+                <input type="checkbox" id="check-${index}" value="${item.endereco}" checked>
+                <span class="stop-badge">STOP ${item.stop}</span>
                 <div class="info">
-                    <strong>${item.Nome || 'Cliente'}</strong><br>
-                    ${item.Endereco}
+                    <strong>Nº ${item.numero}</strong> - ${item.endereco}
                 </div>
             `;
             container.appendChild(div);
@@ -89,14 +109,13 @@
             selecionados.push(cb.value);
         });
 
-        if (selecionados.length === 0) return alert("Selecione ao menos um endereço!");
+        if (selecionados.length === 0) return alert("Selecione pelo menos um endereço.");
 
-        // Google Maps suporta até ~9 paradas + destino no link direto
+        // O Google Maps permite cerca de 9 paradas em links diretos
         const destino = selecionados[selecionados.length - 1];
         const paradas = selecionados.slice(0, -1).join('|');
         
         const url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destino)}&waypoints=${encodeURIComponent(paradas)}&travelmode=driving`;
-        
         window.open(url, '_blank');
     }
 </script>
