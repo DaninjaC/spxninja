@@ -3,41 +3,38 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rotas Ninja V22 - Definitivo</title>
+    <title>Rotas Ninja V22 - Google Integrado</title>
     
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
-    <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
 
     <style>
         body { font-family: sans-serif; margin: 0; background: #000; color: #fff; height: 100vh; display: flex; flex-direction: column; }
         .header { background: #111; padding: 15px; border-bottom: 2px solid #f1c40f; text-align: center; }
-        .btn-arquivo { background: #222; color: #f1c40f; border: 1px dashed #f1c40f; padding: 10px; border-radius: 5px; width: 90%; max-width: 300px; margin-top: 10px; }
+        .btn-arquivo { background: #222; color: #f1c40f; border: 1px dashed #f1c40f; padding: 10px; border-radius: 5px; width: 90%; max-width: 300px; margin-top: 10px; cursor: pointer; }
         
         #main-container { display: flex; flex: 1; overflow: hidden; }
-        #lista-container { width: 350px; overflow-y: auto; padding: 10px; background: #111; z-index: 10; }
-        #map-container { flex: 1; position: relative; background: #222; }
-        #map { height: 100%; width: 100%; }
-
+        #lista-container { width: 350px; overflow-y: auto; padding: 10px; background: #111; z-index: 10; border-right: 1px solid #333; }
+        
+        /* Área onde o Google vai rodar */
+        #map-container { flex: 1; background: #222; display: flex; justify-content: center; align-items: center; flex-direction: column; }
+        #googleFrame { width: 100%; height: 100%; border: none; display: none; }
+        
         .item-entrega { 
             background: #1a1a1a; margin-bottom: 10px; padding: 15px; border-radius: 8px; 
             border-left: 4px solid #f1c40f; cursor: pointer; display: flex; align-items: center;
         }
+        .item-entrega:hover { background: #2a2a2a; }
         .item-entrega.active { background: #f1c40f; color: #000; font-weight: bold; }
         .stop-num { font-size: 20px; color: #f1c40f; margin-right: 15px; font-weight: bold; }
         .active .stop-num { color: #000; }
         
         #status { font-size: 13px; color: #aaa; margin-bottom: 15px; text-align: center; }
-
-        .leaflet-routing-container { background-color: #222 !important; color: #fff !important; }
-        .leaflet-routing-alt h2, .leaflet-routing-alt h3 { color: #f1c40f; }
+        #loading-msg { color: #f1c40f; font-weight: bold; display: none; text-align: center; padding: 20px;}
 
         @media (max-width: 768px) {
             #main-container { flex-direction: column; }
-            #lista-container { width: 100%; height: 40%; border-bottom: 2px solid #f1c40f; }
-            #map-container { height: 60%; }
+            #lista-container { width: 100%; height: 35%; border-bottom: 2px solid #f1c40f; border-right: none; }
+            #map-container { height: 65%; }
         }
     </style>
 </head>
@@ -54,35 +51,16 @@
         <div id="listaEntregas"></div>
     </div>
     <div id="map-container">
-        <div id="map"></div>
+        <div id="loading-msg">Buscando sua localização e traçando rota exata no Google...</div>
+        <iframe id="googleFrame" allowfullscreen></iframe>
     </div>
 </div>
 
 <script>
-    let map, routingControl;
-
-    map = L.map('map').setView([-23.617, -46.551], 13);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
-
-    // FUNÇÃO NINJA: Limpa a sujeira do endereço para o mapa gratuito não bugar
-    function inteligenciarEndereco(enderecoBruto) {
-        // Separa por vírgula. Pega só a Rua (parte 1) e o Número (parte 2)
-        let partes = enderecoBruto.split(',');
-        let rua = partes[0] ? partes[0].trim() : '';
-        let numero = partes[1] ? partes[1].trim().replace(/\D/g, '') : ''; // Pega só os números da segunda parte, ignora letras
-
-        // Traduz abreviações que o mapa gratuito não entende
-        rua = rua.replace(/\bMte\b/gi, 'Monte');
-        rua = rua.replace(/\bCel\b/gi, 'Coronel');
-        rua = rua.replace(/\bDr\b/gi, 'Doutor');
-        rua = rua.replace(/\bProf\b/gi, 'Professor');
-        rua = rua.replace(/\bAv\b/gi, 'Avenida');
-
-        // Retorna só o essencial: "Rua Monte Alegre, 65" (Ignora "Ap 31")
-        return `${rua}, ${numero}`.trim();
-    }
-
     document.getElementById('fileInput').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
         const reader = new FileReader();
         reader.onload = function(event) {
             const data = new Uint8Array(event.target.result);
@@ -94,62 +72,62 @@
             container.innerHTML = "";
             
             dados.forEach((item) => {
+                // Pega o endereço cru da planilha
                 const enderecoRaw = item["Destination Address"] || item["Endereco"] || item["Endereço"] || "";
                 if (!enderecoRaw) return;
 
-                const enderecoLimpoParaBusca = inteligenciarEndereco(enderecoRaw);
-                
                 const div = document.createElement('div');
                 div.className = 'item-entrega';
                 div.innerHTML = `
                     <div class="stop-num">${item.Stop || '?'}</div>
-                    <div style="font-size: 14px;">${enderecoRaw} <br><small style="color:#aaa;">(Busca: ${enderecoLimpoParaBusca})</small></div>
+                    <div style="font-size: 14px;">${enderecoRaw}</div>
                 `;
                 
-                div.onclick = () => buscarRota(enderecoLimpoParaBusca, div);
+                // Ao clicar, envia o endereço do jeito que veio, o Google se vira para entender
+                div.onclick = () => iniciarRotaGoogle(enderecoRaw, div);
                 container.appendChild(div);
             });
-            document.getElementById('status').innerText = `${dados.length} entregas carregadas.`;
+            document.getElementById('status').innerText = `${dados.length} entregas prontas!`;
         };
-        reader.readAsArrayBuffer(e.target.files[0]);
+        reader.readAsArrayBuffer(file);
     });
 
-    function buscarRota(destinoLimpo, elementoClicado) {
+    function iniciarRotaGoogle(destino, elementoClicado) {
         document.querySelectorAll('.item-entrega').forEach(el => el.classList.remove('active'));
         elementoClicado.classList.add('active');
-        document.getElementById('status').innerText = "Traçando rota...";
+        
+        const frame = document.getElementById('googleFrame');
+        const loading = document.getElementById('loading-msg');
+        
+        frame.style.display = 'none';
+        loading.style.display = 'block';
 
         if ("geolocation" in navigator) {
             navigator.geolocation.getCurrentPosition(position => {
                 const latOrigem = position.coords.latitude;
                 const lngOrigem = position.coords.longitude;
 
-                const buscaUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(destinoLimpo + ", São Caetano do Sul, SP")}&limit=1`;
+                // Garante que a busca seja em São Caetano do Sul para não ter erro
+                const destinoFormatado = `${destino}, São Caetano do Sul, SP`;
                 
-                fetch(buscaUrl)
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.length > 0) {
-                            if (routingControl) { map.removeControl(routingControl); }
-                            
-                            routingControl = L.Routing.control({
-                                waypoints: [
-                                    L.latLng(latOrigem, lngOrigem),
-                                    L.latLng(data[0].lat, data[0].lon)
-                                ],
-                                routeWhileDragging: false,
-                                language: 'pt',
-                                showAlternatives: false,
-                                fitSelectedRoutes: true,
-                                router: L.Routing.osrmv1({ language: 'pt', profile: 'driving' })
-                            }).addTo(map);
+                // TRUQUE: O parâmetro 'output=embed' força o Google Maps a abrir em formato de painel dentro do seu site
+                const urlGoogle = `https://maps.google.com/maps?saddr=${latOrigem},${lngOrigem}&daddr=${encodeURIComponent(destinoFormatado)}&hl=pt-BR&output=embed`;
 
-                            document.getElementById('status').innerText = "Rota pronta!";
-                        } else {
-                            alert("Endereço muito complexo na planilha. Tente editar a planilha deixando apenas RUA e NÚMERO.");
-                        }
-                    });
+                frame.src = urlGoogle;
+                
+                // Mostra o frame após carregar a URL
+                setTimeout(() => {
+                    loading.style.display = 'none';
+                    frame.style.display = 'block';
+                }, 1000);
+
+            }, error => {
+                alert("Você precisa permitir o acesso ao GPS (Localização) no seu navegador para calcular a rota.");
+                loading.style.display = 'none';
             });
+        } else {
+            alert("Seu navegador não suporta GPS.");
+            loading.style.display = 'none';
         }
     }
 </script>
