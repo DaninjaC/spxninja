@@ -3,82 +3,111 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rotas Ninja V19 - Fluxo Real</title>
+    <title>Rotas Ninja - Google Frame</title>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
-        body { font-family: sans-serif; margin: 0; background: #0b0e11; color: #e9eaeb; padding: 15px; }
-        .card { background: #15191c; border-radius: 12px; padding: 20px; border: 1px solid #2b2f36; margin-bottom: 20px; }
-        h2 { color: #f1c40f; text-align: center; margin-top: 0; }
-        input[type="file"] { width: 100%; padding: 15px; background: #2b2f36; color: #fff; border: none; border-radius: 8px; cursor: pointer; }
-        .entrega-item { display: flex; align-items: center; background: #1e2329; padding: 15px; margin-bottom: 8px; border-radius: 8px; border-left: 5px solid #f1c40f; }
-        .stop-info { flex: 1; margin-left: 10px; }
-        .stop-number { font-size: 20px; font-weight: bold; color: #f1c40f; min-width: 35px; }
-        .btn-go { background: #f1c40f; color: #000; border: none; padding: 12px 20px; border-radius: 8px; font-weight: bold; cursor: pointer; text-decoration: none; display: inline-block; }
-        .btn-check { width: 25px; height: 25px; cursor: pointer; }
-        #listaStatus { font-size: 12px; color: #848e9c; text-align: center; margin-bottom: 10px; }
+        body { font-family: sans-serif; margin: 0; background: #000; color: #fff; height: 100vh; display: flex; flex-direction: column; }
+        #header { padding: 10px; background: #1a1a1a; border-bottom: 2px solid #f1c40f; text-align: center; }
+        #lista-container { flex: 1; overflow-y: auto; padding: 10px; transition: 0.3s; }
+        .item-rota { 
+            display: flex; align-items: center; background: #222; 
+            margin-bottom: 8px; padding: 15px; border-radius: 10px; 
+            border: 1px solid #333; cursor: pointer;
+        }
+        .item-rota:active { background: #333; }
+        .stop-n { background: #f1c40f; color: #000; padding: 5px 10px; border-radius: 5px; font-weight: bold; margin-right: 15px; }
+        
+        /* O Mapa do Google */
+        #map-frame-container { 
+            display: none; flex: 2; width: 100%; position: relative; background: #000;
+        }
+        iframe { width: 100%; height: 100%; border: none; }
+        
+        .btn-voltar {
+            position: absolute; top: 10px; left: 10px; z-index: 10;
+            background: #f1c40f; color: #000; border: none; padding: 10px 15px;
+            border-radius: 5px; font-weight: bold; cursor: pointer;
+        }
+        .oculto { display: none !important; }
     </style>
 </head>
 <body>
 
-<div class="card">
-    <h2>ROTAS NINJA V19</h2>
-    <input type="file" id="fileInput" accept=".xlsx, .xls">
+<div id="header">
+    <strong style="color:#f1c40f">ROTAS NINJA</strong>
+    <input type="file" id="fileInput" style="margin-top:10px; width:100%">
 </div>
 
-<div id="listaStatus">Aguardando planilha de São Caetano...</div>
-<div id="containerEntregas"></div>
+<div id="lista-container">
+    <p style="text-align:center; color:#666;">Selecione a planilha para começar.</p>
+</div>
+
+<div id="map-frame-container">
+    <button class="btn-voltar" onclick="fecharMapa()">← VOLTAR À LISTA</button>
+    <iframe id="googleMapsFrame" src=""></iframe>
+</div>
 
 <script>
+    let dadosPlanilha = [];
+
     document.getElementById('fileInput').addEventListener('change', function(e) {
         const file = e.target.files[0];
         const reader = new FileReader();
-        
         reader.onload = function(event) {
             const data = new Uint8Array(event.target.result);
-            const workbook = XLSX.read(data, { type: 'array' });
-            const sheet = workbook.Sheets[workbook.SheetNames[0]];
-            const jsonData = XLSX.utils.sheet_to_json(sheet);
-            
-            exibirEntregas(jsonData);
+            const wb = XLSX.read(data, { type: 'array' });
+            dadosPlanilha = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+            renderizarLista();
         };
         reader.readAsArrayBuffer(file);
     });
 
-    function exibirEntregas(dados) {
-        const container = document.getElementById('containerEntregas');
-        const status = document.getElementById('listaStatus');
+    function renderizarLista() {
+        const container = document.getElementById('lista-container');
         container.innerHTML = "";
         
-        if (dados.length === 0) {
-            status.innerText = "Nenhuma entrega encontrada.";
-            return;
-        }
+        dadosPlanilha.sort((a, b) => (a.Stop || 0) - (b.Stop || 0));
 
-        // Ordenação por Stop
-        dados.sort((a, b) => (a.Stop || 0) - (b.Stop || 0));
-
-        dados.forEach((item) => {
-            const enderecoOriginal = item["Destination Address"] || item["Endereco"] || "";
-            if (!enderecoOriginal) return;
-
-            // Limpeza Ninja do endereço para o Google Maps
-            const enderecoLimpo = enderecoOriginal.split('-')[0].split('(')[0].trim() + ", São Caetano do Sul, SP";
-            const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(enderecoLimpo)}&travelmode=driving`;
+        dadosPlanilha.forEach((item) => {
+            const enderecoRaw = item["Destination Address"] || item["Endereco"] || "";
+            if (!enderecoRaw) return;
 
             const div = document.createElement('div');
-            div.className = 'entrega-item';
+            div.className = 'item-rota';
+            div.onclick = () => abrirNoGoogle(enderecoRaw);
             div.innerHTML = `
-                <div class="stop-number">${item.Stop || '?'}</div>
-                <div class="stop-info">
-                    <div style="font-size: 14px; font-weight: bold;">${enderecoOriginal.split(',')[0]}</div>
-                    <div style="font-size: 12px; color: #848e9c;">${item.Nome || 'Cliente'}</div>
+                <div class="stop-n">${item.Stop || '?'}</div>
+                <div style="flex:1">
+                    <div style="font-weight:bold">${enderecoRaw.split(',')[0]}</div>
+                    <div style="font-size:12px; color:#aaa">${item.CEP || ''}</div>
                 </div>
-                <a href="${mapsUrl}" target="_blank" class="btn-go">NAV</a>
             `;
             container.appendChild(div);
         });
+    }
 
-        status.innerText = `${dados.length} entregas carregadas em ordem linear.`;
+    function abrirNoGoogle(endereco) {
+        const lista = document.getElementById('lista-container');
+        const mapaContainer = document.getElementById('map-frame-container');
+        const frame = document.getElementById('googleMapsFrame');
+
+        // Limpa o endereço para o Google
+        const enderecoLimpo = endereco.split('-')[0].split('(')[0].trim() + ", São Caetano do Sul, SP";
+        
+        // Monta a URL de navegação do Google Maps (Embed)
+        // Usamos o modo 'place' para o frame e 'dir' para traçar rota
+        const url = `https://www.google.com/maps?q=${encodeURIComponent(enderecoLimpo)}&output=embed`;
+
+        frame.src = url;
+        
+        lista.classList.add('oculto');
+        mapaContainer.style.display = 'block';
+    }
+
+    function fecharMapa() {
+        document.getElementById('lista-container').classList.remove('oculto');
+        document.getElementById('map-frame-container').style.display = 'none';
+        document.getElementById('googleMapsFrame').src = "";
     }
 </script>
 
