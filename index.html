@@ -4,28 +4,26 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Roteirizador Capi Roots</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/papaparse/5.3.0/papaparse.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
-        body { font-family: sans-serif; padding: 15px; background: #f4f4f9; color: #333; }
-        .container { max-width: 500px; margin: auto; background: white; padding: 20px; border-radius: 12px; shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        h2 { text-align: center; color: #e67e22; }
-        input[type="file"] { width: 100%; padding: 10px; margin: 15px 0; border: 2px dashed #ddd; border-radius: 8px; }
-        .entrega-item { display: flex; align-items: center; padding: 12px; border-bottom: 1px solid #eee; font-size: 14px; }
-        .stop-badge { background: #3498db; color: white; padding: 3px 8px; border-radius: 10px; font-weight: bold; margin-right: 10px; font-size: 11px; min-width: 50px; text-align: center; }
-        .info { flex: 1; }
-        .btn-rota { width: 100%; padding: 15px; background: #27ae60; color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 15px; }
-        .count { text-align: center; font-size: 12px; color: #666; margin-bottom: 10px; }
+        body { font-family: sans-serif; padding: 15px; background: #f4f4f9; }
+        .container { max-width: 500px; margin: auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h2 { text-align: center; color: #d35400; margin-top: 0; }
+        input[type="file"] { width: 100%; padding: 15px; margin: 10px 0; border: 2px dashed #3498db; border-radius: 8px; box-sizing: border-box; }
+        .entrega-item { display: flex; align-items: center; padding: 12px; border-bottom: 1px solid #eee; }
+        .stop-badge { background: #3498db; color: white; padding: 4px 8px; border-radius: 5px; font-weight: bold; margin-right: 10px; font-size: 12px; }
+        .info { flex: 1; font-size: 14px; }
+        .btn-rota { width: 100%; padding: 18px; background: #27ae60; color: white; border: none; border-radius: 8px; font-size: 18px; font-weight: bold; cursor: pointer; margin-top: 15px; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <h2>Capi Roots - Rotas</h2>
-    <input type="file" id="fileInput" accept=".xlsx, .xls, .csv">
-    <div id="count" class="count">Aguardando arquivo...</div>
-    <div id="listaEntregas"></div>
-    <button class="btn-rota" onclick="gerarRota()">Abrir Rota no Google Maps</button>
+    <input type="file" id="fileInput" accept="*">
+    <div id="status" style="text-align:center; font-size:12px; color:gray;">Selecione o arquivo da Shopee</div>
+    <div id="listaEntregas" style="margin-top:15px;"></div>
+    <button class="btn-rota" onclick="gerarRota()">GERAR ROTA NO MAPS</button>
 </div>
 
 <script>
@@ -35,49 +33,37 @@
         const file = e.target.files[0];
         if (!file) return;
 
+        document.getElementById('status').innerText = "Lendo arquivo: " + file.name;
         const reader = new FileReader();
         
-        if (file.name.endsWith('.csv')) {
-            reader.onload = (event) => {
-                Papa.parse(event.target.result, {
-                    header: true,
-                    skipEmptyLines: true,
-                    complete: (results) => processarDados(results.data)
-                });
-            };
-            reader.readAsText(file);
-        } else {
-            // Lógica para Excel (.xlsx ou .xls)
-            reader.onload = (event) => {
+        reader.onload = function(event) {
+            try {
                 const data = new Uint8Array(event.target.result);
                 const workbook = XLSX.read(data, { type: 'array' });
-                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-                const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                const jsonData = XLSX.utils.sheet_to_json(worksheet);
                 processarDados(jsonData);
-            };
-            reader.readAsArrayBuffer(file);
-        }
+            } catch (err) {
+                alert("Erro ao ler o arquivo. Certifique-se de que é um Excel ou CSV.");
+                console.error(err);
+            }
+        };
+        reader.readAsArrayBuffer(file);
     });
 
     function processarDados(data) {
-        document.getElementById('count').innerText = `${data.length} pacotes encontrados.`;
-        
         dadosEntregas = data.map(item => {
-            // Pega o endereço da coluna correta (ajuste o nome se necessário)
-            const enderecoRaw = item["Destination Address"] || item["Endereco"] || "";
-            // Extrai o número para ordenação crescente
-            const numMatch = enderecoRaw.match(/\d+/);
+            // Ajuste para as colunas exatas da Shopee que vi no seu arquivo
+            const endereco = item["Destination Address"] || item["Endereco"] || "";
+            const stop = parseInt(item["Stop"]) || 0;
+            const numMatch = endereco.match(/\d+/);
             const numero = numMatch ? parseInt(numMatch[0]) : 0;
             
-            return {
-                nome: item["Nome"] || "Cliente",
-                endereco: enderecoRaw,
-                stop: parseInt(item["Stop"]) || 0,
-                numero: numero
-            };
+            return { endereco, stop, numero, nome: item["Nome"] || "Cliente" };
         });
 
-        // ORDENAÇÃO: Primeiro por Stop, depois pelo número da casa (Crescente)
+        // Ordenar por STOP e depois por NÚMERO (Crescente)
         dadosEntregas.sort((a, b) => {
             if (a.stop !== b.stop) return a.stop - b.stop;
             return a.numero - b.numero;
@@ -89,18 +75,24 @@
     function renderizarLista() {
         const container = document.getElementById('listaEntregas');
         container.innerHTML = "";
+        if(dadosEntregas.length === 0) {
+            container.innerHTML = "Nenhum dado encontrado na planilha.";
+            return;
+        }
+
         dadosEntregas.forEach((item, index) => {
             const div = document.createElement('div');
             div.className = 'entrega-item';
             div.innerHTML = `
                 <input type="checkbox" id="check-${index}" value="${item.endereco}" checked>
-                <span class="stop-badge">STOP ${item.stop}</span>
+                <span class="stop-badge">S${item.stop}</span>
                 <div class="info">
                     <strong>Nº ${item.numero}</strong> - ${item.endereco}
                 </div>
             `;
             container.appendChild(div);
         });
+        document.getElementById('status').innerText = dadosEntregas.length + " pacotes carregados.";
     }
 
     function gerarRota() {
@@ -109,16 +101,19 @@
             selecionados.push(cb.value);
         });
 
-        if (selecionados.length === 0) return alert("Selecione pelo menos um endereço.");
+        if (selecionados.length === 0) return alert("Selecione os endereços primeiro.");
 
-        // O Google Maps permite cerca de 9 paradas em links diretos
-        const destino = selecionados[selecionados.length - 1];
-        const paradas = selecionados.slice(0, -1).join('|');
+        // O Google Maps aceita melhor até 10 pontos por vez
+        const points = selecionados.map(addr => encodeURIComponent(addr));
+        const origin = points.shift();
+        const destination = points.pop();
+        const waypoints = points.join('|');
         
-        const url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destino)}&waypoints=${encodeURIComponent(paradas)}&travelmode=driving`;
+        let url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}`;
+        if (waypoints) url += `&waypoints=${waypoints}`;
+        
         window.open(url, '_blank');
     }
 </script>
-
 </body>
 </html>
