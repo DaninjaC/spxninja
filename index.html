@@ -3,76 +3,138 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rotas Ninja V22 - Direto ao Ponto</title>
+    <title>Rotas Ninja V22 - Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=SUA_CHAVE_AQUI"></script>
+    
     <style>
-        body { font-family: sans-serif; margin: 0; background: #000; color: #fff; padding: 15px; }
-        .header { background: #1a1a1a; padding: 20px; border-radius: 15px; border: 1px solid #f1c40f; text-align: center; margin-bottom: 20px; }
-        .btn-arquivo { width: 100%; padding: 15px; background: #222; color: #f1c40f; border: 1px dashed #f1c40f; border-radius: 10px; cursor: pointer; }
+        body { font-family: sans-serif; margin: 0; background: #000; color: #fff; height: 100vh; display: flex; flex-direction: column; }
+        .header { background: #1a1a1a; padding: 10px; border-bottom: 2px solid #f1c40f; text-align: center; }
+        
+        #main-container { display: flex; flex: 1; overflow: hidden; }
+        
+        /* Lista de Entregas (Lado Esquerdo) */
+        #lista-container { width: 350px; overflow-y: auto; padding: 10px; border-right: 1px solid #333; background: #111; }
+        
+        /* Área do Mapa (Lado Direito) */
+        #map-container { flex: 1; position: relative; background: #222; }
+        #map { height: 100%; width: 100%; }
+
         .item-entrega { 
-            display: flex; align-items: center; background: #1a1a1a; 
-            margin-bottom: 10px; padding: 18px; border-radius: 12px; 
-            border-left: 6px solid #f1c40f; box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            background: #1a1a1a; margin-bottom: 8px; padding: 12px; border-radius: 8px; 
+            border-left: 4px solid #f1c40f; cursor: pointer; transition: 0.2s;
         }
-        .info { flex: 1; margin-right: 10px; }
-        .stop-num { font-size: 22px; font-weight: bold; color: #f1c40f; margin-right: 15px; min-width: 30px; }
-        .btn-navegar { 
-            background: #f1c40f; color: #000; border: none; padding: 15px 20px; 
-            border-radius: 10px; font-weight: bold; text-decoration: none; font-size: 14px;
-            display: flex; align-items: center; justify-content: center;
+        .item-entrega:hover { background: #252525; }
+        .item-entrega.active { background: #f1c40f; color: #000; }
+        .stop-num { font-weight: bold; color: #f1c40f; margin-right: 10px; }
+        .active .stop-num { color: #000; }
+
+        @media (max-width: 768px) {
+            #main-container { flex-direction: column; }
+            #lista-container { width: 100%; height: 40%; }
+            #map-container { height: 60%; }
         }
-        #status { text-align: center; color: #888; font-size: 14px; margin-bottom: 10px; }
     </style>
 </head>
 <body>
 
 <div class="header">
-    <h2 style="margin:0 0 10px 0; color:#f1c40f;">ROTAS NINJA V22</h2>
-    <input type="file" id="fileInput" class="btn-arquivo">
+    <h3 style="margin:0; color:#f1c40f;">ROTAS NINJA V22 - DASHBOARD</h3>
+    <input type="file" id="fileInput" style="margin-top:5px; font-size:12px;">
 </div>
 
-<div id="status">Aguardando planilha...</div>
-<div id="listaEntregas"></div>
+<div id="main-container">
+    <div id="lista-container">
+        <div id="status" style="font-size:12px; color:#888; margin-bottom:10px;">Carregue sua planilha...</div>
+        <div id="listaEntregas"></div>
+    </div>
+    
+    <div id="map-container">
+        <div id="map"></div>
+    </div>
+</div>
 
 <script>
+    let map, directionsService, directionsRenderer;
+
+    // Inicializa o Mapa
+    function initMap() {
+        map = new google.maps.Map(document.getElementById("map"), {
+            zoom: 14,
+            center: { lat: -23.617, lng: -46.551 }, // São Caetano do Sul
+            styles: [{ "stylers": [{ "invert_lightness": true }, { "saturation": -100 }] }] // Modo Escuro
+        });
+        directionsService = new google.maps.DirectionsService();
+        directionsRenderer = new google.maps.DirectionsRenderer({ map: map });
+    }
+
+    // Chama a inicialização
+    window.onload = initMap;
+
     document.getElementById('fileInput').addEventListener('change', function(e) {
         const reader = new FileReader();
         reader.onload = function(event) {
-            const wb = XLSX.read(new Uint8Array(event.target.result), { type: 'array' });
+            const data = new Uint8Array(event.target.result);
+            const wb = XLSX.read(data, { type: 'array' });
             const dados = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
             
-            // Ordena pelos Stops da planilha
             dados.sort((a, b) => (a.Stop || 0) - (b.Stop || 0));
             
             const container = document.getElementById('listaEntregas');
             container.innerHTML = "";
             
             dados.forEach((item) => {
-                const enderecoRaw = item["Destination Address"] || item["Endereco"] || "";
-                if (!enderecoRaw) return;
-
-                // Limpeza para garantir que o Google ache o número em São Caetano
-                const destinoLimpo = encodeURIComponent(enderecoRaw.split('-')[0].split('(')[0].trim() + ", São Caetano do Sul, SP");
-                
-                // LINK MESTRE: origin=My+Location força o GPS do celular. travelmode=driving força carro.
-                const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${destinoLimpo}&travelmode=driving`;
+                const endereco = item["Destination Address"] || item["Endereco"] || "";
+                if (!endereco) return;
 
                 const div = document.createElement('div');
                 div.className = 'item-entrega';
                 div.innerHTML = `
-                    <div class="stop-num">${item.Stop || '?'}</div>
-                    <div class="info">
-                        <div style="font-weight:bold; font-size:16px;">${enderecoRaw.split(',')[0]}</div>
-                        <div style="font-size:12px; color:#f1c40f;">${item.CEP || ''}</div>
-                    </div>
-                    <a href="${googleMapsUrl}" class="btn-navegar">INICIAR ROTA</a>
+                    <span class="stop-num">${item.Stop || '?'}</span>
+                    <span>${endereco.split(',')[0]}</span>
                 `;
+                
+                div.onclick = () => calcularRota(endereco, div);
                 container.appendChild(div);
             });
-            document.getElementById('status').innerText = dados.length + " entregas prontas para navegação.";
+            document.getElementById('status').innerText = `${dados.length} entregas.`;
         };
         reader.readAsArrayBuffer(e.target.files[0]);
     });
+
+    function calcularRota(destino, elemento) {
+        // Remove destaque de outros itens
+        document.querySelectorAll('.item-entrega').forEach(el => el.classList.remove('active'));
+        elemento.classList.add('active');
+
+        // Tenta obter a localização atual do usuário
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition((position) => {
+                const origem = {
+                    lat: position.coords.latitude,
+                    lng: position.coords.longitude
+                };
+
+                const request = {
+                    origin: origem,
+                    destination: destino + ", São Caetano do Sul, SP",
+                    travelMode: 'DRIVING',
+                    optimizeWaypoints: true,
+                    provideRouteAlternatives: false
+                };
+
+                directionsService.route(request, (result, status) => {
+                    if (status === 'OK') {
+                        directionsRenderer.setDirections(result);
+                    } else {
+                        alert("Não foi possível calcular a rota: " + status);
+                    }
+                });
+            });
+        } else {
+            alert("O GPS não está ativado no seu navegador.");
+        }
+    }
 </script>
 
 </body>
