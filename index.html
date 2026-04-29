@@ -3,32 +3,30 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Rotas Ninja V12</title>
+    <title>Rotas Ninja V13</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
         body { font-family: sans-serif; margin: 0; background: #000; color: #fff; height: 100vh; display: flex; flex-direction: column; }
         #topo { background: #1a1a1a; padding: 10px; border-bottom: 2px solid #f1c40f; text-align: center; }
-        #lista { flex: 1; overflow-y: auto; max-height: 25vh; background: #111; }
-        #map { flex: 3; width: 100%; border-top: 1px solid #333; }
-        .item { display: flex; align-items: center; background: #222; margin: 4px; padding: 12px; border-radius: 8px; font-size: 13px; }
-        .stop-badge { background: #f1c40f; color: #000; padding: 3px 6px; border-radius: 4px; font-weight: bold; margin-right: 12px; }
-        .footer { padding: 12px; background: #1a1a1a; display: flex; gap: 10px; }
-        .btn { flex: 1; padding: 18px; border: none; border-radius: 12px; font-weight: bold; font-size: 15px; cursor: pointer; }
-        .btn-calc { background: #f1c40f; color: #000; }
+        #status { font-size: 12px; color: #f1c40f; background: #222; padding: 8px; text-align: center; font-weight: bold; }
+        #lista { flex: 1; overflow-y: auto; max-height: 25vh; background: #111; border-bottom: 1px solid #333; }
+        .item { display: flex; align-items: center; background: #222; margin: 4px; padding: 12px; border-radius: 8px; }
+        .stop-badge { background: #f1c40f; color: #000; padding: 2px 6px; border-radius: 4px; font-weight: bold; margin-right: 12px; }
+        #map { flex: 3; width: 100%; }
+        .footer { padding: 12px; background: #1a1a1a; }
+        .btn-calc { width: 100%; padding: 18px; background: #f1c40f; color: #000; border: none; border-radius: 12px; font-weight: bold; font-size: 16px; }
         .marker-ninja { background: #f1c40f; border: 2px solid #000; border-radius: 50%; color: #000; font-weight: bold; text-align: center; line-height: 26px; font-size: 14px; }
-        #status { font-size: 12px; text-align: center; padding: 6px; color: #f1c40f; background: #222; }
     </style>
 </head>
 <body>
 
-<div id="topo"><strong style="color:#f1c40f">ROTAS NINJA V12</strong><br>
-<input type="file" id="fileInput" style="margin-top:5px; width:90%"></div>
-<div id="status">Aguardando GPS e Arquivo...</div>
+<div id="topo"><strong>ROTAS NINJA V13</strong><br><input type="file" id="fileInput" style="margin-top:5px; width:90%"></div>
+<div id="status">Aguardando GPS e Planilha...</div>
 <div id="lista"></div>
 <div id="map"></div>
-<div class="footer"><button class="btn btn-calc" onclick="executarRota()">GERAR ROTA LINEAR</button></div>
+<div class="footer"><button class="btn-calc" onclick="processarRotaNinja()">GERAR ROTA COMPLETA</button></div>
 
 <script>
     var map = L.map('map', { zoomControl: false }).setView([-23.6192, -46.5627], 14);
@@ -52,56 +50,62 @@
             lista.innerHTML = "";
             data.forEach((item, index) => {
                 let end = (item["Destination Address"] || item["Endereco"] || "").split('-')[0].trim();
+                let cep = item["CEP"] || "";
                 let stop = item["Stop"] || (index + 1);
                 if(end) {
                     const div = document.createElement('div');
                     div.className = 'item';
-                    div.innerHTML = `<input type="checkbox" class="check-ninja" data-stop="${stop}" value="${end}, São Caetano do Sul, SP" style="transform:scale(1.7); margin-right:15px;"><span class="stop-badge">${stop}</span><div style="flex:1">${end}</div>`;
+                    div.innerHTML = `<input type="checkbox" class="check-ninja" data-stop="${stop}" data-cep="${cep}" value="${end}, São Caetano do Sul, SP" style="transform:scale(1.7); margin-right:15px;"><span class="stop-badge">${stop}</span><div style="flex:1">${end}</div>`;
                     lista.appendChild(div);
                 }
             });
-            document.getElementById('status').innerText = "Arquivo carregado. Selecione as paradas.";
+            document.getElementById('status').innerText = "Planilha carregada. Selecione e clique abaixo.";
         };
         reader.readAsArrayBuffer(e.target.files[0]);
     });
 
-    async function executarRota() {
+    async function processarRotaNinja() {
         if (!minhaPosicao) return alert("Aguarde o sinal do GPS.");
         const selecionados = Array.from(document.querySelectorAll('.check-ninja:checked'));
-        if (selecionados.length === 0) return alert("Selecione os pacotes!");
+        if (selecionados.length === 0) return alert("Marque as caixas de seleção!");
 
         camadaMarcadores.clearLayers();
         if (camadaRota) map.removeLayer(camadaRota);
         
-        let coordenadasParaRota = [ minhaPosicao ];
+        let coordenadas = [ minhaPosicao ];
         const statusDiv = document.getElementById('status');
 
         for (let i = 0; i < selecionados.length; i++) {
-            statusDiv.innerText = `Localizando Stop ${selecionados[i].dataset.stop}...`;
-            try {
-                const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(selecionados[i].value)}`);
-                const data = await res.json();
-                if (data && data[0]) {
-                    const pos = [parseFloat(data[0].lat), parseFloat(data[0].lon)];
-                    coordenadasParaRota.push(pos);
-                    
-                    const icon = L.divIcon({
-                        className: 'marker-ninja',
-                        html: selecionados[i].dataset.stop,
-                        iconSize: [30, 30], iconAnchor: [15, 15]
-                    });
-                    L.marker(pos, {icon: icon}).addTo(camadaMarcadores);
-                } else {
-                    console.log("Não achei:", selecionados[i].value);
-                }
-            } catch (err) { }
-            await new Promise(r => setTimeout(r, 1000)); // Espera 1 seg para não ser banido
+            statusDiv.innerText = `Buscando Parada ${selecionados[i].dataset.stop}...`;
+            
+            // Tentativa 1: Endereço completo + CEP
+            let query = `${selecionados[i].value} ${selecionados[i].dataset.cep}`;
+            let pos = await buscarCoordenada(query);
+            
+            // Tentativa 2: Se falhar, tenta só endereço
+            if (!pos) {
+                pos = await buscarCoordenada(selecionados[i].value);
+            }
+
+            if (pos) {
+                coordenadas.push(pos);
+                const icon = L.divIcon({
+                    className: 'marker-ninja',
+                    html: selecionados[i].dataset.stop,
+                    iconSize: [30, 30], iconAnchor: [15, 15]
+                });
+                L.marker(pos, {icon: icon}).addTo(camadaMarcadores);
+            } else {
+                alert(`Aviso: Não localizei o endereço do Stop ${selecionados[i].dataset.stop}. Ele será pulado.`);
+            }
+            // Espera 1.2 segundos para garantir que o servidor não nos bloqueie
+            await new Promise(r => setTimeout(r, 1200));
         }
 
+        if (coordenadas.length < 2) return;
+
         statusDiv.innerText = "Desenhando percurso linear...";
-        const coordsStr = coordenadasParaRota.map(c => `${c[1]},${c[0]}`).join(';');
-        
-        // Usamos /route/ para seguir a ordem exata dos pontos sem looping
+        const coordsStr = coordenadas.map(c => `${c[1]},${c[0]}`).join(';');
         const url = `https://router.project-osrm.org/route/v1/driving/${coordsStr}?overview=full&geometries=geojson`;
 
         try {
@@ -115,8 +119,19 @@
                 document.getElementById('lista').style.display = 'none';
             }
         } catch (e) {
-            statusDiv.innerText = "Erro na conexão. Tente novamente.";
+            statusDiv.innerText = "Erro ao traçar linha.";
         }
+    }
+
+    async function buscarCoordenada(query) {
+        try {
+            const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`);
+            const data = await res.json();
+            if (data && data[0]) {
+                return [parseFloat(data[0].lat), parseFloat(data[0].lon)];
+            }
+            return null;
+        } catch (e) { return null; }
     }
 </script>
 </body>
