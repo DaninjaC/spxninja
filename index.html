@@ -3,30 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rotas Ninja - Google Frame</title>
+    <title>Rotas Ninja V20 - Rota Expressa</title>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
         body { font-family: sans-serif; margin: 0; background: #000; color: #fff; height: 100vh; display: flex; flex-direction: column; }
         #header { padding: 10px; background: #1a1a1a; border-bottom: 2px solid #f1c40f; text-align: center; }
-        #lista-container { flex: 1; overflow-y: auto; padding: 10px; transition: 0.3s; }
+        #lista-container { flex: 1; overflow-y: auto; padding: 10px; }
         .item-rota { 
             display: flex; align-items: center; background: #222; 
             margin-bottom: 8px; padding: 15px; border-radius: 10px; 
             border: 1px solid #333; cursor: pointer;
         }
-        .item-rota:active { background: #333; }
         .stop-n { background: #f1c40f; color: #000; padding: 5px 10px; border-radius: 5px; font-weight: bold; margin-right: 15px; }
         
-        /* O Mapa do Google */
+        /* Container do Mapa */
         #map-frame-container { 
-            display: none; flex: 2; width: 100%; position: relative; background: #000;
+            display: none; flex: 1; width: 100%; position: relative; background: #000;
         }
         iframe { width: 100%; height: 100%; border: none; }
         
         .btn-voltar {
-            position: absolute; top: 10px; left: 10px; z-index: 10;
-            background: #f1c40f; color: #000; border: none; padding: 10px 15px;
-            border-radius: 5px; font-weight: bold; cursor: pointer;
+            position: absolute; top: 10px; right: 10px; z-index: 10;
+            background: #f1c40f; color: #000; border: none; padding: 12px 20px;
+            border-radius: 8px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.5);
         }
         .oculto { display: none !important; }
     </style>
@@ -34,38 +33,35 @@
 <body>
 
 <div id="header">
-    <strong style="color:#f1c40f">ROTAS NINJA</strong>
+    <strong style="color:#f1c40f">ROTAS NINJA V20</strong>
     <input type="file" id="fileInput" style="margin-top:10px; width:100%">
 </div>
 
 <div id="lista-container">
-    <p style="text-align:center; color:#666;">Selecione a planilha para começar.</p>
+    <p style="text-align:center; color:#666;">Carregue a planilha para listar as entregas.</p>
 </div>
 
 <div id="map-frame-container">
-    <button class="btn-voltar" onclick="fecharMapa()">← VOLTAR À LISTA</button>
-    <iframe id="googleMapsFrame" src=""></iframe>
+    <button class="btn-voltar" onclick="fecharMapa()">LISTA</button>
+    <iframe id="googleMapsFrame" allow="geolocation" src=""></iframe>
 </div>
 
 <script>
     let dadosPlanilha = [];
 
     document.getElementById('fileInput').addEventListener('change', function(e) {
-        const file = e.target.files[0];
         const reader = new FileReader();
         reader.onload = function(event) {
-            const data = new Uint8Array(event.target.result);
-            const wb = XLSX.read(data, { type: 'array' });
+            const wb = XLSX.read(new Uint8Array(event.target.result), { type: 'array' });
             dadosPlanilha = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
             renderizarLista();
         };
-        reader.readAsArrayBuffer(file);
+        reader.readAsArrayBuffer(e.target.files[0]);
     });
 
     function renderizarLista() {
         const container = document.getElementById('lista-container');
         container.innerHTML = "";
-        
         dadosPlanilha.sort((a, b) => (a.Stop || 0) - (b.Stop || 0));
 
         dadosPlanilha.forEach((item) => {
@@ -74,7 +70,7 @@
 
             const div = document.createElement('div');
             div.className = 'item-rota';
-            div.onclick = () => abrirNoGoogle(enderecoRaw);
+            div.onclick = () => abrirRotaExpressa(enderecoRaw);
             div.innerHTML = `
                 <div class="stop-n">${item.Stop || '?'}</div>
                 <div style="flex:1">
@@ -86,19 +82,26 @@
         });
     }
 
-    function abrirNoGoogle(endereco) {
+    function abrirRotaExpressa(endereco) {
         const lista = document.getElementById('lista-container');
         const mapaContainer = document.getElementById('map-frame-container');
         const frame = document.getElementById('googleMapsFrame');
 
-        // Limpa o endereço para o Google
-        const enderecoLimpo = endereco.split('-')[0].split('(')[0].trim() + ", São Caetano do Sul, SP";
+        // Limpeza do endereço para o Google não se perder
+        const destino = encodeURIComponent(endereco.split('-')[0].split('(')[0].trim() + ", São Caetano do Sul, SP");
         
-        // Monta a URL de navegação do Google Maps (Embed)
-        // Usamos o modo 'place' para o frame e 'dir' para traçar rota
-        const url = `https://www.google.com/maps?q=${encodeURIComponent(enderecoLimpo)}&output=embed`;
-
-        frame.src = url;
+        /* URL de Direções Estruturada:
+           - origin: Vazio para o Google usar o GPS do seu celular.
+           - destination: O endereço da planilha.
+           - travelmode: driving (força rota de carro/moto).
+        */
+        const url = `https://www.google.com/maps/embed/v1/directions?key=SUA_CHAVE_AQUI&origin=Current+Location&destination=${destino}&mode=driving`;
+        
+        // Versão sem API Key (Embed direto via Search modificado para Directions)
+        const urlFinal = `https://maps.google.com/maps?q=${destino}&output=embed&dg=oo`;
+        
+        // Para garantir que ele mostre a ROTA e não só o ponto, usamos a URL de visualização de tráfego/direção
+        frame.src = `https://maps.google.com/maps?saddr=My+Location&daddr=${destino}&ie=UTF8&t=&z=14&iwloc=B&output=embed`;
         
         lista.classList.add('oculto');
         mapaContainer.style.display = 'block';
