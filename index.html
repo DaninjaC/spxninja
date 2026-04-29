@@ -3,159 +3,119 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Rotas Ninja V11</title>
+    <title>Rotas Ninja V12</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
         body { font-family: sans-serif; margin: 0; background: #000; color: #fff; height: 100vh; display: flex; flex-direction: column; }
         #topo { background: #1a1a1a; padding: 10px; border-bottom: 2px solid #f1c40f; text-align: center; }
-        #listaEntregas { flex: 1; overflow-y: auto; max-height: 25vh; background: #111; padding: 5px; }
+        #lista { flex: 1; overflow-y: auto; max-height: 25vh; background: #111; }
         #map { flex: 3; width: 100%; border-top: 1px solid #333; }
-        .entrega-item { display: flex; align-items: center; background: #222; margin: 4px; padding: 12px; border-radius: 8px; font-size: 13px; }
+        .item { display: flex; align-items: center; background: #222; margin: 4px; padding: 12px; border-radius: 8px; font-size: 13px; }
         .stop-badge { background: #f1c40f; color: #000; padding: 3px 6px; border-radius: 4px; font-weight: bold; margin-right: 12px; }
-        .btn-footer { padding: 15px; background: #1a1a1a; display: flex; gap: 10px; }
-        .btn { flex: 1; padding: 18px; border: none; border-radius: 12px; font-weight: bold; font-size: 15px; cursor: pointer; text-transform: uppercase; }
+        .footer { padding: 12px; background: #1a1a1a; display: flex; gap: 10px; }
+        .btn { flex: 1; padding: 18px; border: none; border-radius: 12px; font-weight: bold; font-size: 15px; cursor: pointer; }
         .btn-calc { background: #f1c40f; color: #000; }
-        .btn-reset { background: #333; color: #ccc; border: 1px solid #444; }
-        
-        /* Estilo do Marcador com Número */
-        .marker-ninja {
-            background-color: #f1c40f;
-            border: 2px solid #000;
-            border-radius: 50%;
-            color: #000;
-            font-weight: bold;
-            text-align: center;
-            line-height: 26px;
-            font-size: 14px;
-            box-shadow: 0 0 8px rgba(241,196,15,0.6);
-        }
-        .oculto { display: none !important; }
+        .marker-ninja { background: #f1c40f; border: 2px solid #000; border-radius: 50%; color: #000; font-weight: bold; text-align: center; line-height: 26px; font-size: 14px; }
+        #status { font-size: 12px; text-align: center; padding: 6px; color: #f1c40f; background: #222; }
     </style>
 </head>
 <body>
 
-<div id="topo">
-    <strong style="color:#f1c40f">ROTAS NINJA V11</strong>
-    <input type="file" id="fileInput" style="margin-top:10px; width:100%">
-</div>
-
-<div id="status" style="font-size:12px; text-align:center; padding:6px; color:#f1c40f; background:#222">Aguardando sinal GPS...</div>
-
-<div id="listaEntregas"></div>
-
+<div id="topo"><strong style="color:#f1c40f">ROTAS NINJA V12</strong><br>
+<input type="file" id="fileInput" style="margin-top:5px; width:90%"></div>
+<div id="status">Aguardando GPS e Arquivo...</div>
+<div id="lista"></div>
 <div id="map"></div>
-
-<div class="btn-footer">
-    <button class="btn btn-reset" onclick="location.reload()">LIMPAR TUDO</button>
-    <button class="btn btn-calc" onclick="iniciarOtimizacao()">TRAÇAR ROTA</button>
-</div>
+<div class="footer"><button class="btn btn-calc" onclick="executarRota()">GERAR ROTA LINEAR</button></div>
 
 <script>
-    var map = L.map('map', { zoomControl: false }).setView([-23.6192, -46.5627], 15);
+    var map = L.map('map', { zoomControl: false }).setView([-23.6192, -46.5627], 14);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-
     var markerGPS = L.circleMarker([0,0], {color: '#00ffff', radius: 9, fillOpacity: 1}).addTo(map);
-    var camadaMarcadores = L.layerGroup().addTo(map);
+    var camadaMarcadores = L.featureGroup().addTo(map);
     var camadaRota = null;
     var minhaPosicao = null;
 
-    // Atualização de GPS constante
     navigator.geolocation.watchPosition(pos => {
         minhaPosicao = [pos.coords.latitude, pos.coords.longitude];
         markerGPS.setLatLng(minhaPosicao);
     }, null, { enableHighAccuracy: true });
 
     document.getElementById('fileInput').addEventListener('change', function(e) {
-        const file = e.target.files[0];
         const reader = new FileReader();
         reader.onload = function(event) {
             const wb = XLSX.read(new Uint8Array(event.target.result), { type: 'array' });
             const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
-            const lista = document.getElementById('listaEntregas');
+            const lista = document.getElementById('lista');
             lista.innerHTML = "";
-            
             data.forEach((item, index) => {
-                let endRaw = item["Destination Address"] || item["Endereco"] || "";
-                let end = endRaw.split('-')[0].trim();
+                let end = (item["Destination Address"] || item["Endereco"] || "").split('-')[0].trim();
                 let stop = item["Stop"] || (index + 1);
-                
                 if(end) {
                     const div = document.createElement('div');
-                    div.className = 'entrega-item';
-                    div.innerHTML = `
-                        <input type="checkbox" class="check-ninja" data-stop="${stop}" value="${end}, São Caetano do Sul, SP" style="transform:scale(1.7); margin-right:15px;">
-                        <span class="stop-badge">${stop}</span>
-                        <div style="flex:1">${end}</div>
-                    `;
+                    div.className = 'item';
+                    div.innerHTML = `<input type="checkbox" class="check-ninja" data-stop="${stop}" value="${end}, São Caetano do Sul, SP" style="transform:scale(1.7); margin-right:15px;"><span class="stop-badge">${stop}</span><div style="flex:1">${end}</div>`;
                     lista.appendChild(div);
                 }
             });
-            document.getElementById('status').innerText = "Planilha carregada. Selecione os destinos.";
+            document.getElementById('status').innerText = "Arquivo carregado. Selecione as paradas.";
         };
-        reader.readAsArrayBuffer(file);
+        reader.readAsArrayBuffer(e.target.files[0]);
     });
 
-    async function iniciarOtimizacao() {
-        if (!minhaPosicao) return alert("Habilite o GPS e aguarde o sinal (bola azul).");
+    async function executarRota() {
+        if (!minhaPosicao) return alert("Aguarde o sinal do GPS.");
         const selecionados = Array.from(document.querySelectorAll('.check-ninja:checked'));
-        if (selecionados.length === 0) return alert("Selecione os pacotes na lista!");
+        if (selecionados.length === 0) return alert("Selecione os pacotes!");
 
         camadaMarcadores.clearLayers();
         if (camadaRota) map.removeLayer(camadaRota);
-
-        let coordenadas = [ {latlng: minhaPosicao, stop: "0"} ];
+        
+        let coordenadasParaRota = [ minhaPosicao ];
         const statusDiv = document.getElementById('status');
 
         for (let i = 0; i < selecionados.length; i++) {
-            statusDiv.innerText = `Processando Stop ${selecionados[i].dataset.stop}...`;
-            
+            statusDiv.innerText = `Localizando Stop ${selecionados[i].dataset.stop}...`;
             try {
                 const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(selecionados[i].value)}`);
                 const data = await res.json();
-                
                 if (data && data[0]) {
                     const pos = [parseFloat(data[0].lat), parseFloat(data[0].lon)];
-                    coordenadas.push({latlng: pos, stop: selecionados[i].dataset.stop});
+                    coordenadasParaRota.push(pos);
                     
-                    // Ícone customizado com o NÚMERO DO STOP
                     const icon = L.divIcon({
                         className: 'marker-ninja',
                         html: selecionados[i].dataset.stop,
-                        iconSize: [30, 30],
-                        iconAnchor: [15, 15]
+                        iconSize: [30, 30], iconAnchor: [15, 15]
                     });
                     L.marker(pos, {icon: icon}).addTo(camadaMarcadores);
+                } else {
+                    console.log("Não achei:", selecionados[i].value);
                 }
-            } catch (err) { console.error("Erro no ponto", i); }
-            
-            // Pausa técnica para evitar bloqueio do servidor (crucial)
-            await new Promise(r => setTimeout(r, 1000));
+            } catch (err) { }
+            await new Promise(r => setTimeout(r, 1000)); // Espera 1 seg para não ser banido
         }
 
-        statusDiv.innerText = "Calculando melhor caminho linear...";
+        statusDiv.innerText = "Desenhando percurso linear...";
+        const coordsStr = coordenadasParaRota.map(c => `${c[1]},${c[0]}`).join(';');
         
-        // Monta as coordenadas para o motor de rota
-        const coordsStr = coordenadas.map(c => `${c.latlng[1]},${c.latlng[0]}`).join(';');
-        
-        // Perfil 'trip' com waypoint_optimization
-        const url = `https://router.project-osrm.org/trip/v1/driving/${coordsStr}?source=first&overview=full&geometries=geojson`;
+        // Usamos /route/ para seguir a ordem exata dos pontos sem looping
+        const url = `https://router.project-osrm.org/route/v1/driving/${coordsStr}?overview=full&geometries=geojson`;
 
         try {
             const resp = await fetch(url);
             const rData = await resp.json();
-            if (rData.trips && rData.trips[0]) {
-                const routeLine = rData.trips[0].geometry.coordinates.map(c => [c[1], c[0]]);
+            if (rData.routes && rData.routes[0]) {
+                const routeLine = rData.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
                 camadaRota = L.polyline(routeLine, {color: '#f1c40f', weight: 8, opacity: 0.8}).addTo(map);
-                map.fitBounds(camadaRota.getBounds());
-                statusDiv.innerText = "ROTA NINJA PRONTA!";
-                document.getElementById('listaEntregas').classList.add('oculto');
-            } else {
-                statusDiv.innerText = "Erro ao traçar rota. Tente marcar menos pontos.";
+                map.fitBounds(camadaMarcadores.getBounds());
+                statusDiv.innerText = "ROTA LINEAR CRIADA!";
+                document.getElementById('lista').style.display = 'none';
             }
         } catch (e) {
-            statusDiv.innerText = "Falha na conexão de rota.";
+            statusDiv.innerText = "Erro na conexão. Tente novamente.";
         }
     }
 </script>
