@@ -2,110 +2,274 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rotas Ninja V22 - Google Real</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SPX Ninja - Pro Edition</title>
     
-    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <style>
-        body { font-family: sans-serif; margin: 0; background: #000; color: #fff; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
-        .header { background: #111; padding: 10px; border-bottom: 2px solid #f1c40f; text-align: center; }
-        .btn-arquivo { background: #222; color: #f1c40f; border: 1px dashed #f1c40f; padding: 8px; border-radius: 5px; width: 90%; max-width: 300px; cursor: pointer; font-size: 12px; }
+        body { background-color: #000; color: #fff; font-family: sans-serif; margin: 0; text-align: center; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
         
-        #main-container { display: flex; flex: 1; overflow: hidden; }
+        #painel-topo { background: #007AFF; padding: 10px; min-height: 140px; display: flex; flex-direction: column; justify-content: center; z-index: 1001; transition: background 0.3s; }
+        .modo-confirmacao { background: #FFCC00 !important; color: #000 !important; }
         
-        /* Lista de Entregas */
-        #lista-container { width: 320px; overflow-y: auto; padding: 10px; background: #111; border-right: 1px solid #333; }
-        .item-entrega { 
-            background: #1a1a1a; margin-bottom: 8px; padding: 12px; border-radius: 8px; 
-            border-left: 4px solid #f1c40f; cursor: pointer; transition: 0.2s;
-        }
-        .item-entrega:hover { background: #252525; }
-        .item-entrega.active { background: #f1c40f; color: #000; font-weight: bold; }
-        .stop-num { font-weight: bold; color: #f1c40f; margin-right: 10px; }
-        .active .stop-num { color: #000; }
+        #stop-badge { background: #000; color: #39FF14; padding: 3px 10px; border-radius: 8px; font-weight: bold; font-size: 18px; margin-bottom: 5px; display: inline-block; border: 1px solid #39FF14; }
+        #seta-instrucao { font-size: 60px; line-height: 1; display: block; }
+        #distancia-curva { font-size: 40px; font-weight: bold; display: block; }
 
-        /* Área do Mapa (Google) */
-        #map-container { flex: 1; position: relative; background: #222; }
-        iframe { width: 100%; height: 100%; border: none; }
+        #nav-ui { display: block; }
+        #painel-acoes { display: none; gap: 10px; padding: 10px; justify-content: center; }
+        .btn-status { flex: 1; padding: 20px; border: none; border-radius: 10px; font-weight: bold; font-size: 16px; cursor: pointer; color: #fff; }
+        .btn-check { background: #28a745; }
+        .btn-fail { background: #dc3545; }
 
-        #status { font-size: 12px; color: #888; margin-bottom: 10px; text-align: center; }
+        #map { flex: 1; width: 100%; background: #111; z-index: 1; }
 
-        /* Ajuste para Celular */
-        @media (max-width: 768px) {
-            #main-container { flex-direction: column; }
-            #lista-container { width: 100%; height: 35%; border-right: none; border-bottom: 2px solid #f1c40f; }
-            #map-container { height: 65%; }
-        }
+        #info-final { background: #111; padding: 10px; min-height: 100px; display: flex; flex-direction: column; justify-content: center; z-index: 1001; }
+        #rua-atual { color: #39FF14; font-weight: bold; font-size: 16px; text-transform: uppercase; }
+        #distancia-final { font-size: 30px; font-weight: bold; }
+
+        #controles { padding: 15px; background: #000; z-index: 1001; }
+        .btn-ini { background: #39FF14; color: #000; padding: 15px; border-radius: 12px; font-weight: bold; font-size: 18px; cursor: pointer; display: block; text-align: center; }
+        input[type="file"] { display: none; }
+
+        .stop-label { background: rgba(0,0,0,0.8); color: #fff; border: 1px solid #39FF14; font-weight: bold; padding: 2px 4px; border-radius: 3px; font-size: 10px; }
+        .leaflet-tile-container { filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%); }
     </style>
 </head>
 <body>
 
-<div class="header">
-    <h3 style="margin:0; color:#f1c40f;">ROTAS NINJA V22</h3>
-    <input type="file" id="fileInput" class="btn-arquivo" accept=".xlsx, .xls, .csv">
-</div>
-
-<div id="main-container">
-    <div id="lista-container">
-        <div id="status">Selecione a planilha de hoje</div>
-        <div id="listaEntregas"></div>
+    <div id="painel-topo">
+        <div><div id="stop-badge">STOP --</div></div>
+        <div id="nav-ui">
+            <span id="seta-instrucao">---</span>
+            <span id="distancia-curva">0 m</span>
+        </div>
+        <div id="painel-acoes">
+            <button class="btn-status btn-check" onclick="finalizarParada('concluido')">CONCLUÍDO</button>
+            <button class="btn-status btn-fail" onclick="finalizarParada('pendente')">PENDENTE</button>
+        </div>
     </div>
-    
-    <div id="map-container">
-        <iframe id="googleMapsIframe" src="about:blank"></iframe>
+
+    <div id="map"></div>
+
+    <div id="info-final">
+        <div id="rua-atual">AGUARDANDO PLANILHA</div>
+        <div id="distancia-final">---</div>
     </div>
-</div>
 
-<script>
-    const iframe = document.getElementById('googleMapsIframe');
-    const status = document.getElementById('status');
+    <div id="controles">
+        <label class="btn-ini" id="btnLabel">
+            🚀 INICIAR EXPEDIENTE SPX
+            <input type="file" id="fileInput" accept=".xlsx, .xls, .csv">
+        </label>
+    </div>
 
-    document.getElementById('fileInput').addEventListener('change', function(e) {
-        const reader = new FileReader();
-        reader.onload = function(event) {
-            const data = new Uint8Array(event.target.result);
-            const wb = XLSX.read(data, { type: 'array' });
-            const planilha = wb.Sheets[wb.SheetNames[0]];
-            const dados = XLSX.utils.sheet_to_json(planilha);
-            
-            // Ordena pelos Stops
-            dados.sort((a, b) => (Number(a.Stop) || 0) - (Number(b.Stop) || 0));
-            
-            const container = document.getElementById('listaEntregas');
-            container.innerHTML = "";
-            
-            dados.forEach((item) => {
-                const endereco = item["Destination Address"] || item["Endereco"] || item["Endereço"] || "";
-                if (!endereco) return;
+    <script>
+        let rotaSpx = [], passosNavegacao = [], idxDestino = 0, idxPasso = 0;
+        let minhaLat, minhaLon, mapa, markerUser, markerDest, polylineRota;
+        let camadaFundo = L.layerGroup(), aguardandoConfirmacao = false, ultimaLatReq, ultimaLonReq;
+        let wakeLock = null;
 
-                const div = document.createElement('div');
-                div.className = 'item-entrega';
-                div.innerHTML = `<span class="stop-num">${item.Stop || '?'}</span><span>${endereco}</span>`;
-                
-                div.onclick = () => carregarRotaNoGoogle(endereco, div);
-                container.appendChild(div);
-            });
-            status.innerText = `${dados.length} entregas carregadas.`;
+        // --- GESTÃO DE TELA (WAKE LOCK) ---
+        async function requestWakeLock() {
+            try {
+                if ('wakeLock' in navigator) {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                }
+            } catch (err) { console.error(`${err.name}, ${err.message}`); }
+        }
+
+        function releaseWakeLock() {
+            if (wakeLock !== null) {
+                wakeLock.release();
+                wakeLock = null;
+            }
+        }
+
+        window.onload = function() {
+            mapa = L.map('map', { zoomControl: false, attributionControl: false }).setView([-23.61, -46.57], 16);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(mapa);
+            camadaFundo.addTo(mapa);
+            setTimeout(() => { mapa.invalidateSize(); }, 500);
         };
-        reader.readAsArrayBuffer(e.target.files[0]);
-    });
 
-    function carregarRotaNoGoogle(destino, elemento) {
-        // Marca o item como selecionado
-        document.querySelectorAll('.item-entrega').forEach(el => el.classList.remove('active'));
-        elemento.classList.add('active');
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            const reader = new FileReader();
+            requestWakeLock(); // Ativa a tela assim que escolhe o arquivo
+            
+            reader.onload = function(evt) {
+                try {
+                    const wb = XLSX.read(evt.target.result, { type: 'binary' });
+                    const dataRaw = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+                    
+                    // Normalização de cabeçalhos (lowercase e trim)
+                    const json = dataRaw.map(row => {
+                        const normalized = {};
+                        for (let key in row) {
+                            normalized[key.trim().toLowerCase()] = row[key];
+                        }
+                        return normalized;
+                    });
 
-        // URL MESTRE DO GOOGLE:
-        // saddr=My+Location (Origem: Minha Localização Atual)
-        // daddr= (Destino: Endereço da planilha)
-        // output=embed (Faz abrir dentro do seu aplicativo)
-        const url = `https://maps.google.com/maps?saddr=My+Location&daddr=${encodeURIComponent(destino + ", São Caetano do Sul, SP")}&output=embed`;
-        
-        iframe.src = url;
-        status.innerText = "Rota traçada no Google!";
-    }
-</script>
+                    const contagem = {};
+                    json.forEach(i => { 
+                        let s = i.stop || i.parada || i.sequence;
+                        if(s && !isNaN(s)) contagem[s] = (contagem[s] || 0) + 1; 
+                    });
 
+                    rotaSpx = json.filter(i => (i.stop || i.parada || i.sequence) && !isNaN(i.stop || i.parada || i.sequence))
+                        .sort((a, b) => (a.stop || a.parada) - (b.stop || b.parada))
+                        .map(i => {
+                            let rawLat = String(i.latitude || i.lat).replace(',', '.');
+                            let rawLon = String(i.longitude || i.lon || i.lng).replace(',', '.');
+                            return {
+                                lat: parseFloat(rawLat),
+                                lon: parseFloat(rawLon),
+                                addr: i["destination address"] || i.endereco || "Endereço não identificado",
+                                stop: i.stop || i.parada || i.sequence,
+                                pacotes: contagem[i.stop || i.parada || i.sequence] || 1,
+                                status: 'neutro',
+                                marker: null
+                            };
+                        })
+                        .filter(i => !isNaN(i.lat) && !isNaN(i.lon));
+
+                    if (rotaSpx.length > 0) {
+                        desenharStopsFundo();
+                        document.getElementById('btnLabel').style.display = 'none';
+                        document.getElementById('rua-atual').innerText = "BUSCANDO GPS...";
+                        iniciarGPS();
+                    } else {
+                        alert("Erro: Não encontrei colunas de 'Stop', 'Latitude' ou 'Longitude'. Verifique o arquivo.");
+                    }
+                } catch (err) {
+                    alert("Erro ao processar planilha: " + err.message);
+                }
+            };
+            reader.readAsBinaryString(e.target.files[0]);
+        });
+
+        function desenharStopsFundo() {
+            camadaFundo.clearLayers();
+            rotaSpx.forEach((p) => {
+                p.marker = L.circleMarker([p.lat, p.lon], { radius: 6, color: '#666', fillColor: '#333', fillOpacity: 1, weight: 1 })
+                .bindTooltip("Stop " + p.stop, { permanent: true, direction: 'top', className: 'stop-label', offset: [0, -5] })
+                .addTo(camadaFundo);
+            });
+        }
+
+        function iniciarGPS() {
+            navigator.geolocation.watchPosition(async pos => {
+                minhaLat = pos.coords.latitude; minhaLon = pos.coords.longitude;
+                
+                if (!markerUser) {
+                    markerUser = L.circleMarker([minhaLat, minhaLon], { color: '#007AFF', fillOpacity: 1, radius: 8, zIndexOffset: 1000 }).addTo(mapa);
+                } else {
+                    markerUser.setLatLng([minhaLat, minhaLon]);
+                }
+
+                const desviou = ultimaLatReq && dist(minhaLat, minhaLon, ultimaLatReq, ultimaLonReq) > 30;
+
+                if (idxDestino < rotaSpx.length && !aguardandoConfirmacao) {
+                    if (passosNavegacao.length === 0 || desviou) {
+                        await calcularRota();
+                        ultimaLatReq = minhaLat; ultimaLonReq = minhaLon;
+                    }
+                    navegar();
+                }
+                mapa.panTo([minhaLat, minhaLon]);
+            }, (err) => {
+                document.getElementById('rua-atual').innerText = "ERRO NO GPS: " + err.message;
+            }, { enableHighAccuracy: true });
+        }
+
+        async function calcularRota() {
+            try {
+                const d = rotaSpx[idxDestino];
+                document.getElementById('stop-badge').innerText = "STOP " + d.stop + " (" + d.pacotes + " vol)";
+                
+                if (markerDest) mapa.removeLayer(markerDest);
+                markerDest = L.circleMarker([d.lat, d.lon], { radius: 11, color: '#fff', fillColor: '#007AFF', fillOpacity: 1, weight: 3 }).addTo(mapa);
+
+                const url = `https://router.project-osrm.org/route/v1/driving/${minhaLon},${minhaLat};${d.lon},${d.lat}?steps=true&overview=full&geometries=geojson`;
+                const res = await fetch(url);
+                const data = await res.json();
+                
+                if (data.routes && data.routes[0]) {
+                    const route = data.routes[0];
+                    passosNavegacao = route.legs[0].steps.map(s => ({
+                        lat: s.maneuver.location[1], lon: s.maneuver.location[0],
+                        manobra: s.maneuver.modifier, rua: s.name || "Siga em frente"
+                    }));
+                    idxPasso = 0;
+                    if (polylineRota) mapa.removeLayer(polylineRota);
+                    polylineRota = L.polyline(route.geometry.coordinates.map(c => [c[1], c[0]]), { color: '#007AFF', weight: 6, opacity: 0.8 }).addTo(mapa);
+                }
+            } catch (e) {
+                document.getElementById('rua-atual').innerText = "ERRO DE CONEXÃO/API";
+            }
+        }
+
+        function navegar() {
+            if (!rotaSpx[idxDestino] || passosNavegacao.length === 0) return;
+
+            const dFinal = dist(minhaLat, minhaLon, rotaSpx[idxDestino].lat, rotaSpx[idxDestino].lon);
+            
+            if (dFinal < 60) {
+                aguardandoConfirmacao = true;
+                releaseWakeLock();
+                document.getElementById('nav-ui').style.display = 'none';
+                document.getElementById('painel-acoes').style.display = 'flex';
+                document.getElementById('painel-topo').classList.add('modo-confirmacao');
+                document.getElementById('rua-atual').innerText = "VOCÊ CHEGOU!";
+                if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+                return;
+            }
+
+            const passo = passosNavegacao[idxPasso];
+            if (!passo) return;
+            const dCurva = dist(minhaLat, minhaLon, passo.lat, passo.lon);
+
+            document.getElementById('distancia-curva').innerText = Math.round(dCurva) + " m";
+            document.getElementById('distancia-final').innerText = dFinal > 1000 ? (dFinal/1000).toFixed(1) + " km" : Math.round(dFinal) + " m";
+            document.getElementById('rua-atual').innerText = passo.rua;
+
+            const m = passo.manobra;
+            if (m && m.includes("left")) document.getElementById('seta-instrucao').innerText = "⬅️";
+            else if (m && m.includes("right")) document.getElementById('seta-instrucao').innerText = "➡️";
+            else document.getElementById('seta-instrucao').innerText = "⬆️";
+
+            if (dCurva < 25 && idxPasso < passosNavegacao.length - 1) idxPasso++;
+        }
+
+        function finalizarParada(status) {
+            const p = rotaSpx[idxDestino];
+            p.status = status;
+            p.marker.setStyle({ fillColor: status === 'concluido' ? '#888' : '#ff0000', color: '#fff', weight: 2 });
+
+            aguardandoConfirmacao = false;
+            requestWakeLock();
+            
+            idxDestino++;
+            passosNavegacao = [];
+            document.getElementById('nav-ui').style.display = 'block';
+            document.getElementById('painel-acoes').style.display = 'none';
+            document.getElementById('painel-topo').classList.remove('modo-confirmacao');
+            
+            if (idxDestino < rotaSpx.length) calcularRota();
+            else { releaseWakeLock(); document.getElementById('rua-atual').innerText = "ROTA FINALIZADA"; }
+        }
+
+        function dist(la1, lo1, la2, lo2) {
+            const R = 6371000;
+            const dLat = (la2-la1) * Math.PI/180;
+            const dLon = (lo2-lo1) * Math.PI/180;
+            const a = Math.sin(dLat/2)**2 + Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)*Math.sin(dLon/2)**2;
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        }
+    </script>
 </body>
 </html>
