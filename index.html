@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Rotas Ninja V15</title>
+    <title>Rotas Ninja V16 - Full</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -22,7 +22,7 @@
 </head>
 <body>
 
-<div id="topo"><strong>ROTAS NINJA V15</strong><br><input type="file" id="fileInput" style="margin-top:5px; width:90%"></div>
+<div id="topo"><strong>ROTAS NINJA V16</strong><br><input type="file" id="fileInput" style="margin-top:5px; width:90%"></div>
 <div id="status">Aguardando GPS e Planilha...</div>
 <div id="lista"></div>
 <div id="map"></div>
@@ -44,75 +44,77 @@
 
     document.getElementById('fileInput').addEventListener('change', function(e) {
         const file = e.target.files[0];
-        if (!file) return;
-
         const reader = new FileReader();
         reader.onload = function(event) {
-            try {
-                const data = new Uint8Array(event.target.result);
-                const wb = XLSX.read(data, { type: 'array' });
-                
-                // Pega a primeira aba que tiver conteúdo
-                const sheetName = wb.SheetNames[0];
-                const sheet = wb.Sheets[sheetName];
-                const jsonData = XLSX.utils.sheet_to_json(sheet);
-                
-                if (jsonData.length === 0) {
-                    alert("A planilha parece estar vazia.");
-                    return;
-                }
+            const data = new Uint8Array(event.target.result);
+            const wb = XLSX.read(data, { type: 'array' });
+            const sheet = wb.Sheets[wb.SheetNames[0]];
+            const jsonData = XLSX.utils.sheet_to_json(sheet);
+            
+            const lista = document.getElementById('lista');
+            lista.innerHTML = "";
+            
+            jsonData.forEach((item, index) => {
+                let raw = item["Destination Address"] || item["Endereco"] || "";
+                let stop = item["Stop"] || (index + 1);
+                let cep = item["CEP"] || "";
 
-                const lista = document.getElementById('lista');
-                lista.innerHTML = "";
-                
-                jsonData.forEach((item, index) => {
-                    // Tenta encontrar a coluna de endereço por diferentes nomes possíveis
-                    let endRaw = item["Destination Address"] || item["Endereco"] || item["Endereço"] || "";
-                    let stop = item["Stop"] || (index + 1);
-                    
-                    if(endRaw) {
-                        const div = document.createElement('div');
-                        div.className = 'item';
-                        div.innerHTML = `
-                            <input type="checkbox" class="check-ninja" 
-                                   data-stop="${stop}" 
-                                   data-orig="${endRaw}" 
-                                   value="${limparEndereco(endRaw)}" 
-                                   style="transform:scale(1.8); margin-right:20px;">
-                            <span class="stop-badge">${stop}</span>
-                            <div style="flex:1; font-size:14px;">${endRaw}</div>
-                        `;
-                        lista.appendChild(div);
-                    }
-                });
-                document.getElementById('status').innerText = "Sucesso! Selecione as paradas abaixo.";
-            } catch (err) {
-                console.error(err);
-                alert("Erro ao ler o arquivo. Certifique-se que é um Excel válido.");
-            }
+                if(raw) {
+                    const div = document.createElement('div');
+                    div.className = 'item';
+                    div.innerHTML = `
+                        <input type="checkbox" class="check-ninja" 
+                               data-stop="${stop}" 
+                               data-cep="${cep}" 
+                               data-orig="${raw}" 
+                               style="transform:scale(1.8); margin-right:20px;">
+                        <span class="stop-badge">${stop}</span>
+                        <div style="flex:1; font-size:13px;">${raw}</div>
+                    `;
+                    lista.appendChild(div);
+                }
+            });
+            document.getElementById('status').innerText = "Planilha carregada em São Caetano.";
         };
         reader.readAsArrayBuffer(file);
     });
 
-    function limparEndereco(texto) {
-        let limpo = texto.split('-')[0].split('(')[0];
-        limpo = limpo.replace(/R\./g, "Rua").replace(/Av\./g, "Avenida").replace(/nº/gi, "").trim();
-        return limpo + ", São Caetano do Sul, SP";
+    // FUNÇÃO NINJA: Extrai apenas o endereço puro
+    function extrairEnderecoPuro(texto) {
+        // Remove nome de cliente e pega a partir de Rua/Av
+        let match = texto.match(/(Rua|Av|Avenida|Al|Alameda|Pca|Praça)\s+[^,0-9]+,\s*\d+/i);
+        if (match) return match[0] + ", São Caetano do Sul, SP";
+        
+        // Se não achar o padrão acima, limpa o texto básico
+        return texto.split('-')[0].split(',')[0].trim() + ", São Caetano do Sul, SP";
     }
 
-    async function buscarCoordenada(query) {
-        try {
-            const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&viewbox=-46.59,-23.64,-46.53,-23.59&bounded=1`;
-            const res = await fetch(url, { headers: { 'Accept-Language': 'pt-BR' } });
-            const data = await res.json();
-            return (data && data[0]) ? [parseFloat(data[0].lat), parseFloat(data[0].lon)] : null;
-        } catch (e) { return null; }
+    async function buscarEndereco(item) {
+        const cep = item.dataset.cep.replace(/\D/g, '');
+        const raw = item.dataset.orig;
+        const numMatch = raw.match(/,\s*(\d+)/);
+        const numero = numMatch ? numMatch[1] : "";
+
+        // TENTATIVA 1: CEP + Número (Mais preciso)
+        if (cep && numero) {
+            let res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&postalcode=${cep}&street=${numero}&city=São Caetano do Sul&format=json`);
+            let data = await res.json();
+            if (data[0]) return [parseFloat(data[0].lat), parseFloat(data[0].lon)];
+        }
+
+        // TENTATIVA 2: Endereço Limpo
+        let enderecoLimpo = extrairEnderecoPuro(raw);
+        let res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(enderecoLimpo)}`);
+        let data = await res.json();
+        if (data[0]) return [parseFloat(data[0].lat), parseFloat(data[0].lon)];
+
+        return null;
     }
 
     async function gerarRotaNinja() {
-        if (!minhaPosicao) return alert("Aguarde o sinal do GPS (bola azul).");
+        if (!minhaPosicao) return alert("Aguarde o sinal do GPS.");
         const selecionados = Array.from(document.querySelectorAll('.check-ninja:checked'));
-        if (selecionados.length === 0) return alert("Selecione as entregas primeiro!");
+        if (selecionados.length === 0) return alert("Selecione os pacotes!");
 
         camadaMarcadores.clearLayers();
         if (camadaRota) map.removeLayer(camadaRota);
@@ -121,8 +123,8 @@
         const statusDiv = document.getElementById('status');
 
         for (let i = 0; i < selecionados.length; i++) {
-            statusDiv.innerText = `Localizando: ${selecionados[i].dataset.orig}...`;
-            let pos = await buscarCoordenada(selecionados[i].value);
+            statusDiv.innerText = `Localizando: ${i+1}/${selecionados.length}`;
+            let pos = await buscarEndereco(selecionados[i]);
 
             if (pos) {
                 coordenadas.push(pos);
@@ -132,17 +134,11 @@
                     iconSize: [30, 30], iconAnchor: [15, 15]
                 });
                 L.marker(pos, {icon: icon}).addTo(camadaMarcadores);
-            } else {
-                alert(`Não achei: ${selecionados[i].dataset.orig}. Verifique se o endereço está correto.`);
-                return;
             }
-            await new Promise(r => setTimeout(r, 1200));
+            await new Promise(r => setTimeout(r, 1100));
         }
 
-        statusDiv.innerText = "Calculando melhor caminho...";
         const coordsStr = coordenadas.map(c => `${c[1]},${c[0]}`).join(';');
-        
-        // OSRM Trip para otimizar a ordem linear
         const url = `https://router.project-osrm.org/trip/v1/driving/${coordsStr}?source=first&overview=full&geometries=geojson`;
 
         try {
@@ -152,12 +148,10 @@
                 const routeLine = rData.trips[0].geometry.coordinates.map(c => [c[1], c[0]]);
                 camadaRota = L.polyline(routeLine, {color: '#f1c40f', weight: 8, opacity: 0.9}).addTo(map);
                 map.fitBounds(camadaMarcadores.getBounds(), {padding: [40, 40]});
-                statusDiv.innerText = "ROTA PRONTA! Siga o mapa.";
+                statusDiv.innerText = "ROTA OTIMIZADA!";
                 document.getElementById('lista').style.display = 'none';
             }
-        } catch (e) {
-            statusDiv.innerText = "Erro ao traçar rota.";
-        }
+        } catch (e) { statusDiv.innerText = "Erro ao traçar rota."; }
     }
 </script>
 </body>
