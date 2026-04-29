@@ -3,49 +3,52 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rotas Ninja V8</title>
+    <title>Rotas Ninja V9</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
         body { font-family: sans-serif; margin: 0; background: #000; color: #fff; height: 100vh; display: flex; flex-direction: column; }
-        .header { padding: 10px; background: #1a1a1a; border-bottom: 2px solid #f1c40f; text-align: center; font-weight: bold; color: #f1c40f; }
-        #status { font-size: 12px; color: #aaa; background: #222; padding: 5px; text-align: center; }
-        #listaEntregas { flex: 1; overflow-y: auto; max-height: 25vh; padding: 10px; background: #111; border-bottom: 1px solid #333; }
-        .entrega-item { display: flex; align-items: center; background: #222; margin-bottom: 5px; padding: 10px; border-radius: 8px; font-size: 13px; }
-        .stop-badge { background: #f1c40f; color: #000; padding: 2px 6px; border-radius: 4px; font-weight: bold; margin-right: 10px; font-size: 11px; }
-        #map { flex: 2; width: 100%; }
-        .footer { padding: 10px; background: #1a1a1a; }
-        .btn-acao { width: 100%; padding: 15px; background: #f1c40f; color: #000; border: none; border-radius: 10px; font-weight: bold; font-size: 16px; }
+        .header { padding: 10px; background: #1a1a1a; border-bottom: 2px solid #f1c40f; text-align: center; color: #f1c40f; }
+        #status { font-size: 11px; color: #aaa; background: #222; padding: 5px; text-align: center; height: 15px; }
+        #listaEntregas { flex: 1; overflow-y: auto; max-height: 25vh; padding: 10px; background: #111; }
+        .entrega-item { display: flex; align-items: center; background: #222; margin-bottom: 4px; padding: 10px; border-radius: 8px; font-size: 12px; }
+        .stop-badge { background: #f1c40f; color: #000; padding: 2px 6px; border-radius: 4px; font-weight: bold; margin-right: 10px; }
+        #map { flex: 2; width: 100%; border-top: 1px solid #333; }
+        .footer { padding: 10px; background: #1a1a1a; display: flex; gap: 10px; }
+        .btn { flex: 1; padding: 15px; border: none; border-radius: 10px; font-weight: bold; font-size: 14px; cursor: pointer; }
+        .btn-calc { background: #444; color: #fff; }
+        .btn-go { background: #f1c40f; color: #000; }
     </style>
 </head>
 <body>
 
 <div class="header">ROTAS NINJA</div>
-<div id="status">Aguardando GPS e Planilha...</div>
+<div id="status">Aguardando GPS...</div>
 <div style="padding:10px; background:#1a1a1a;"><input type="file" id="fileInput"></div>
 <div id="listaEntregas"></div>
 <div id="map"></div>
-<div class="footer"><button class="btn-acao" onclick="iniciarRota()">TRAÇAR ROTA LINEAR</button></div>
+
+<div class="footer">
+    <button class="btn btn-calc" onclick="calcularNoMapa()">1. VER NO MAPA</button>
+    <button class="btn btn-go" onclick="abrirNavegacao()">2. INICIAR GPS</button>
+</div>
 
 <script>
-    // Inicializa Mapa
     let map = L.map('map').setView([-23.6192, -46.5627], 14);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
     let markers = [];
     let polyline = null;
     let minhaPosicao = null;
-    let markerGPS = L.circleMarker([0,0], {color: '#00ffff', radius: 8, fillOpacity: 0.8}).addTo(map);
+    let markerGPS = L.circleMarker([0,0], {color: '#00ffff', radius: 7}).addTo(map);
+    let enderecosSelecionados = [];
 
-    // Captura GPS com alta precisão
     navigator.geolocation.watchPosition(pos => {
         minhaPosicao = [pos.coords.latitude, pos.coords.longitude];
         markerGPS.setLatLng(minhaPosicao);
-        document.getElementById('status').innerText = "GPS Ativo. Carregue o arquivo.";
-    }, (err) => {
-        document.getElementById('status').innerText = "Erro no GPS: Ative a localização.";
-    }, { enableHighAccuracy: true });
+        document.getElementById('status').innerText = "GPS OK. Carregue o arquivo.";
+    }, null, { enableHighAccuracy: true });
 
     document.getElementById('fileInput').addEventListener('change', function(e) {
         const file = e.target.files[0];
@@ -63,64 +66,69 @@
                     const div = document.createElement('div');
                     div.className = 'entrega-item';
                     div.innerHTML = `
-                        <input type="checkbox" class="addr-check" value="${end}, São Caetano do Sul, SP" style="transform:scale(1.4); margin-right:12px;">
+                        <input type="checkbox" class="addr-check" value="${end}, São Caetano do Sul, SP" style="transform:scale(1.3); margin-right:10px;">
                         <span class="stop-badge">S${item["Stop"] || index}</span>
                         <div style="flex:1">${end}</div>
                     `;
                     listaDiv.appendChild(div);
                 }
             });
-            document.getElementById('status').innerText = "Planilha pronta. Selecione e trace.";
         };
         reader.readAsArrayBuffer(file);
     });
 
-    async function iniciarRota() {
-        const status = document.getElementById('status');
-        const selecionados = Array.from(document.querySelectorAll('.addr-check:checked'));
+    async function calcularNoMapa() {
+        if (!minhaPosicao) return alert("Aguarde o GPS.");
+        const checks = Array.from(document.querySelectorAll('.addr-check:checked'));
+        if (checks.length === 0) return alert("Selecione os pacotes.");
 
-        if (!minhaPosicao) return alert("Aguarde o sinal do GPS (bola azul no mapa).");
-        if (selecionados.length === 0) return alert("Selecione os destinos.");
-
-        // Limpeza
         markers.forEach(m => map.removeLayer(m));
         if (polyline) map.removeLayer(polyline);
         markers = [];
+        enderecosSelecionados = [];
 
-        status.innerText = "Buscando endereços em São Caetano...";
         let coordenadas = [minhaPosicao];
+        const status = document.getElementById('status');
 
-        for (let i = 0; i < selecionados.length; i++) {
-            status.innerText = `Localizando: ${i+1}/${selecionados.length}`;
-            try {
-                const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(selecionados[i].value)}`);
-                const data = await res.json();
-                if (data && data[0]) {
-                    const latlng = [parseFloat(data[0].lat), parseFloat(data[0].lon)];
-                    coordenadas.push(latlng);
-                    markers.push(L.marker(latlng).addTo(map).bindPopup(selecionados[i].value));
-                }
-                await new Promise(r => setTimeout(r, 900)); // Delay para evitar bloqueio
-            } catch (e) { console.error(e); }
+        for (let i = 0; i < checks.length; i++) {
+            status.innerText = `Localizando: ${i+1}/${checks.length}`;
+            const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(checks[i].value)}`);
+            const data = await res.json();
+            if (data && data[0]) {
+                const pt = [parseFloat(data[0].lat), parseFloat(data[0].lon)];
+                coordenadas.push(pt);
+                enderecosSelecionados.push(checks[i].value);
+                let m = L.marker(pt).addTo(map).bindPopup(`Parada ${i+1}`);
+                markers.push(m);
+            }
+            await new Promise(r => setTimeout(r, 800));
         }
 
-        status.innerText = "Desenhando caminho mais curto...";
-        // Mudança para API 'route' em vez de 'trip' para evitar o erro de paradas
         const coordsStr = coordenadas.map(c => `${c[1]},${c[0]}`).join(';');
-        
-        try {
-            const res = await fetch(`https://router.project-osrm.org/route/v1/driving/${coordsStr}?overview=full&geometries=geojson`);
-            const route = await res.json();
+        const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${coordsStr}?overview=full&geometries=geojson`;
 
+        try {
+            const res = await fetch(osrmUrl);
+            const route = await res.json();
             if (route.routes && route.routes[0]) {
                 const line = route.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
-                polyline = L.polyline(line, {color: '#f1c40f', weight: 6, opacity: 0.9}).addTo(map);
+                polyline = L.polyline(line, {color: '#f1c40f', weight: 5}).addTo(map);
                 map.fitBounds(polyline.getBounds());
-                status.innerText = "Rota Ninja Finalizada!";
-            } else {
-                status.innerText = "Endereço não encontrado ou inacessível via carro.";
+                status.innerText = "Rota Ninja Traçada!";
             }
-        } catch (e) { status.innerText = "Erro de conexão com o servidor de rotas."; }
+        } catch (e) { status.innerText = "Erro ao traçar linha."; }
+    }
+
+    function abrirNavegacao() {
+        if (enderecosSelecionados.length === 0) return alert("Primeiro clique em VER NO MAPA");
+        
+        const origin = "current+location";
+        const destino = encodeURIComponent(enderecosSelecionados[enderecosSelecionados.length - 1]);
+        const waypoints = enderecosSelecionados.slice(0, -1).map(a => encodeURIComponent(a)).join('|');
+        
+        // Esta URL força o Google Maps a abrir o modo Navegação com as paradas na ordem correta
+        const url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destino}&waypoints=${waypoints}&travelmode=driving`;
+        window.open(url, '_blank');
     }
 </script>
 </body>
