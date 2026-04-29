@@ -3,51 +3,65 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Rotas Ninja - Performance</title>
+    <title>Rotas Ninja V11</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
         body { font-family: sans-serif; margin: 0; background: #000; color: #fff; height: 100vh; display: flex; flex-direction: column; }
-        #menu { background: #1a1a1a; padding: 10px; border-bottom: 2px solid #f1c40f; }
-        #listaEntregas { flex: 1; overflow-y: auto; max-height: 25vh; background: #111; }
-        #map { flex: 3; width: 100%; }
-        .entrega-item { display: flex; align-items: center; background: #222; margin: 4px; padding: 10px; border-radius: 8px; font-size: 13px; }
-        .stop-badge { background: #f1c40f; color: #000; padding: 3px 6px; border-radius: 4px; font-weight: bold; margin-right: 10px; }
+        #topo { background: #1a1a1a; padding: 10px; border-bottom: 2px solid #f1c40f; text-align: center; }
+        #listaEntregas { flex: 1; overflow-y: auto; max-height: 25vh; background: #111; padding: 5px; }
+        #map { flex: 3; width: 100%; border-top: 1px solid #333; }
+        .entrega-item { display: flex; align-items: center; background: #222; margin: 4px; padding: 12px; border-radius: 8px; font-size: 13px; }
+        .stop-badge { background: #f1c40f; color: #000; padding: 3px 6px; border-radius: 4px; font-weight: bold; margin-right: 12px; }
         .btn-footer { padding: 15px; background: #1a1a1a; display: flex; gap: 10px; }
-        .btn { flex: 1; padding: 15px; border: none; border-radius: 10px; font-weight: bold; font-size: 14px; cursor: pointer; text-transform: uppercase; }
+        .btn { flex: 1; padding: 18px; border: none; border-radius: 12px; font-weight: bold; font-size: 15px; cursor: pointer; text-transform: uppercase; }
         .btn-calc { background: #f1c40f; color: #000; }
-        .number-icon { background: #f1c40f; color: #000; border: 2px solid #000; border-radius: 50%; text-align: center; font-weight: bold; line-height: 20px; font-size: 12px; }
+        .btn-reset { background: #333; color: #ccc; border: 1px solid #444; }
+        
+        /* Estilo do Marcador com Número */
+        .marker-ninja {
+            background-color: #f1c40f;
+            border: 2px solid #000;
+            border-radius: 50%;
+            color: #000;
+            font-weight: bold;
+            text-align: center;
+            line-height: 26px;
+            font-size: 14px;
+            box-shadow: 0 0 8px rgba(241,196,15,0.6);
+        }
         .oculto { display: none !important; }
     </style>
 </head>
 <body>
 
-<div id="menu">
-    <div style="display:flex; justify-content:space-between; align-items:center;">
-        <strong style="color:#f1c40f">ROTAS NINJA V10</strong>
-        <button onclick="document.getElementById('listaEntregas').classList.toggle('oculto')" style="background:none; border:1px solid #f1c40f; color:#f1c40f; font-size:10px;">LISTA</button>
-    </div>
+<div id="topo">
+    <strong style="color:#f1c40f">ROTAS NINJA V11</strong>
     <input type="file" id="fileInput" style="margin-top:10px; width:100%">
 </div>
 
-<div id="status" style="font-size:11px; text-align:center; padding:5px; color:#f1c40f">Aguardando GPS...</div>
+<div id="status" style="font-size:12px; text-align:center; padding:6px; color:#f1c40f; background:#222">Aguardando sinal GPS...</div>
+
 <div id="listaEntregas"></div>
+
 <div id="map"></div>
 
 <div class="btn-footer">
-    <button class="btn btn-calc" onclick="calcularRotaNinja()">OTIMIZAR E TRAÇAR</button>
+    <button class="btn btn-reset" onclick="location.reload()">LIMPAR TUDO</button>
+    <button class="btn btn-calc" onclick="iniciarOtimizacao()">TRAÇAR ROTA</button>
 </div>
 
 <script>
     var map = L.map('map', { zoomControl: false }).setView([-23.6192, -46.5627], 15);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-    var markerGPS = L.circleMarker([0,0], {color: '#00ffff', radius: 8, fillOpacity: 1}).addTo(map);
-    var markersLayer = L.layerGroup().addTo(map);
-    var rotaLayer = null;
+    var markerGPS = L.circleMarker([0,0], {color: '#00ffff', radius: 9, fillOpacity: 1}).addTo(map);
+    var camadaMarcadores = L.layerGroup().addTo(map);
+    var camadaRota = null;
     var minhaPosicao = null;
 
+    // Atualização de GPS constante
     navigator.geolocation.watchPosition(pos => {
         minhaPosicao = [pos.coords.latitude, pos.coords.longitude];
         markerGPS.setLatLng(minhaPosicao);
@@ -57,77 +71,91 @@
         const file = e.target.files[0];
         const reader = new FileReader();
         reader.onload = function(event) {
-            const workbook = XLSX.read(new Uint8Array(event.target.result), { type: 'array' });
-            const data = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
-            const listaDiv = document.getElementById('listaEntregas');
-            listaDiv.innerHTML = "";
+            const wb = XLSX.read(new Uint8Array(event.target.result), { type: 'array' });
+            const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+            const lista = document.getElementById('listaEntregas');
+            lista.innerHTML = "";
             
             data.forEach((item, index) => {
-                let end = (item["Destination Address"] || item["Endereco"] || "").split('-')[0].trim();
+                let endRaw = item["Destination Address"] || item["Endereco"] || "";
+                let end = endRaw.split('-')[0].trim();
+                let stop = item["Stop"] || (index + 1);
+                
                 if(end) {
                     const div = document.createElement('div');
                     div.className = 'entrega-item';
                     div.innerHTML = `
-                        <input type="checkbox" class="addr-check" data-stop="${item["Stop"] || index}" value="${end}, São Caetano do Sul, SP" style="transform:scale(1.5); margin-right:15px;">
-                        <span class="stop-badge">S${item["Stop"] || index}</span>
+                        <input type="checkbox" class="check-ninja" data-stop="${stop}" value="${end}, São Caetano do Sul, SP" style="transform:scale(1.7); margin-right:15px;">
+                        <span class="stop-badge">${stop}</span>
                         <div style="flex:1">${end}</div>
                     `;
-                    listaDiv.appendChild(div);
+                    lista.appendChild(div);
                 }
             });
-            document.getElementById('status').innerText = "Planilha pronta para otimização.";
+            document.getElementById('status').innerText = "Planilha carregada. Selecione os destinos.";
         };
         reader.readAsArrayBuffer(file);
     });
 
-    async function calcularRotaNinja() {
-        if (!minhaPosicao) return alert("Aguarde o sinal do GPS.");
-        const selecionados = Array.from(document.querySelectorAll('.addr-check:checked'));
-        if (selecionados.length === 0) return alert("Selecione os pacotes!");
+    async function iniciarOtimizacao() {
+        if (!minhaPosicao) return alert("Habilite o GPS e aguarde o sinal (bola azul).");
+        const selecionados = Array.from(document.querySelectorAll('.check-ninja:checked'));
+        if (selecionados.length === 0) return alert("Selecione os pacotes na lista!");
 
-        markersLayer.clearLayers();
-        if (rotaLayer) map.removeLayer(rotaLayer);
+        camadaMarcadores.clearLayers();
+        if (camadaRota) map.removeLayer(camadaRota);
 
-        let coordenadas = [{latlng: minhaPosicao, stop: "GPS"}];
-        const status = document.getElementById('status');
+        let coordenadas = [ {latlng: minhaPosicao, stop: "0"} ];
+        const statusDiv = document.getElementById('status');
 
         for (let i = 0; i < selecionados.length; i++) {
-            status.innerText = `Localizando: ${i+1}/${selecionados.length}`;
-            const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(selecionados[i].value)}`);
-            const data = await res.json();
-            if (data && data[0]) {
-                const pos = [parseFloat(data[0].lat), parseFloat(data[0].lon)];
-                coordenadas.push({latlng: pos, stop: selecionados[i].getAttribute('data-stop')});
+            statusDiv.innerText = `Processando Stop ${selecionados[i].dataset.stop}...`;
+            
+            try {
+                const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(selecionados[i].value)}`);
+                const data = await res.json();
                 
-                // Criar Marcador com Número do Stop
-                const icon = L.divIcon({
-                    className: 'custom-div-icon',
-                    html: `<div class="number-icon">${selecionados[i].getAttribute('data-stop')}</div>`,
-                    iconSize: [24, 24], iconAnchor: [12, 12]
-                });
-                L.marker(pos, {icon: icon}).addTo(markersLayer);
-            }
-            await new Promise(r => setTimeout(r, 850));
+                if (data && data[0]) {
+                    const pos = [parseFloat(data[0].lat), parseFloat(data[0].lon)];
+                    coordenadas.push({latlng: pos, stop: selecionados[i].dataset.stop});
+                    
+                    // Ícone customizado com o NÚMERO DO STOP
+                    const icon = L.divIcon({
+                        className: 'marker-ninja',
+                        html: selecionados[i].dataset.stop,
+                        iconSize: [30, 30],
+                        iconAnchor: [15, 15]
+                    });
+                    L.marker(pos, {icon: icon}).addTo(camadaMarcadores);
+                }
+            } catch (err) { console.error("Erro no ponto", i); }
+            
+            // Pausa técnica para evitar bloqueio do servidor (crucial)
+            await new Promise(r => setTimeout(r, 1000));
         }
 
-        status.innerText = "Otimizando percurso linear...";
+        statusDiv.innerText = "Calculando melhor caminho linear...";
         
-        // Usamos o motor TRIP que reorganiza os pontos para a menor distância total
+        // Monta as coordenadas para o motor de rota
         const coordsStr = coordenadas.map(c => `${c.latlng[1]},${c.latlng[0]}`).join(';');
+        
+        // Perfil 'trip' com waypoint_optimization
         const url = `https://router.project-osrm.org/trip/v1/driving/${coordsStr}?source=first&overview=full&geometries=geojson`;
 
         try {
-            const response = await fetch(url);
-            const routeData = await response.json();
-            if (routeData.trips && routeData.trips[0]) {
-                const pts = routeData.trips[0].geometry.coordinates.map(c => [c[1], c[0]]);
-                rotaLayer = L.polyline(pts, {color: '#f1c40f', weight: 6, opacity: 0.9}).addTo(map);
-                map.fitBounds(rotaLayer.getBounds());
-                status.innerText = "Rota Otimizada com Sucesso!";
+            const resp = await fetch(url);
+            const rData = await resp.json();
+            if (rData.trips && rData.trips[0]) {
+                const routeLine = rData.trips[0].geometry.coordinates.map(c => [c[1], c[0]]);
+                camadaRota = L.polyline(routeLine, {color: '#f1c40f', weight: 8, opacity: 0.8}).addTo(map);
+                map.fitBounds(camadaRota.getBounds());
+                statusDiv.innerText = "ROTA NINJA PRONTA!";
                 document.getElementById('listaEntregas').classList.add('oculto');
+            } else {
+                statusDiv.innerText = "Erro ao traçar rota. Tente marcar menos pontos.";
             }
         } catch (e) {
-            status.innerText = "Erro ao processar rota.";
+            statusDiv.innerText = "Falha na conexão de rota.";
         }
     }
 </script>
