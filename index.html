@@ -44,7 +44,7 @@
     <div id="modal-selecao">
         <h2 style="margin: 0; color: #39FF14;">Selecione a Parada</h2>
         <div id="lista-paradas"></div>
-        <button onclick="fecharModal()" style="margin-top: 15px; padding: 15px; background: #444; border: none; color: #fff; border-radius: 10px; font-weight: bold;">FECHAR</button>
+        <button onclick="fecharModal()" style="margin-top: 15px; padding: 15px; background: #444; border: none; color: #fff; border-radius: 10px; font-weight: bold;">VOLTAR</button>
     </div>
 
     <div id="painel-topo">
@@ -80,9 +80,9 @@
         let camadaFundo = L.layerGroup(), aguardandoConfirmacao = false, ultimaLatReq, ultimaLonReq;
         let wakeLock = null;
         
-        // TRAVAS DE ÁUDIO
-        let idPassoFalado = -1; 
-        let falouChegadaNoStop = -1;
+        // --- CONTROLE DE VOZ RIGOROSO ---
+        let ultimoIdManobraFalada = -1; 
+        let falouChegadaDesteStop = -1;
 
         function falar(texto) {
             window.speechSynthesis.cancel();
@@ -127,14 +127,14 @@
                             let rawLon = String(i.longitude || i.lon || i.lng).replace(',', '.');
                             paradasUnicas[s] = {
                                 lat: parseFloat(rawLat), lon: parseFloat(rawLon),
-                                addr: i["destination address"] || i.endereco || i.address || "Endereço não identificado",
+                                addr: i["destination address"] || i.endereco || i.address || "S/N",
                                 stop: parseInt(s), pacotes: contagem[s], marker: null
                             };
                         }
                     });
                     rotaSpx = Object.values(paradasUnicas).sort((a, b) => a.stop - b.stop);
                     if (rotaSpx.length > 0) abrirModalSelecao();
-                } catch (err) { alert("Erro ao ler planilha."); }
+                } catch (err) { alert("Erro na planilha."); }
             };
             reader.readAsBinaryString(e.target.files[0]);
         });
@@ -162,8 +162,8 @@
             document.getElementById('btn-re-stop').style.display = 'flex';
             aguardandoConfirmacao = false;
             passosNavegacao = [];
-            idPassoFalado = -1; // Reseta as falas
-            falouChegadaNoStop = -1;
+            ultimoIdManobraFalada = -1; 
+            falouChegadaDesteStop = -1;
             document.getElementById('nav-ui').style.display = 'block';
             document.getElementById('painel-acoes').style.display = 'none';
             document.getElementById('painel-topo').classList.remove('modo-confirmacao');
@@ -200,7 +200,7 @@
         async function calcularRota() {
             try {
                 const d = rotaSpx[idxDestino];
-                document.getElementById('stop-badge').innerText = "STOP " + d.stop + " (" + d.pacotes + " vol)";
+                document.getElementById('stop-badge').innerText = "STOP " + d.stop;
                 if (markerDest) mapa.removeLayer(markerDest);
                 markerDest = L.circleMarker([d.lat, d.lon], { radius: 11, color: '#fff', fillColor: '#007AFF', fillOpacity: 1, weight: 3 }).addTo(mapa);
                 const url = `https://router.project-osrm.org/route/v1/driving/${minhaLon},${minhaLat};${d.lon},${d.lat}?steps=true&overview=full&geometries=geojson`;
@@ -210,10 +210,10 @@
                     const route = data.routes[0];
                     passosNavegacao = route.legs[0].steps.map((s, i) => ({
                         id: i, lat: s.maneuver.location[1], lon: s.maneuver.location[0],
-                        manobra: s.maneuver.modifier, rua: s.name || "Siga em frente"
+                        manobra: s.maneuver.modifier
                     }));
                     idxPasso = 0;
-                    idPassoFalado = -1; // Reset ao calcular nova rota
+                    ultimoIdManobraFalada = -1;
                     if (polylineRota) mapa.removeLayer(polylineRota);
                     polylineRota = L.polyline(route.geometry.coordinates.map(c => [c[1], c[0]]), { color: '#007AFF', weight: 6 }).addTo(mapa);
                 }
@@ -225,17 +225,17 @@
             const destinoAtual = rotaSpx[idxDestino];
             const dFinal = dist(minhaLat, minhaLon, destinoAtual.lat, destinoAtual.lon);
             
-            // CHEGADA NO DESTINO (60m) - FALA UMA ÚNICA VEZ
+            // CHEGADA (60m)
             if (dFinal < 60) {
-                if (falouChegadaNoStop !== destinoAtual.stop) {
-                    falar("O destino chegou. Stop " + destinoAtual.stop);
-                    falouChegadaNoStop = destinoAtual.stop;
+                if (falouChegadaDesteStop !== destinoAtual.stop) {
+                    falar("O destino chegou. Número " + destinoAtual.stop);
+                    falouChegadaDesteStop = destinoAtual.stop;
                 }
                 aguardandoConfirmacao = true;
                 document.getElementById('nav-ui').style.display = 'none';
                 document.getElementById('painel-acoes').style.display = 'flex';
                 document.getElementById('painel-topo').classList.add('modo-confirmacao');
-                document.getElementById('rua-atual').innerText = "VOCÊ CHEGOU!";
+                document.getElementById('rua-atual').innerText = "CHEGOU AO DESTINO";
                 return;
             }
 
@@ -245,18 +245,17 @@
 
             document.getElementById('distancia-curva').innerText = Math.round(dCurva) + " m";
             document.getElementById('distancia-final').innerText = dFinal > 1000 ? (dFinal/1000).toFixed(1) + " km" : Math.round(dFinal) + " m";
-            document.getElementById('rua-atual').innerText = passo.rua;
+            document.getElementById('rua-atual').innerText = "EM DIREÇÃO AO STOP " + destinoAtual.stop;
 
+            // --- LÓGICA DE FALA ÚNICA AOS 100 METROS ---
             const m = passo.manobra || "";
-            
-            // LÓGICA DE FALA ÚNICA AOS 50 METROS
-            if (dCurva < 50 && idPassoFalado !== passo.id) {
+            if (dCurva <= 100 && dCurva > 20 && ultimoIdManobraFalada !== passo.id) {
                 if (m.includes("left")) {
-                    falar("A cinquenta metros, vire à esquerda na " + passo.rua);
-                    idPassoFalado = passo.id;
+                    falar("Vire à esquerda");
+                    ultimoIdManobraFalada = passo.id;
                 } else if (m.includes("right")) {
-                    falar("A cinquenta metros, vire à direita na " + passo.rua);
-                    idPassoFalado = passo.id;
+                    falar("Vire à direita");
+                    ultimoIdManobraFalada = passo.id;
                 }
             }
 
@@ -264,10 +263,7 @@
             else if (m.includes("right")) document.getElementById('seta-instrucao').innerText = "➡️";
             else document.getElementById('seta-instrucao').innerText = "⬆️";
 
-            // Troca de passo quando a curva passa (20m de tolerância)
-            if (dCurva < 20 && idxPasso < passosNavegacao.length - 1) {
-                idxPasso++;
-            }
+            if (dCurva < 20 && idxPasso < passosNavegacao.length - 1) idxPasso++;
         }
 
         function finalizarParada(status) {
