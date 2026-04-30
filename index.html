@@ -12,7 +12,7 @@
     <style>
         body { background-color: #000; color: #fff; font-family: sans-serif; margin: 0; text-align: center; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
         
-        #painel-topo { background: #007AFF; padding: 10px; min-height: 140px; display: flex; flex-direction: column; justify-content: center; z-index: 1001; transition: background 0.3s; }
+        #painel-topo { background: #007AFF; padding: 10px; min-height: 140px; display: flex; flex-direction: column; justify-content: center; z-index: 1001; transition: background 0.3s; position: relative; }
         .modo-confirmacao { background: #FFCC00 !important; color: #000 !important; }
         
         #stop-badge { background: #000; color: #39FF14; padding: 3px 10px; border-radius: 8px; font-weight: bold; font-size: 18px; margin-bottom: 5px; display: inline-block; border: 1px solid #39FF14; }
@@ -35,6 +35,9 @@
         .btn-ini { background: #39FF14; color: #000; padding: 15px; border-radius: 12px; font-weight: bold; font-size: 18px; cursor: pointer; display: block; text-align: center; }
         input[type="file"] { display: none; }
 
+        /* Botão Re-selecionar Stop */
+        #btn-re-stop { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.5); border: 1px solid #fff; color: #fff; border-radius: 50%; width: 35px; height: 35px; display: none; align-items: center; justify-content: center; font-size: 20px; cursor: pointer; }
+
         .stop-label { background: rgba(0,0,0,0.8); color: #fff; border: 1px solid #39FF14; font-weight: bold; padding: 2px 4px; border-radius: 3px; font-size: 10px; }
         .leaflet-tile-container { filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%); }
     </style>
@@ -42,6 +45,7 @@
 <body>
 
     <div id="painel-topo">
+        <div id="btn-re-stop" onclick="solicitarTrocaStop()">📑</div>
         <div><div id="stop-badge">STOP --</div></div>
         <div id="nav-ui">
             <span id="seta-instrucao">---</span>
@@ -72,45 +76,42 @@
         let minhaLat, minhaLon, mapa, markerUser, markerDest, polylineRota;
         let camadaFundo = L.layerGroup(), aguardandoConfirmacao = false, ultimaLatReq, ultimaLonReq;
         let wakeLock = null;
+        
+        // Variáveis de controle de áudio
+        let ultimaManobraFalada = "";
+        let falouChegada = false;
 
-        // --- GESTÃO DE TELA (WAKE LOCK) ---
-        async function requestWakeLock() {
-            try {
-                if ('wakeLock' in navigator) {
-                    wakeLock = await navigator.wakeLock.request('screen');
-                }
-            } catch (err) { console.error(`${err.name}, ${err.message}`); }
+        function falar(texto) {
+            window.speechSynthesis.cancel(); // Para falas anteriores para não encavalar
+            const msg = new SpeechSynthesisUtterance(texto);
+            msg.lang = 'pt-BR';
+            msg.rate = 1.2;
+            window.speechSynthesis.speak(msg);
         }
 
-        function releaseWakeLock() {
-            if (wakeLock !== null) {
-                wakeLock.release();
-                wakeLock = null;
-            }
+        async function requestWakeLock() {
+            try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } 
+            catch (err) { console.error(err); }
         }
 
         window.onload = function() {
             mapa = L.map('map', { zoomControl: false, attributionControl: false }).setView([-23.61, -46.57], 16);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(mapa);
             camadaFundo.addTo(mapa);
-            setTimeout(() => { mapa.invalidateSize(); }, 500);
         };
 
         document.getElementById('fileInput').addEventListener('change', function(e) {
             const reader = new FileReader();
-            requestWakeLock(); // Ativa a tela assim que escolhe o arquivo
+            requestWakeLock();
             
             reader.onload = function(evt) {
                 try {
                     const wb = XLSX.read(evt.target.result, { type: 'binary' });
                     const dataRaw = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
                     
-                    // Normalização de cabeçalhos (lowercase e trim)
                     const json = dataRaw.map(row => {
                         const normalized = {};
-                        for (let key in row) {
-                            normalized[key.trim().toLowerCase()] = row[key];
-                        }
+                        for (let key in row) normalized[key.trim().toLowerCase()] = row[key];
                         return normalized;
                     });
 
@@ -126,31 +127,48 @@
                             let rawLat = String(i.latitude || i.lat).replace(',', '.');
                             let rawLon = String(i.longitude || i.lon || i.lng).replace(',', '.');
                             return {
-                                lat: parseFloat(rawLat),
-                                lon: parseFloat(rawLon),
-                                addr: i["destination address"] || i.endereco || "Endereço não identificado",
+                                lat: parseFloat(rawLat), lon: parseFloat(rawLon),
+                                addr: i["destination address"] || i.endereco || "S/N",
                                 stop: i.stop || i.parada || i.sequence,
                                 pacotes: contagem[i.stop || i.parada || i.sequence] || 1,
-                                status: 'neutro',
-                                marker: null
+                                status: 'neutro', marker: null
                             };
-                        })
-                        .filter(i => !isNaN(i.lat) && !isNaN(i.lon));
+                        }).filter(i => !isNaN(i.lat) && !isNaN(i.lon));
 
                     if (rotaSpx.length > 0) {
+                        const listaStops = rotaSpx.map(r => r.stop).join(", ");
+                        const inicio = prompt("Planilha lida! Stops encontrados: " + listaStops + "\n\nDigite o número do STOP por onde deseja começar:", rotaSpx[0].stop);
+                        
+                        const buscaIdx = rotaSpx.findIndex(r => r.stop == inicio);
+                        idxDestino = buscaIdx !== -1 ? buscaIdx : 0;
+
                         desenharStopsFundo();
                         document.getElementById('btnLabel').style.display = 'none';
+                        document.getElementById('btn-re-stop').style.display = 'flex';
                         document.getElementById('rua-atual').innerText = "BUSCANDO GPS...";
                         iniciarGPS();
-                    } else {
-                        alert("Erro: Não encontrei colunas de 'Stop', 'Latitude' ou 'Longitude'. Verifique o arquivo.");
                     }
-                } catch (err) {
-                    alert("Erro ao processar planilha: " + err.message);
-                }
+                } catch (err) { alert("Erro: " + err.message); }
             };
             reader.readAsBinaryString(e.target.files[0]);
         });
+
+        function solicitarTrocaStop() {
+            const novo = prompt("Para qual STOP deseja pular agora?");
+            if (novo) {
+                const buscaIdx = rotaSpx.findIndex(r => r.stop == novo);
+                if (buscaIdx !== -1) {
+                    idxDestino = buscaIdx;
+                    aguardandoConfirmacao = false;
+                    passosNavegacao = [];
+                    falouChegada = false;
+                    document.getElementById('nav-ui').style.display = 'block';
+                    document.getElementById('painel-acoes').style.display = 'none';
+                    document.getElementById('painel-topo').classList.remove('modo-confirmacao');
+                    calcularRota();
+                } else { alert("Stop não encontrado."); }
+            }
+        }
 
         function desenharStopsFundo() {
             camadaFundo.clearLayers();
@@ -164,15 +182,10 @@
         function iniciarGPS() {
             navigator.geolocation.watchPosition(async pos => {
                 minhaLat = pos.coords.latitude; minhaLon = pos.coords.longitude;
-                
-                if (!markerUser) {
-                    markerUser = L.circleMarker([minhaLat, minhaLon], { color: '#007AFF', fillOpacity: 1, radius: 8, zIndexOffset: 1000 }).addTo(mapa);
-                } else {
-                    markerUser.setLatLng([minhaLat, minhaLon]);
-                }
+                if (!markerUser) markerUser = L.circleMarker([minhaLat, minhaLon], { color: '#007AFF', fillOpacity: 1, radius: 8 }).addTo(mapa);
+                else markerUser.setLatLng([minhaLat, minhaLon]);
 
-                const desviou = ultimaLatReq && dist(minhaLat, minhaLon, ultimaLatReq, ultimaLonReq) > 30;
-
+                const desviou = ultimaLatReq && dist(minhaLat, minhaLon, ultimaLatReq, ultimaLonReq) > 35;
                 if (idxDestino < rotaSpx.length && !aguardandoConfirmacao) {
                     if (passosNavegacao.length === 0 || desviou) {
                         await calcularRota();
@@ -181,16 +194,13 @@
                     navegar();
                 }
                 mapa.panTo([minhaLat, minhaLon]);
-            }, (err) => {
-                document.getElementById('rua-atual').innerText = "ERRO NO GPS: " + err.message;
-            }, { enableHighAccuracy: true });
+            }, null, { enableHighAccuracy: true });
         }
 
         async function calcularRota() {
             try {
                 const d = rotaSpx[idxDestino];
                 document.getElementById('stop-badge').innerText = "STOP " + d.stop + " (" + d.pacotes + " vol)";
-                
                 if (markerDest) mapa.removeLayer(markerDest);
                 markerDest = L.circleMarker([d.lat, d.lon], { radius: 11, color: '#fff', fillColor: '#007AFF', fillOpacity: 1, weight: 3 }).addTo(mapa);
 
@@ -205,20 +215,24 @@
                         manobra: s.maneuver.modifier, rua: s.name || "Siga em frente"
                     }));
                     idxPasso = 0;
+                    ultimaManobraFalada = "";
                     if (polylineRota) mapa.removeLayer(polylineRota);
-                    polylineRota = L.polyline(route.geometry.coordinates.map(c => [c[1], c[0]]), { color: '#007AFF', weight: 6, opacity: 0.8 }).addTo(mapa);
+                    polylineRota = L.polyline(route.geometry.coordinates.map(c => [c[1], c[0]]), { color: '#007AFF', weight: 6 }).addTo(mapa);
                 }
-            } catch (e) {
-                document.getElementById('rua-atual').innerText = "ERRO DE CONEXÃO/API";
-            }
+            } catch (e) { console.error(e); }
         }
 
         function navegar() {
             if (!rotaSpx[idxDestino] || passosNavegacao.length === 0) return;
-
-            const dFinal = dist(minhaLat, minhaLon, rotaSpx[idxDestino].lat, rotaSpx[idxDestino].lon);
+            const destinoAtual = rotaSpx[idxDestino];
+            const dFinal = dist(minhaLat, minhaLon, destinoAtual.lat, destinoAtual.lon);
             
+            // CHEGADA AO DESTINO (60 metros)
             if (dFinal < 60) {
+                if (!falouChegada) {
+                    falar("O destino chegou no stop " + destinoAtual.stop);
+                    falouChegada = true;
+                }
                 aguardandoConfirmacao = true;
                 releaseWakeLock();
                 document.getElementById('nav-ui').style.display = 'none';
@@ -237,30 +251,37 @@
             document.getElementById('distancia-final').innerText = dFinal > 1000 ? (dFinal/1000).toFixed(1) + " km" : Math.round(dFinal) + " m";
             document.getElementById('rua-atual').innerText = passo.rua;
 
-            const m = passo.manobra;
-            if (m && m.includes("left")) document.getElementById('seta-instrucao').innerText = "⬅️";
-            else if (m && m.includes("right")) document.getElementById('seta-instrucao').innerText = "➡️";
+            const m = passo.manobra || "";
+            // ALERTA SONORO DE CURVA (30 metros)
+            if (dCurva < 30 && ultimaManobraFalada !== (passo.lat + m)) {
+                if (m.includes("left")) falar("Vire à esquerda na " + passo.rua);
+                else if (m.includes("right")) falar("Vire à direita na " + passo.rua);
+                ultimaManobraFalada = passo.lat + m;
+            }
+
+            if (m.includes("left")) document.getElementById('seta-instrucao').innerText = "⬅️";
+            else if (m.includes("right")) document.getElementById('seta-instrucao').innerText = "➡️";
             else document.getElementById('seta-instrucao').innerText = "⬆️";
 
-            if (dCurva < 25 && idxPasso < passosNavegacao.length - 1) idxPasso++;
+            if (dCurva < 20 && idxPasso < passosNavegacao.length - 1) idxPasso++;
         }
 
         function finalizarParada(status) {
-            const p = rotaSpx[idxDestino];
-            p.status = status;
-            p.marker.setStyle({ fillColor: status === 'concluido' ? '#888' : '#ff0000', color: '#fff', weight: 2 });
-
-            aguardandoConfirmacao = false;
-            requestWakeLock();
+            rotaSpx[idxDestino].status = status;
+            rotaSpx[idxDestino].marker.setStyle({ fillColor: status === 'concluido' ? '#888' : '#ff0000' });
             
+            aguardandoConfirmacao = false;
+            falouChegada = false;
+            requestWakeLock();
             idxDestino++;
             passosNavegacao = [];
+            
             document.getElementById('nav-ui').style.display = 'block';
             document.getElementById('painel-acoes').style.display = 'none';
             document.getElementById('painel-topo').classList.remove('modo-confirmacao');
             
             if (idxDestino < rotaSpx.length) calcularRota();
-            else { releaseWakeLock(); document.getElementById('rua-atual').innerText = "ROTA FINALIZADA"; }
+            else { releaseWakeLock(); document.getElementById('rua-atual').innerText = "FIM DA ROTA"; }
         }
 
         function dist(la1, lo1, la2, lo2) {
@@ -270,6 +291,8 @@
             const a = Math.sin(dLat/2)**2 + Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)*Math.sin(dLon/2)**2;
             return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
         }
+
+        function releaseWakeLock() { if (wakeLock) { wakeLock.release(); wakeLock = null; } }
     </script>
 </body>
 </html>
