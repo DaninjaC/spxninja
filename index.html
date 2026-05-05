@@ -86,8 +86,20 @@
         let camadaFundo = L.layerGroup(), aguardandoConfirmacao = false, ultimaLatReq, ultimaLonReq;
         let wakeLock = null;
 
+        // --- GESTÃO DE TELA (WAKE LOCK) CORRIGIDA ---
         async function requestWakeLock() {
-            try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch (e) {}
+            try { 
+                if ('wakeLock' in navigator) {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                }
+            } catch (e) { console.log("WakeLock erro: " + e.message); }
+        }
+
+        function releaseWakeLock() {
+            if (wakeLock !== null) {
+                wakeLock.release();
+                wakeLock = null;
+            }
         }
 
         window.onload = function() {
@@ -98,7 +110,8 @@
 
         document.getElementById('fileInput').addEventListener('change', function(e) {
             const reader = new FileReader();
-            requestWakeLock();
+            requestWakeLock(); // Inicia o WakeLock ao carregar arquivo
+            
             reader.onload = function(evt) {
                 try {
                     const wb = XLSX.read(evt.target.result, { type: 'binary' });
@@ -150,6 +163,7 @@
             document.getElementById('rua-atual').innerText = "AGUARDANDO GPS...";
             aguardandoConfirmacao = false;
             passosNavegacao = [];
+            requestWakeLock(); // Garante tela acesa ao selecionar
             if(!minhaLat) iniciarGPS(); else calcularRota();
         }
 
@@ -179,11 +193,10 @@
             }, (err) => { document.getElementById('rua-atual').innerText = "ERRO GPS: " + err.message; }, { enableHighAccuracy: true });
         }
 
-        // --- MODO DIAGNÓSTICO INTEGRADO ---
         async function calcularRota() {
             if(!minhaLat || !minhaLon) return;
             const d = rotaSpx[idxDestino];
-            document.getElementById('stop-badge').innerText = "STOP " + d.stop;
+            document.getElementById('stop-badge').innerText = "STOP " + d.stop + " (" + d.pacotes + " vol)";
             
             if (markerDest) mapa.removeLayer(markerDest);
             markerDest = L.circleMarker([d.lat, d.lon], { radius: 11, color: '#fff', fillColor: '#007AFF', fillOpacity: 1, weight: 3 }).addTo(mapa);
@@ -191,12 +204,6 @@
             try {
                 const url = `https://router.project-osrm.org/route/v1/driving/${minhaLon},${minhaLat};${d.lon},${d.lat}?steps=true&overview=full&geometries=geojson`;
                 const res = await fetch(url);
-                
-                if (!res.ok) {
-                    document.getElementById('rua-atual').innerText = "ERRO API: " + res.status + " (" + res.statusText + ")";
-                    return;
-                }
-
                 const data = await res.json();
                 if (data.routes && data.routes[0]) {
                     const route = data.routes[0];
@@ -207,11 +214,8 @@
                     idxPasso = 0;
                     if (polylineRota) mapa.removeLayer(polylineRota);
                     polylineRota = L.polyline(route.geometry.coordinates.map(c => [c[1], c[0]]), { color: '#007AFF', weight: 6, opacity: 0.8 }).addTo(mapa);
-                    document.getElementById('rua-atual').innerText = passosNavegacao[0].rua;
                 }
-            } catch (e) {
-                document.getElementById('rua-atual').innerText = "ERRO DE REDE: " + e.message;
-            }
+            } catch (e) { document.getElementById('rua-atual').innerText = "ERRO API"; }
         }
 
         function navegar() {
@@ -219,12 +223,15 @@
             const dest = rotaSpx[idxDestino];
             const df = dist(minhaLat, minhaLon, dest.lat, dest.lon);
             
+            // CORREÇÃO: LIBERA A TELA AO CHEGAR
             if (df < 60) {
                 aguardandoConfirmacao = true;
+                releaseWakeLock(); // Permite que o celular apague na entrega
                 document.getElementById('nav-ui').style.display = 'none';
                 document.getElementById('painel-acoes').style.display = 'flex';
                 document.getElementById('painel-topo').classList.add('modo-confirmacao');
                 document.getElementById('rua-atual').innerText = "VOCÊ CHEGOU!";
+                if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
                 return;
             }
 
@@ -243,13 +250,27 @@
         }
 
         function finalizarParada(status) {
+            const p = rotaSpx[idxDestino];
+            if(p.marker) {
+                p.marker.setStyle({ fillColor: status === 'concluido' ? '#888' : '#ff0000', color: '#fff' });
+            }
+
             idxDestino++;
             aguardandoConfirmacao = false;
+            
+            // CORREÇÃO: LIGA A TELA NOVAMENTE PARA A PRÓXIMA ROTA
+            requestWakeLock();
+            
             document.getElementById('nav-ui').style.display = 'block';
             document.getElementById('painel-acoes').style.display = 'none';
             document.getElementById('painel-topo').classList.remove('modo-confirmacao');
-            if (idxDestino < rotaSpx.length) calcularRota();
-            else document.getElementById('rua-atual').innerText = "ROTA FINALIZADA";
+            
+            if (idxDestino < rotaSpx.length) {
+                calcularRota();
+            } else { 
+                releaseWakeLock(); // Fim do expediente, libera tela
+                document.getElementById('rua-atual').innerText = "ROTA FINALIZADA"; 
+            }
         }
 
         function dist(la1, lo1, la2, lo2) {
