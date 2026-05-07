@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SPX Ninja - Diagnostic Pro</title>
+    <title>SPX Ninja - Pro Edition</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -12,22 +12,31 @@
     <style>
         body { background-color: #000; color: #fff; font-family: sans-serif; margin: 0; text-align: center; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
         
-        #painel-topo { background: #007AFF; padding: 10px; min-height: 140px; display: flex; flex-direction: column; justify-content: center; z-index: 1001; position: relative; }
+        /* Ajuste do Painel Topo para layout com seta na esquerda */
+        #painel-topo { background: #007AFF; padding: 10px; min-height: 160px; display: flex; align-items: center; justify-content: space-around; z-index: 1001; position: relative; transition: background 0.3s; }
         .modo-confirmacao { background: #FFCC00 !important; color: #000 !important; }
         
-        #stop-badge { background: #000; color: #39FF14; padding: 3px 10px; border-radius: 8px; font-weight: bold; font-size: 18px; margin-bottom: 5px; display: inline-block; border: 1px solid #39FF14; }
-        #seta-instrucao { font-size: 60px; line-height: 1; display: block; }
-        #distancia-curva { font-size: 40px; font-weight: bold; display: block; }
+        #col-seta { flex: 1; display: flex; flex-direction: column; align-items: center; }
+        #col-info { flex: 2; display: flex; flex-direction: column; align-items: center; text-align: center; }
 
-        #nav-ui { display: block; }
-        #painel-acoes { display: none; gap: 10px; padding: 10px; justify-content: center; }
+        #stop-badge { background: #000; color: #39FF14; padding: 5px 15px; border-radius: 8px; font-weight: bold; font-size: 20px; margin-bottom: 5px; border: 1px solid #39FF14; }
+        #seta-instrucao { font-size: 85px; line-height: 1; display: block; }
+        #distancia-curva { font-size: 30px; font-weight: bold; display: block; margin-top: -10px; }
+
+        /* Lista de pacotes no topo */
+        #lista-pacotes-topo { font-size: 11px; color: #fff; max-height: 80px; overflow-y: auto; width: 100%; text-align: center; font-weight: bold; margin-top: 5px; line-height: 1.2; }
+        .item-pacote-mini { border-bottom: 1px solid rgba(255,255,255,0.2); padding: 2px 0; }
+
+        #nav-ui { width: 100%; display: flex; align-items: center; }
+        #painel-acoes { display: none; gap: 10px; padding: 10px; justify-content: center; width: 100%; }
         .btn-status { flex: 1; padding: 20px; border: none; border-radius: 10px; font-weight: bold; font-size: 16px; cursor: pointer; color: #fff; }
 
         #map { flex: 1; width: 100%; background: #111; z-index: 1; }
 
-        #info-final { background: #111; padding: 10px; min-height: 100px; display: flex; flex-direction: column; justify-content: center; z-index: 1001; }
-        #rua-atual { color: #39FF14; font-weight: bold; font-size: 14px; text-transform: uppercase; padding: 0 5px; }
-        #distancia-final { font-size: 30px; font-weight: bold; }
+        /* Ajuste do Rodapé */
+        #info-final { background: #111; padding: 10px; min-height: 100px; display: flex; flex-direction: column; justify-content: center; z-index: 1001; border-top: 2px solid #333; }
+        #rua-atual { color: #39FF14; font-weight: bold; font-size: 16px; text-transform: uppercase; padding: 0 5px; margin-bottom: 5px; }
+        #distancia-final { font-size: 35px; font-weight: bold; color: #fff; }
 
         #controles { padding: 15px; background: #000; z-index: 1001; }
         .btn-ini { background: #39FF14; color: #000; padding: 15px; border-radius: 12px; font-weight: bold; font-size: 18px; cursor: pointer; display: block; }
@@ -43,6 +52,10 @@
 
         .stop-label { background: rgba(0,0,0,0.8); color: #fff; border: 1px solid #39FF14; font-weight: bold; padding: 2px 4px; border-radius: 3px; font-size: 10px; }
         .leaflet-tile-container { filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%); }
+        
+        /* Popup do Leaflet Customizado */
+        .leaflet-popup-content-wrapper { background: #222; color: #fff; border: 1px solid #39FF14; }
+        .popup-btn { padding: 8px; margin: 5px; border: none; border-radius: 5px; font-weight: bold; color: #fff; cursor: pointer; display: block; width: 100px; }
     </style>
 </head>
 <body>
@@ -55,11 +68,18 @@
 
     <div id="painel-topo">
         <div id="btn-re-stop" onclick="abrirModalSelecao()">📑</div>
-        <div><div id="stop-badge">STOP --</div></div>
+        
         <div id="nav-ui">
-            <span id="seta-instrucao">---</span>
-            <span id="distancia-curva">0 m</span>
+            <div id="col-seta">
+                <span id="seta-instrucao">---</span>
+                <span id="distancia-curva">0 m</span>
+            </div>
+            <div id="col-info">
+                <div id="stop-badge">STOP --</div>
+                <div id="lista-pacotes-topo"></div>
+            </div>
         </div>
+
         <div id="painel-acoes">
             <button class="btn-status" style="background:#28a745" onclick="finalizarParada('concluido')">CONCLUÍDO</button>
             <button class="btn-status" style="background:#dc3545" onclick="finalizarParada('pendente')">PENDENTE</button>
@@ -86,20 +106,12 @@
         let camadaFundo = L.layerGroup(), aguardandoConfirmacao = false, ultimaLatReq, ultimaLonReq;
         let wakeLock = null;
 
-        // --- GESTÃO DE TELA (WAKE LOCK) CORRIGIDA ---
         async function requestWakeLock() {
-            try { 
-                if ('wakeLock' in navigator) {
-                    wakeLock = await navigator.wakeLock.request('screen');
-                }
-            } catch (e) { console.log("WakeLock erro: " + e.message); }
+            try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch (e) {}
         }
 
         function releaseWakeLock() {
-            if (wakeLock !== null) {
-                wakeLock.release();
-                wakeLock = null;
-            }
+            if (wakeLock !== null) { wakeLock.release(); wakeLock = null; }
         }
 
         window.onload = function() {
@@ -108,10 +120,15 @@
             camadaFundo.addTo(mapa);
         };
 
+        // Função para extrair apenas o número do endereço para ordenação
+        function extrairNumero(str) {
+            const matches = str.match(/\d+/);
+            return matches ? parseInt(matches[0]) : 0;
+        }
+
         document.getElementById('fileInput').addEventListener('change', function(e) {
             const reader = new FileReader();
-            requestWakeLock(); // Inicia o WakeLock ao carregar arquivo
-            
+            requestWakeLock();
             reader.onload = function(evt) {
                 try {
                     const wb = XLSX.read(evt.target.result, { type: 'binary' });
@@ -124,15 +141,25 @@
                         let s = n.stop || n.parada || n.sequence;
                         let lat = parseFloat(String(n.latitude || n.lat).replace(',', '.'));
                         let lon = parseFloat(String(n.longitude || n.lon).replace(',', '.'));
+                        let endereco = n["destination address"] || n.endereco || "S/N";
 
                         if(!isNaN(s) && !isNaN(lat)) {
                             if(!paradasUnicas[s]) {
-                                paradasUnicas[s] = { lat, lon, addr: n["destination address"] || n.endereco || "S/N", stop: parseInt(s), pacotes: 1 };
-                            } else { paradasUnicas[s].pacotes++; }
+                                paradasUnicas[s] = { lat, lon, addr: endereco, stop: parseInt(s), pacotes: 1, listaEnderecos: [endereco] };
+                            } else { 
+                                paradasUnicas[s].pacotes++;
+                                paradasUnicas[s].listaEnderecos.push(endereco);
+                            }
                         }
                     });
 
                     rotaSpx = Object.values(paradasUnicas).sort((a, b) => a.stop - b.stop);
+                    
+                    // Ordena os endereços dentro de cada parada por número crescente
+                    rotaSpx.forEach(p => {
+                        p.listaEnderecos.sort((a, b) => extrairNumero(a) - extrairNumero(b));
+                    });
+
                     if (rotaSpx.length > 0) abrirModalSelecao();
                 } catch (err) { alert("Erro ao ler arquivo."); }
             };
@@ -163,17 +190,37 @@
             document.getElementById('rua-atual').innerText = "AGUARDANDO GPS...";
             aguardandoConfirmacao = false;
             passosNavegacao = [];
-            requestWakeLock(); // Garante tela acesa ao selecionar
+            requestWakeLock();
             if(!minhaLat) iniciarGPS(); else calcularRota();
         }
 
         function desenharStopsFundo() {
             camadaFundo.clearLayers();
-            rotaSpx.forEach(p => {
-                p.marker = L.circleMarker([p.lat, p.lon], { radius: 6, color: '#666', fillColor: '#333', fillOpacity: 1, weight: 1 })
+            rotaSpx.forEach((p, i) => {
+                let cor = p.status === 'concluido' ? '#888' : (p.status === 'pendente' ? '#ff0000' : '#333');
+                p.marker = L.circleMarker([p.lat, p.lon], { radius: 8, color: '#666', fillColor: cor, fillOpacity: 1, weight: 2 })
                 .bindTooltip("Stop " + p.stop, { permanent: true, direction: 'top', className: 'stop-label', offset: [0, -5] })
                 .addTo(camadaFundo);
+
+                // Clique no marcador para mudar status manualmente
+                p.marker.on('click', (e) => {
+                    L.DomEvent.stopPropagation(e);
+                    const popupContent = `
+                        <div style="text-align:center">
+                            <b>STOP ${p.stop}</b><br>
+                            <button class="popup-btn" style="background:#28a745" onclick="mudarStatusManual(${i}, 'concluido')">CONCLUÍDO</button>
+                            <button class="popup-btn" style="background:#dc3545" onclick="mudarStatusManual(${i}, 'pendente')">PENDENTE</button>
+                        </div>
+                    `;
+                    L.popup().setLatLng([p.lat, p.lon]).setContent(popupContent).openOn(mapa);
+                });
             });
+        }
+
+        window.mudarStatusManual = function(index, status) {
+            rotaSpx[index].status = status;
+            desenharStopsFundo();
+            mapa.closePopup();
         }
 
         function iniciarGPS() {
@@ -196,7 +243,11 @@
         async function calcularRota() {
             if(!minhaLat || !minhaLon) return;
             const d = rotaSpx[idxDestino];
-            document.getElementById('stop-badge').innerText = "STOP " + d.stop + " (" + d.pacotes + " vol)";
+            
+            // Atualiza Topo: Badge e Lista de pacotes ordenada
+            document.getElementById('stop-badge').innerText = `STOP ${d.stop} (${d.pacotes} vol)`;
+            const listaHtml = d.listaEnderecos.map(addr => `<div class="item-pacote-mini">${addr}</div>`).join('');
+            document.getElementById('lista-pacotes-topo').innerHTML = listaHtml;
             
             if (markerDest) mapa.removeLayer(markerDest);
             markerDest = L.circleMarker([d.lat, d.lon], { radius: 11, color: '#fff', fillColor: '#007AFF', fillOpacity: 1, weight: 3 }).addTo(mapa);
@@ -223,10 +274,10 @@
             const dest = rotaSpx[idxDestino];
             const df = dist(minhaLat, minhaLon, dest.lat, dest.lon);
             
-            // CORREÇÃO: LIBERA A TELA AO CHEGAR
+            // Chegada no destino
             if (df < 60) {
                 aguardandoConfirmacao = true;
-                releaseWakeLock(); // Permite que o celular apague na entrega
+                releaseWakeLock();
                 document.getElementById('nav-ui').style.display = 'none';
                 document.getElementById('painel-acoes').style.display = 'flex';
                 document.getElementById('painel-topo').classList.add('modo-confirmacao');
@@ -237,10 +288,16 @@
 
             const passo = passosNavegacao[idxPasso];
             const dc = dist(minhaLat, minhaLon, passo.lat, passo.lon);
-            document.getElementById('distancia-curva').innerText = Math.round(dc) + " m";
-            document.getElementById('distancia-final').innerText = df > 1000 ? (df/1000).toFixed(1) + " km" : Math.round(df) + " m";
-            document.getElementById('rua-atual').innerText = passo.rua;
 
+            // ATUALIZAÇÃO DE UI CONFORME SEU RASCUNHO:
+            // Topo mostra distância até a próxima curva
+            document.getElementById('distancia-curva').innerText = Math.round(dc) + " m";
+            
+            // Rodapé mostra o endereço do destino e a distância total regressiva
+            document.getElementById('rua-atual').innerText = dest.addr;
+            document.getElementById('distancia-final').innerText = df > 1000 ? (df/1000).toFixed(1) + " km" : Math.round(df) + " m";
+
+            // Seta de instrução (Topo)
             const m = passo.manobra;
             if (m && m.includes("left")) document.getElementById('seta-instrucao').innerText = "⬅️";
             else if (m && m.includes("right")) document.getElementById('seta-instrucao').innerText = "➡️";
@@ -250,25 +307,21 @@
         }
 
         function finalizarParada(status) {
-            const p = rotaSpx[idxDestino];
-            if(p.marker) {
-                p.marker.setStyle({ fillColor: status === 'concluido' ? '#888' : '#ff0000', color: '#fff' });
-            }
+            rotaSpx[idxDestino].status = status;
+            desenharStopsFundo();
 
             idxDestino++;
             aguardandoConfirmacao = false;
-            
-            // CORREÇÃO: LIGA A TELA NOVAMENTE PARA A PRÓXIMA ROTA
             requestWakeLock();
             
-            document.getElementById('nav-ui').style.display = 'block';
+            document.getElementById('nav-ui').style.display = 'flex';
             document.getElementById('painel-acoes').style.display = 'none';
             document.getElementById('painel-topo').classList.remove('modo-confirmacao');
             
             if (idxDestino < rotaSpx.length) {
                 calcularRota();
             } else { 
-                releaseWakeLock(); // Fim do expediente, libera tela
+                releaseWakeLock();
                 document.getElementById('rua-atual').innerText = "ROTA FINALIZADA"; 
             }
         }
