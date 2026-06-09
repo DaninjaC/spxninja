@@ -12,18 +12,18 @@
     <style>
         body { background-color: #000; color: #fff; font-family: sans-serif; margin: 0; text-align: center; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
         
-        /* Painel Topo Ampliado para caber mais itens da lista de pacotes */
-        #painel-topo { background: #00479e; padding: 8px 10px; min-height: 190px; max-height: 210px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; z-index: 1001; position: relative; border-bottom: 2px solid #000; box-sizing: border-box; }
+        /* 1. PAINEL TOPO AZUL AMPLIADO (Área nobre para listar muitos endereços sem cortar) */
+        #painel-topo { background: #00479e; padding: 10px; min-height: 250px; max-height: 270px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; z-index: 1001; position: relative; border-bottom: 3px solid #000; box-sizing: border-box; }
         
-        #col-info { width: 100%; display: flex; flex-direction: column; align-items: center; text-align: center; box-sizing: border-box; padding: 0 50px 0 0; }
+        #col-info { width: 100%; display: flex; flex-direction: column; align-items: center; text-align: center; box-sizing: border-box; }
 
-        #stop-badge { background: #000; color: #39FF14; padding: 3px 15px; border-radius: 6px; font-weight: bold; font-size: 18px; margin-bottom: 3px; border: 1px solid #39FF14; display: inline-block; }
+        #stop-badge { background: #000; color: #39FF14; padding: 4px 18px; border-radius: 6px; font-weight: bold; font-size: 19px; margin-bottom: 6px; border: 1px solid #39FF14; display: inline-block; }
 
-        /* Lista de pacotes no topo calibrada para não quebrar nomes longos */
+        /* Lista de pacotes maximizada e com rolagem limpa */
         #lista-pacotes-topo { 
             font-size: 15px; 
             color: #39FF14; 
-            max-height: 130px; 
+            max-height: 190px; 
             overflow-y: auto; 
             width: 100%; 
             text-align: left; 
@@ -36,25 +36,22 @@
         }
         
         .item-pacote-mini { 
-            border-bottom: 1px solid rgba(0,0,0,0.15); 
-            padding: 3px 0; 
+            border-bottom: 1px solid rgba(0,0,0,0.2); 
+            padding: 5px 0; 
             word-wrap: break-word;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
         }
 
-        /* Número da casa em tamanho proporcional e equilibrado */
+        /* Destaque do Número no Topo */
         .numero-destaque {
             background-color: #000;
             color: #FFFF00; 
-            padding: 1px 5px;
+            padding: 2px 6px;
             border-radius: 4px;
             font-size: 17px;
             font-weight: 900;
             border: 1px solid #39FF14;
             display: inline-block;
-            margin: 0 3px;
+            margin: 0 4px;
             text-shadow: none; 
         }
 
@@ -62,26 +59,26 @@
         #map-container { flex: 1; width: 100%; position: relative; display: flex; }
         #map { width: 100%; height: 100%; background: #111; z-index: 1; }
 
-        /* Seta Flutuante perfeitamente posicionada sobre o mapa lateral */
+        /* 2. SETA FLUTUANTE ULTRA GIGANTE NA ESQUERDA (Conforme rascunho de navegação) */
         #col-seta { 
             position: absolute; 
             top: 15px; 
-            right: 15px; 
+            left: 15px; 
             background: #2076d2; 
-            border: 3px solid #fff;
-            border-radius: 12px; 
-            padding: 6px;
+            border: 3.5px solid #fff;
+            border-radius: 14px; 
+            padding: 10px;
             display: flex; 
             flex-direction: column; 
             align-items: center; 
             justify-content: center;
             z-index: 1005;
-            box-shadow: 0px 4px 10px rgba(0,0,0,0.5);
-            width: 90px;
+            box-shadow: 0px 5px 12px rgba(0,0,0,0.6);
+            width: 120px;
             box-sizing: border-box;
         }
-        #seta-instrucao { font-size: 60px; line-height: 1; display: block; color: #fff; }
-        #distancia-curva { font-size: 18px; font-weight: bold; display: block; color: #fff; margin-top: -2px; white-space: nowrap; }
+        #seta-instrucao { font-size: 80px; line-height: 1; display: block; color: #fff; font-weight: bold; }
+        #distancia-curva { font-size: 22px; font-weight: bold; display: block; color: #fff; margin-top: 2px; white-space: nowrap; }
 
         /* Painel de ações flutuante na parte inferior sobre o mapa */
         #painel-acoes { 
@@ -103,10 +100,10 @@
 
         #nav-ui { width: 100%; display: flex; align-items: center; }
 
-        /* Rodapé Reduzido e Compactado para dar espaço útil à tela */
-        #info-final { background: #000; padding: 6px 10px; min-height: 65px; display: flex; flex-direction: column; justify-content: center; z-index: 1001; border-top: 3px solid #00479e; box-sizing: border-box; }
-        #rua-atual { color: #39FF14; font-weight: bold; font-size: 15px; text-transform: uppercase; padding: 0 5px; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        #distancia-final { font-size: 28px; font-weight: bold; color: #fff; line-height: 1.1; }
+        /* 3. RODAPÉ PRETO ULTRA COMPACTO (Eliminação de espaços mortos) */
+        #info-final { background: #000; padding: 4px 10px; min-height: 50px; display: flex; flex-direction: column; justify-content: center; z-index: 1001; border-top: 3px solid #00479e; box-sizing: border-box; }
+        #rua-atual { color: #39FF14; font-weight: bold; font-size: 15px; text-transform: uppercase; padding: 0 5px; margin-bottom: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        #distancia-final { font-size: 24px; font-weight: bold; color: #fff; line-height: 1; }
 
         #controles { padding: 10px; background: #000; z-index: 1001; }
         .btn-ini { background: #39FF14; color: #000; padding: 12px; border-radius: 12px; font-weight: bold; font-size: 16px; cursor: pointer; display: block; }
@@ -173,6 +170,7 @@
     </div>
 
     <script>
+        // MANUTENÇÃO INTEGRAL DAS LÓGICAS DO SISTEMA
         let rotaSpx = [], passosNavegacao = [], idxDestino = 0, idxPasso = 0;
         let minhaLat, minhaLon, mapa, markerUser, markerDest, polylineRota;
         let camadaFundo = L.layerGroup(), aguardandoConfirmacao = false, ultimaLatReq, ultimaLonReq;
