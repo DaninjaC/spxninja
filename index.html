@@ -12,10 +12,27 @@
     <style>
         body { background-color: #000; color: #fff; font-family: sans-serif; margin: 0; text-align: center; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
         
-        /* Ajuste do Painel Topo para layout com seta na esquerda */
+        /* Ajuste do Painel Topo fixo azul para navegação limpa */
         #painel-topo { background: #007AFF; padding: 10px; min-height: 160px; display: flex; align-items: center; justify-content: space-around; z-index: 1001; position: relative; transition: background 0.3s; }
-        .modo-confirmacao { background: #FFCC00 !important; color: #000 !important; }
         
+        /* NOVO: Modo confirmação agora fica em uma barra flutuante sobre o mapa, sem cobrir o topo nem o rodapé */
+        #painel-acoes { 
+            display: none; 
+            gap: 15px; 
+            padding: 15px; 
+            justify-content: center; 
+            width: 90%; 
+            position: absolute; 
+            top: 180px; 
+            left: 50%; 
+            transform: translateX(-50%); 
+            background: #FFCC00; 
+            border-radius: 15px; 
+            box-shadow: 0px 4px 15px rgba(0,0,0,0.5); 
+            z-index: 1005; 
+        }
+        .btn-status { flex: 1; padding: 22px; border: none; border-radius: 12px; font-weight: bold; font-size: 20px; cursor: pointer; color: #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
+
         #col-seta { flex: 1; display: flex; flex-direction: column; align-items: center; }
         #col-info { flex: 2; display: flex; flex-direction: column; align-items: center; text-align: center; }
 
@@ -23,20 +40,19 @@
         #seta-instrucao { font-size: 85px; line-height: 1; display: block; }
         #distancia-curva { font-size: 30px; font-weight: bold; display: block; margin-top: -10px; }
 
-        /* Lista de pacotes no topo */
         #lista-pacotes-topo { font-size: 11px; color: #fff; max-height: 80px; overflow-y: auto; width: 100%; text-align: center; font-weight: bold; margin-top: 5px; line-height: 1.2; }
         .item-pacote-mini { border-bottom: 1px solid rgba(255,255,255,0.2); padding: 2px 0; }
 
         #nav-ui { width: 100%; display: flex; align-items: center; }
-        #painel-acoes { display: none; gap: 10px; padding: 10px; justify-content: center; width: 100%; }
-        .btn-status { flex: 1; padding: 20px; border: none; border-radius: 10px; font-weight: bold; font-size: 16px; cursor: pointer; color: #fff; }
 
         #map { flex: 1; width: 100%; background: #111; z-index: 1; }
 
-        /* Ajuste do Rodapé */
-        #info-final { background: #111; padding: 10px; min-height: 100px; display: flex; flex-direction: column; justify-content: center; z-index: 1001; border-top: 2px solid #333; }
-        #rua-atual { color: #39FF14; font-weight: bold; font-size: 16px; text-transform: uppercase; padding: 0 5px; margin-bottom: 5px; }
-        #distancia-final { font-size: 35px; font-weight: bold; color: #fff; }
+        /* Ajuste do Rodapé com Fonte ULTRA VISÍVEL para motoristas */
+        #info-final { background: #111; padding: 15px 10px; min-height: 120px; display: flex; flex-direction: column; justify-content: center; z-index: 1001; border-top: 3px solid #333; }
+        
+        /* Endereço Amarelo Neon, letras grandes e grossas para o dia a dia */
+        #rua-atual { color: #FFFF00; font-weight: 900; font-size: 24px; text-transform: uppercase; padding: 0 5px; margin-bottom: 8px; line-height: 1.3; letter-spacing: 0.5px; }
+        #distancia-final { font-size: 40px; font-weight: bold; color: #fff; }
 
         #controles { padding: 15px; background: #000; z-index: 1001; }
         .btn-ini { background: #39FF14; color: #000; padding: 15px; border-radius: 12px; font-weight: bold; font-size: 18px; cursor: pointer; display: block; }
@@ -53,7 +69,6 @@
         .stop-label { background: rgba(0,0,0,0.8); color: #fff; border: 1px solid #39FF14; font-weight: bold; padding: 2px 4px; border-radius: 3px; font-size: 10px; }
         .leaflet-tile-container { filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%); }
         
-        /* Popup do Leaflet Customizado */
         .leaflet-popup-content-wrapper { background: #222; color: #fff; border: 1px solid #39FF14; }
         .popup-btn { padding: 8px; margin: 5px; border: none; border-radius: 5px; font-weight: bold; color: #fff; cursor: pointer; display: block; width: 100px; }
     </style>
@@ -64,6 +79,11 @@
         <h2 style="margin: 0; color: #39FF14;">Selecione a Parada</h2>
         <div id="lista-paradas"></div>
         <button onclick="fecharModal()" style="margin-top: 15px; padding: 15px; background: #444; color: #fff; border: none; border-radius: 10px; font-weight: bold;">VOLTAR</button>
+    </div>
+
+    <div id="painel-acoes">
+        <button class="btn-status" style="background:#28a745" onclick="finalizarParada('concluido')">CONCLUÍDO</button>
+        <button class="btn-status" style="background:#dc3545" onclick="finalizarParada('pendente')">PENDENTE</button>
     </div>
 
     <div id="painel-topo">
@@ -78,11 +98,6 @@
                 <div id="stop-badge">STOP --</div>
                 <div id="lista-pacotes-topo"></div>
             </div>
-        </div>
-
-        <div id="painel-acoes">
-            <button class="btn-status" style="background:#28a745" onclick="finalizarParada('concluido')">CONCLUÍDO</button>
-            <button class="btn-status" style="background:#dc3545" onclick="finalizarParada('pendente')">PENDENTE</button>
         </div>
     </div>
 
@@ -120,7 +135,6 @@
             camadaFundo.addTo(mapa);
         };
 
-        // Função para extrair apenas o número do endereço para ordenação
         function extrairNumero(str) {
             const matches = str.match(/\d+/);
             return matches ? parseInt(matches[0]) : 0;
@@ -155,7 +169,6 @@
 
                     rotaSpx = Object.values(paradasUnicas).sort((a, b) => a.stop - b.stop);
                     
-                    // Ordena os endereços dentro de cada parada por número crescente
                     rotaSpx.forEach(p => {
                         p.listaEnderecos.sort((a, b) => extrairNumero(a) - extrairNumero(b));
                     });
@@ -191,6 +204,11 @@
             aguardandoConfirmacao = false;
             passosNavegacao = [];
             requestWakeLock();
+            
+            // Força reset visual ao trocar de stop manual
+            document.getElementById('painel-acoes').style.display = 'none';
+            document.getElementById('rua-atual').style.color = '#FFFF00'; 
+            
             if(!minhaLat) iniciarGPS(); else calcularRota();
         }
 
@@ -202,7 +220,6 @@
                 .bindTooltip("Stop " + p.stop, { permanent: true, direction: 'top', className: 'stop-label', offset: [0, -5] })
                 .addTo(camadaFundo);
 
-                // Clique no marcador para mudar status manualmente
                 p.marker.on('click', (e) => {
                     L.DomEvent.stopPropagation(e);
                     const popupContent = `
@@ -244,7 +261,6 @@
             if(!minhaLat || !minhaLon) return;
             const d = rotaSpx[idxDestino];
             
-            // Atualiza Topo: Badge e Lista de pacotes ordenada
             document.getElementById('stop-badge').innerText = `STOP ${d.stop} (${d.pacotes} vol)`;
             const listaHtml = d.listaEnderecos.map(addr => `<div class="item-pacote-mini">${addr}</div>`).join('');
             document.getElementById('lista-pacotes-topo').innerHTML = listaHtml;
@@ -274,14 +290,19 @@
             const dest = rotaSpx[idxDestino];
             const df = dist(minhaLat, minhaLon, dest.lat, dest.lon);
             
-            // Chegada no destino
+            // Chegada no destino (Menos de 60 metros)
             if (df < 60) {
                 aguardandoConfirmacao = true;
                 releaseWakeLock();
-                document.getElementById('nav-ui').style.display = 'none';
+                
+                // Exibe os botões flutuantes sobre o mapa, mantendo o painel azul e o rodapé intocados
                 document.getElementById('painel-acoes').style.display = 'flex';
-                document.getElementById('painel-topo').classList.add('modo-confirmacao');
-                document.getElementById('rua-atual').innerText = "VOCÊ CHEGOU!";
+                
+                // Altera o rodapé para vermelho de aviso, mas MANTÉM o endereço visível!
+                document.getElementById('rua-atual').style.color = '#FF2D55'; 
+                document.getElementById('rua-atual').innerText = "CHEGOU: " + dest.addr;
+                document.getElementById('distancia-final').innerText = Math.round(df) + " m";
+                
                 if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
                 return;
             }
@@ -289,15 +310,13 @@
             const passo = passosNavegacao[idxPasso];
             const dc = dist(minhaLat, minhaLon, passo.lat, passo.lon);
 
-            // ATUALIZAÇÃO DE UI CONFORME SEU RASCUNHO:
-            // Topo mostra distância até a próxima curva
             document.getElementById('distancia-curva').innerText = Math.round(dc) + " m";
             
-            // Rodapé mostra o endereço do destino e a distância total regressiva
+            // Exibição robusta e limpa no rodapé (Endereço em Amarelo Gritante)
+            document.getElementById('rua-atual').style.color = '#FFFF00';
             document.getElementById('rua-atual').innerText = dest.addr;
             document.getElementById('distancia-final').innerText = df > 1000 ? (df/1000).toFixed(1) + " km" : Math.round(df) + " m";
 
-            // Seta de instrução (Topo)
             const m = passo.manobra;
             if (m && m.includes("left")) document.getElementById('seta-instrucao').innerText = "⬅️";
             else if (m && m.includes("right")) document.getElementById('seta-instrucao').innerText = "➡️";
@@ -314,9 +333,9 @@
             aguardandoConfirmacao = false;
             requestWakeLock();
             
-            document.getElementById('nav-ui').style.display = 'flex';
+            // Restaura visual padrão escondendo os botões flutuantes
             document.getElementById('painel-acoes').style.display = 'none';
-            document.getElementById('painel-topo').classList.remove('modo-confirmacao');
+            document.getElementById('rua-atual').style.color = '#FFFF00';
             
             if (idxDestino < rotaSpx.length) {
                 calcularRota();
