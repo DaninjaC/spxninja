@@ -22,7 +22,7 @@
         #seta-instrucao { font-size: 85px; line-height: 1; display: block; }
         #distancia-curva { font-size: 30px; font-weight: bold; display: block; margin-top: -10px; }
 
-        /* NOVA FORMATAÇÃO DO TOPO: Verde Neon com borda preta grossa para leitura de dia */
+        /* Formatação do Topo: Verde Neon com borda preta grossa */
         #lista-pacotes-topo { 
             font-size: 18px; 
             color: #39FF14; 
@@ -34,7 +34,6 @@
             margin-top: 8px; 
             line-height: 1.4;
             text-transform: uppercase;
-            /* Cria o efeito de borda preta forte nas letras */
             text-shadow: -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000, 0px 3px 5px rgba(0,0,0,0.8);
         }
         
@@ -55,10 +54,10 @@
             border: 1px solid #39FF14;
             display: inline-block;
             margin-left: 5px;
-            text-shadow: none; /* Limpa para ficar legível no fundo preto */
+            text-shadow: none; 
         }
 
-        /* Painel de ações flutuante sobre o mapa (não cobre informações) */
+        /* Painel de ações flutuante sobre o mapa */
         #painel-acoes { 
             display: none; 
             gap: 15px; 
@@ -170,14 +169,12 @@
             return matches ? parseInt(matches[0]) : 0;
         }
 
-        // Função auxiliar para destacar visualmente o número dentro da string do endereço
         function formatarEnderecoComNumeroDestaque(endereco) {
-            // Procura por sequências de números isoladas (ex: ", 123" ou " 45 ")
+            // Procura por sequências de números (ex: ", 565" ou " 582")
             const match = endereco.match(/(,\s*|-?\s*)(\d+)(\s*|$)/);
             if (match) {
-                const numero original = match[2];
-                // Substitui o número na string por um elemento HTML ultra visível
-                return endereco.replace(numerooriginal, `<span class="numero-destaque">${numerooriginal}</span>`);
+                const numeroOriginal = match[2];
+                return endereco.replace(numeroOriginal, `<span class="numero-destaque">${numeroOriginal}</span>`);
             }
             return endereco;
         }
@@ -279,28 +276,27 @@
 
         function iniciarGPS() {
             navigator.geolocation.watchPosition(async pos => {
-                minhaLat = pos.coords.latitude; minhaLon = pos.coords.longitude;
-                if (!markerUser) markerUser = L.circleMarker([minhaLat, minhaLon], { color: '#007AFF', fillOpacity: 1, radius: 8, zIndexOffset: 1000 }).addTo(mapa);
-                else markerUser.setLatLng([minhaLat, minhaLon]);
+                minhaLat = pos.coords.latitude; minLon = pos.coords.longitude;
+                if (!markerUser) markerUser = L.circleMarker([minhaLat, minLon], { color: '#007AFF', fillOpacity: 1, radius: 8, zIndexOffset: 1000 }).addTo(mapa);
+                else markerUser.setLatLng([minhaLat, minLon]);
 
                 if (idxDestino < rotaSpx.length && !aguardandoConfirmacao) {
-                    if (passosNavegacao.length === 0 || dist(minhaLat, minhaLon, ultimaLatReq, ultimaLonReq) > 35) {
+                    if (passosNavegacao.length === 0 || dist(minhaLat, minLon, ultimaLatReq, ultimaLonReq) > 35) {
                         await calcularRota();
-                        ultimaLatReq = minhaLat; ultimaLonReq = minhaLon;
+                        ultimaLatReq = minhaLat; ultimaLonReq = minLon;
                     }
                     navegar();
                 }
-                mapa.panTo([minhaLat, minhaLon]);
+                mapa.panTo([minhaLat, minLon]);
             }, (err) => { document.getElementById('rua-atual').innerText = "ERRO GPS: " + err.message; }, { enableHighAccuracy: true });
         }
 
         async function calcularRota() {
-            if(!minhaLat || !minhaLon) return;
+            if(!minhaLat || !minLon) return;
             const d = rotaSpx[idxDestino];
             
             document.getElementById('stop-badge').innerText = `STOP ${d.stop} (${d.pacotes} vol)`;
             
-            // Aplica a nova formatação destacada com o número em destaque na lista do topo
             const listaHtml = d.listaEnderecos.map(addr => {
                 return `<div class="item-pacote-mini">${formatarEnderecoComNumeroDestaque(addr)}</div>`;
             }).join('');
@@ -311,7 +307,7 @@
             markerDest = L.circleMarker([d.lat, d.lon], { radius: 11, color: '#fff', fillColor: '#007AFF', fillOpacity: 1, weight: 3 }).addTo(mapa);
 
             try {
-                const url = `https://router.project-osrm.org/route/v1/driving/${minhaLon},${minhaLat};${d.lon},${d.lat}?steps=true&overview=full&geometries=geojson`;
+                const url = `https://router.project-osrm.org/route/v1/driving/${minLon},${minhaLat};${d.lon},${d.lat}?steps=true&overview=full&geometries=geojson`;
                 const res = await fetch(url);
                 const data = await res.json();
                 if (data.routes && data.routes[0]) {
@@ -330,7 +326,7 @@
         function navegar() {
             if (!rotaSpx[idxDestino] || passosNavegacao.length === 0) return;
             const dest = rotaSpx[idxDestino];
-            const df = dist(minhaLat, minhaLon, dest.lat, dest.lon);
+            const df = dist(minhaLat, minLon, dest.lat, dest.lon);
             
             if (df < 60) {
                 aguardandoConfirmacao = true;
@@ -342,7 +338,7 @@
             }
 
             const passo = passosNavegacao[idxPasso];
-            const dc = dist(minhaLat, minhaLon, passo.lat, passo.lon);
+            const dc = dist(minhaLat, minLon, passo.lat, passo.lon);
 
             document.getElementById('distancia-curva').innerText = Math.round(dc) + " m";
             
