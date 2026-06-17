@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SPX Ninja - Pro Edition</title>
+    <title>SPX Ninja - V2.0 (Proximidade + Doca)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -12,150 +12,71 @@
     <style>
         body { background-color: #000; color: #fff; font-family: sans-serif; margin: 0; text-align: center; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
         
-        /* 1. PAINEL TOPO AZUL AMPLIADO (Área nobre para listar muitos endereços sem cortar) */
-        #painel-topo { background: #00479e; padding: 10px; min-height: 250px; max-height: 270px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; z-index: 1001; position: relative; border-bottom: 3px solid #000; box-sizing: border-box; }
+        /* Modais V2.0 */
+        .modal-fullscreen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 3000; display: none; flex-direction: column; padding: 20px; box-sizing: border-box; overflow-y: auto; }
+        .modal-fullscreen h2 { color: #39FF14; margin-top: 10px; margin-bottom: 20px; font-size: 24px;}
+        .btn-modo { width: 100%; padding: 25px 15px; border: none; border-radius: 12px; font-weight: bold; font-size: 20px; cursor: pointer; margin-bottom: 15px; color: #000; }
+        .btn-padrao { background: #ccc; }
+        .btn-otimizada { background: #39FF14; }
         
-        #col-info { width: 100%; display: flex; flex-direction: column; align-items: center; text-align: center; box-sizing: border-box; }
+        /* Layout Modo Doca */
+        .bag-container { background: #111; border: 1px solid #39FF14; border-radius: 10px; margin-bottom: 15px; padding: 15px; text-align: left; }
+        .bag-container h3 { margin: 0 0 10px 0; color: #39FF14; border-bottom: 1px solid #333; padding-bottom: 5px;}
+        .bag-item { padding: 8px 0; border-bottom: 1px dashed #333; display: flex; justify-content: space-between; align-items: center; }
+        .bag-item:last-child { border-bottom: none; }
+        .bag-item strong { font-size: 18px; color: #fff; }
+        .bag-item small { color: #aaa; display: block; margin-top: 3px; font-size: 12px;}
+        .bag-vol { background: #39FF14; color: #000; padding: 3px 8px; border-radius: 12px; font-weight: bold; font-size: 14px; }
 
-        #stop-badge { background: #000; color: #39FF14; padding: 4px 18px; border-radius: 6px; font-weight: bold; font-size: 19px; margin-bottom: 6px; border: 1px solid #39FF14; display: inline-block; }
-
-        /* Lista de pacotes maximizada e com rolagem limpa */
-        #lista-pacotes-topo { 
-            font-size: 15px; 
-            color: #39FF14; 
-            max-height: 190px; 
-            overflow-y: auto; 
-            width: 100%; 
-            text-align: left; 
-            padding-left: 5px;
-            font-weight: 900; 
-            line-height: 1.4;
-            text-transform: uppercase;
-            text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
-            box-sizing: border-box;
-        }
-        
-        .item-pacote-mini { 
-            border-bottom: 1px solid rgba(0,0,0,0.2); 
-            padding: 5px 0; 
-            word-wrap: break-word;
-        }
-
-        /* Destaque do Número no Topo */
-        .numero-destaque {
-            background-color: #000;
-            color: #FFFF00; 
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-size: 17px;
-            font-weight: 900;
-            border: 1px solid #39FF14;
-            display: inline-block;
-            margin: 0 4px;
-            text-shadow: none; 
-        }
-
-        /* Container do Mapa */
-        #map-container { flex: 1; width: 100%; position: relative; display: flex; }
-        #map { width: 100%; height: 100%; background: #111; z-index: 1; }
-
-        /* 2. SETA FLUTUANTE ULTRA GIGANTE NA ESQUERDA (Conforme rascunho de navegação) */
-        #col-seta { 
-            position: absolute; 
-            top: 15px; 
-            left: 15px; 
-            background: #2076d2; 
-            border: 3.5px solid #fff;
-            border-radius: 14px; 
-            padding: 10px;
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
-            justify-content: center;
-            z-index: 1005;
-            box-shadow: 0px 5px 12px rgba(0,0,0,0.6);
-            width: 120px;
-            box-sizing: border-box;
-        }
-        #seta-instrucao { font-size: 80px; line-height: 1; display: block; color: #fff; font-weight: bold; }
-        #distancia-curva { font-size: 22px; font-weight: bold; display: block; color: #fff; margin-top: 2px; white-space: nowrap; }
-
-        /* Painel de ações flutuante na parte inferior sobre o mapa */
-        #painel-acoes { 
-            display: none; 
-            gap: 15px; 
-            padding: 12px; 
-            justify-content: center; 
-            width: 85%; 
-            position: absolute; 
-            bottom: 15px; 
-            left: 50%; 
-            transform: translateX(-50%); 
-            background: rgba(0, 0, 0, 0.90); 
-            border: 2px solid #FFCC00;
-            border-radius: 15px; 
-            z-index: 1005; 
-        }
-        .btn-status { flex: 1; padding: 14px; border: none; border-radius: 10px; font-weight: bold; font-size: 18px; cursor: pointer; color: #fff; }
-
-        #nav-ui { width: 100%; display: flex; align-items: center; }
-
-        /* 3. RODAPÉ PRETO ULTRA COMPACTO (Eliminação de espaços mortos) */
-        #info-final { background: #000; padding: 4px 10px; min-height: 50px; display: flex; flex-direction: column; justify-content: center; z-index: 1001; border-top: 3px solid #00479e; box-sizing: border-box; }
-        #rua-atual { color: #39FF14; font-weight: bold; font-size: 15px; text-transform: uppercase; padding: 0 5px; margin-bottom: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        #distancia-final { font-size: 24px; font-weight: bold; color: #fff; line-height: 1; }
-
-        #controles { padding: 10px; background: #000; z-index: 1001; }
-        .btn-ini { background: #39FF14; color: #000; padding: 12px; border-radius: 12px; font-weight: bold; font-size: 16px; cursor: pointer; display: block; }
+        /* Interface Sagrada Original */
+        #painel-topo { background: #007AFF; padding: 10px; min-height: 140px; display: flex; flex-direction: column; justify-content: center; z-index: 1001; transition: background 0.3s; }
+        .modo-confirmacao { background: #FFCC00 !important; color: #000 !important; }
+        #stop-badge { background: #000; color: #39FF14; padding: 3px 10px; border-radius: 8px; font-weight: bold; font-size: 18px; margin-bottom: 5px; display: inline-block; border: 1px solid #39FF14; }
+        #seta-instrucao { font-size: 60px; line-height: 1; display: block; }
+        #distancia-curva { font-size: 40px; font-weight: bold; display: block; }
+        #nav-ui { display: block; }
+        #painel-acoes { display: none; gap: 10px; padding: 10px; justify-content: center; }
+        .btn-status { flex: 1; padding: 20px; border: none; border-radius: 10px; font-weight: bold; font-size: 16px; cursor: pointer; color: #fff; }
+        .btn-check { background: #28a745; }
+        .btn-fail { background: #dc3545; }
+        #map { flex: 1; width: 100%; background: #111; z-index: 1; }
+        #info-final { background: #111; padding: 10px; min-height: 100px; display: flex; flex-direction: column; justify-content: center; z-index: 1001; }
+        #rua-atual { color: #39FF14; font-weight: bold; font-size: 16px; text-transform: uppercase; }
+        #distancia-final { font-size: 30px; font-weight: bold; }
+        #controles { padding: 15px; background: #000; z-index: 1001; }
+        .btn-ini { background: #39FF14; color: #000; padding: 15px; border-radius: 12px; font-weight: bold; font-size: 18px; cursor: pointer; display: block; text-align: center; }
         input[type="file"] { display: none; }
-
-        #btn-re-stop { position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.6); border: 1px solid #fff; color: #fff; border-radius: 50%; width: 36px; height: 36px; display: none; align-items: center; justify-content: center; font-size: 18px; cursor: pointer; z-index: 1002; }
-
-        #modal-selecao { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 2000; display: none; flex-direction: column; padding: 20px; box-sizing: border-box; }
-        #lista-paradas { flex: 1; overflow-y: auto; margin-top: 15px; border: 1px solid #333; border-radius: 10px; text-align: left; }
-        .item-parada { padding: 15px; border-bottom: 1px solid #333; cursor: pointer; }
-        .item-parada:active { background: #007AFF; }
-        .item-parada .titulo { color: #39FF14; font-weight: bold; font-size: 18px; }
-
         .stop-label { background: rgba(0,0,0,0.8); color: #fff; border: 1px solid #39FF14; font-weight: bold; padding: 2px 4px; border-radius: 3px; font-size: 10px; }
         .leaflet-tile-container { filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%); }
-        
-        .leaflet-popup-content-wrapper { background: #222; color: #fff; border: 1px solid #39FF14; }
-        .popup-btn { padding: 8px; margin: 5px; border: none; border-radius: 5px; font-weight: bold; color: #fff; cursor: pointer; display: block; width: 100px; }
     </style>
 </head>
 <body>
 
-    <div id="modal-selecao">
-        <h2 style="margin: 0; color: #39FF14;">Selecione a Parada</h2>
-        <div id="lista-paradas"></div>
-        <button onclick="fecharModal()" style="margin-top: 15px; padding: 15px; background: #444; color: #fff; border: none; border-radius: 10px; font-weight: bold;">VOLTAR</button>
+    <div id="modal-modo" class="modal-fullscreen">
+        <h2>ESCOLHA O MODO DE ROTA</h2>
+        <button class="btn-modo btn-otimizada" onclick="iniciarRotaOtimizada()">🚀 ROTA OTIMIZADA<br><small style="font-weight:normal;">(Por Proximidade + Rua)</small></button>
+        <button class="btn-modo btn-padrao" onclick="iniciarRotaPadrao()">▶️ ROTA PADRÃO<br><small style="font-weight:normal;">(Ordem da Planilha Original)</small></button>
+    </div>
+
+    <div id="modal-doca" class="modal-fullscreen">
+        <h2>📦 MODO DOCA - SEPARAÇÃO</h2>
+        <div id="lista-bags"></div>
+        <button class="btn-modo btn-otimizada" style="margin-top:10px; margin-bottom:40px;" onclick="iniciarGPSPosDoca()">INICIAR VIAGEM 🚀</button>
     </div>
 
     <div id="painel-topo">
-        <div id="btn-re-stop" onclick="abrirModalSelecao()">📑</div>
-        
+        <div><div id="stop-badge">STOP --</div></div>
         <div id="nav-ui">
-            <div id="col-info">
-                <div id="stop-badge">STOP --</div>
-                <div id="lista-pacotes-topo"></div>
-            </div>
-        </div>
-    </div>
-
-    <div id="map-container">
-        <div id="map"></div>
-        
-        <div id="col-seta">
             <span id="seta-instrucao">---</span>
             <span id="distancia-curva">0 m</span>
         </div>
-
         <div id="painel-acoes">
-            <button class="btn-status" style="background:#28a745" onclick="finalizarParada('concluido')">CONCLUÍDO</button>
-            <button class="btn-status" style="background:#dc3545" onclick="finalizarParada('pendente')">PENDENTE</button>
+            <button class="btn-status btn-check" onclick="finalizarParada('concluido')">CONCLUÍDO</button>
+            <button class="btn-status btn-fail" onclick="finalizarParada('pendente')">PENDENTE</button>
         </div>
     </div>
+
+    <div id="map"></div>
 
     <div id="info-final">
         <div id="rua-atual">AGUARDANDO PLANILHA</div>
@@ -170,14 +91,15 @@
     </div>
 
     <script>
-        // MANUTENÇÃO INTEGRAL DAS LÓGICAS DO SISTEMA
         let rotaSpx = [], passosNavegacao = [], idxDestino = 0, idxPasso = 0;
         let minhaLat, minhaLon, mapa, markerUser, markerDest, polylineRota;
         let camadaFundo = L.layerGroup(), aguardandoConfirmacao = false, ultimaLatReq, ultimaLonReq;
         let wakeLock = null;
 
+        // --- GESTÃO DE TELA (WAKE LOCK) ---
         async function requestWakeLock() {
-            try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch (e) {}
+            try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } 
+            catch (err) { console.error(err); }
         }
 
         function releaseWakeLock() {
@@ -188,150 +110,215 @@
             mapa = L.map('map', { zoomControl: false, attributionControl: false }).setView([-23.61, -46.57], 16);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(mapa);
             camadaFundo.addTo(mapa);
+            setTimeout(() => { mapa.invalidateSize(); }, 500);
         };
 
-        function extrairNumero(str) {
-            const matches = str.match(/\d+/);
-            return matches ? parseInt(matches[0]) : 0;
+        // --- EXTRATOR DE RUAS (O "Limpador Ninja") ---
+        function extrairRuaPadrao(enderecoBruto) {
+            if (!enderecoBruto) return "DESCONHECIDO";
+            // Remove acentos e joga pra maiúscula
+            let limpo = enderecoBruto.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+            // Corta no primeiro número, vírgula ou traço
+            let match = limpo.match(/^([^,0-9-]+)/);
+            if (match) limpo = match[1].trim();
+            // Padroniza as siglas
+            limpo = limpo.replace(/^R\.\s|^R\s/, "RUA ");
+            limpo = limpo.replace(/^AV\.\s|^AV\s/, "AVENIDA ");
+            limpo = limpo.replace(/^TR\.\s|^TR\s|^TRV\s/, "TRAVESSA ");
+            limpo = limpo.replace(/^PCA\.\s|^PCA\s|^PRACA\s/, "PRACA ");
+            return limpo.trim();
         }
 
-        function formatarEnderecoComNumeroDestaque(endereco) {
-            const match = endereco.match(/(,\s*|-?\s*)(\d+)(\s*|$)/);
-            if (match) {
-                const numeroOriginal = match[2];
-                return endereco.replace(numeroOriginal, `<span class="numero-destaque">${numeroOriginal}</span>`);
-            }
-            return endereco;
-        }
-
+        // --- LEITURA DA PLANILHA ---
         document.getElementById('fileInput').addEventListener('change', function(e) {
             const reader = new FileReader();
-            requestWakeLock();
+            requestWakeLock(); 
+
             reader.onload = function(evt) {
                 try {
                     const wb = XLSX.read(evt.target.result, { type: 'binary' });
                     const dataRaw = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
-                    const paradasUnicas = {};
-
-                    dataRaw.forEach(row => {
-                        const n = {};
-                        for (let k in row) n[k.trim().toLowerCase()] = row[k];
-                        let s = n.stop || n.parada || n.sequence;
-                        let lat = parseFloat(String(n.latitude || n.lat).replace(',', '.'));
-                        let lon = parseFloat(String(n.longitude || n.lon).replace(',', '.'));
-                        let endereco = n["destination address"] || n.endereco || "S/N";
-
-                        if(!isNaN(s) && !isNaN(lat)) {
-                            if(!paradasUnicas[s]) {
-                                paradasUnicas[s] = { lat, lon, addr: endereco, stop: parseInt(s), pacotes: 1, listaEnderecos: [endereco] };
-                            } else { 
-                                paradasUnicas[s].pacotes++;
-                                paradasUnicas[s].listaEnderecos.push(endereco);
-                            }
-                        }
-                    });
-
-                    rotaSpx = Object.values(paradasUnicas).sort((a, b) => a.stop - b.stop);
                     
-                    rotaSpx.forEach(p => {
-                        p.listaEnderecos.sort((a, b) => extrairNumero(a) - extrairNumero(b));
+                    const json = dataRaw.map(row => {
+                        const normalized = {};
+                        for (let key in row) normalized[key.trim().toLowerCase()] = row[key];
+                        return normalized;
                     });
 
-                    if (rotaSpx.length > 0) abrirModalSelecao();
-                } catch (err) { alert("Erro ao ler arquivo."); }
+                    const contagem = {};
+                    json.forEach(i => { 
+                        let s = i.stop || i.parada || i.sequence;
+                        if(s && !isNaN(s)) contagem[s] = (contagem[s] || 0) + 1; 
+                    });
+
+                    rotaSpx = json.filter(i => (i.stop || i.parada || i.sequence) && !isNaN(i.stop || i.parada || i.sequence))
+                        .sort((a, b) => (a.stop || a.parada) - (b.stop || b.parada))
+                        .map(i => {
+                            let rawLat = String(i.latitude || i.lat).replace(',', '.');
+                            let rawLon = String(i.longitude || i.lon || i.lng).replace(',', '.');
+                            return {
+                                lat: parseFloat(rawLat),
+                                lon: parseFloat(rawLon),
+                                addr: i["destination address"] || i.endereco || "Endereço não identificado",
+                                ruaPadrao: extrairRuaPadrao(i["destination address"] || i.endereco),
+                                stop: i.stop || i.parada || i.sequence,
+                                pacotes: contagem[i.stop || i.parada || i.sequence] || 1,
+                                status: 'neutro',
+                                marker: null
+                            };
+                        })
+                        .filter(i => !isNaN(i.lat) && !isNaN(i.lon));
+
+                    if (rotaSpx.length > 0) {
+                        document.getElementById('btnLabel').style.display = 'none';
+                        // Abre a tela de escolha de rota!
+                        document.getElementById('modal-modo').style.display = 'flex';
+                    } else {
+                        alert("Erro: Não encontrei colunas de Stop/Lat/Lon. Verifique o arquivo.");
+                    }
+                } catch (err) {
+                    alert("Erro ao processar planilha: " + err.message);
+                }
             };
             reader.readAsBinaryString(e.target.files[0]);
         });
 
-        function abrirModalSelecao() {
-            const container = document.getElementById('lista-paradas');
-            container.innerHTML = '';
-            rotaSpx.forEach((p, index) => {
-                const item = document.createElement('div');
-                item.className = 'item-parada';
-                item.onclick = () => selecionarParada(index);
-                item.innerHTML = `<div class="titulo">STOP ${p.stop} (${p.pacotes} vol)</div><div style="font-size:12px; color:#aaa">${p.addr}</div>`;
-                container.appendChild(item);
-            });
-            document.getElementById('modal-selecao').style.display = 'flex';
-        }
-
-        function fecharModal() { document.getElementById('modal-selecao').style.display = 'none'; }
-
-        function selecionarParada(index) {
-            idxDestino = index;
-            fecharModal();
+        // --- FLUXOS DE ROTA ---
+        function iniciarRotaPadrao() {
+            document.getElementById('modal-modo').style.display = 'none';
             desenharStopsFundo();
-            document.getElementById('btnLabel').style.display = 'none';
-            document.getElementById('btn-re-stop').style.display = 'flex';
-            document.getElementById('rua-atual').innerText = "AGUARDANDO GPS...";
-            aguardandoConfirmacao = false;
-            passosNavegacao = [];
-            requestWakeLock();
-            if(!minhaLat) iniciarGPS(); else calcularRota();
+            document.getElementById('rua-atual').innerText = "BUSCANDO GPS...";
+            iniciarGPS();
         }
 
+        function iniciarRotaOtimizada() {
+            document.getElementById('modal-modo').style.display = 'none';
+            otimizarRota();
+            renderizarModoDoca();
+            document.getElementById('modal-doca').style.display = 'flex';
+        }
+
+        function iniciarGPSPosDoca() {
+            document.getElementById('modal-doca').style.display = 'none';
+            desenharStopsFundo();
+            document.getElementById('rua-atual').innerText = "BUSCANDO GPS...";
+            iniciarGPS();
+        }
+
+        // --- O MOTOR MATEMÁTICO (VIZINHO MAIS PRÓXIMO + GRAVIDADE DE RUA) ---
+        function otimizarRota() {
+            if (rotaSpx.length <= 1) return;
+
+            let rotaOtimizada = [];
+            let atual = rotaSpx[0]; // Ponto 1 é sagrado
+            rotaOtimizada.push(atual);
+
+            let pendentes = rotaSpx.slice(1);
+
+            while (pendentes.length > 0) {
+                let melhorProximo = null;
+                let menorDistancia = Infinity;
+                let indexMelhor = -1;
+
+                let ruaAtual = atual.ruaPadrao;
+
+                for (let i = 0; i < pendentes.length; i++) {
+                    let candidato = pendentes[i];
+                    let distReal = dist(atual.lat, atual.lon, candidato.lat, candidato.lon);
+                    
+                    let ruaCandidato = candidato.ruaPadrao;
+                    let distCalculo = distReal;
+
+                    // O PULO DO GATO: Se for a mesma rua, aplicamos um super desconto na distância
+                    if (ruaAtual === ruaCandidato && ruaAtual !== "DESCONHECIDO") {
+                        distCalculo = distCalculo * 0.05; 
+                    }
+
+                    if (distCalculo < menorDistancia) {
+                        menorDistancia = distCalculo;
+                        melhorProximo = candidato;
+                        indexMelhor = i;
+                    }
+                }
+
+                rotaOtimizada.push(melhorProximo);
+                pendentes.splice(indexMelhor, 1); // Risca da lista (Exclusão)
+                atual = melhorProximo; // Pula para o próximo alvo
+            }
+            rotaSpx = rotaOtimizada; // Substitui a lista padrão pela inteligente
+        }
+
+        // --- RENDERIZADOR DO MODO DOCA ---
+        function renderizarModoDoca() {
+            let container = document.getElementById('lista-bags');
+            container.innerHTML = '';
+            
+            let bagsHtml = '';
+            let bagNum = 1;
+
+            for (let i = 0; i < rotaSpx.length; i += 10) {
+                let lote = rotaSpx.slice(i, i + 10);
+                bagsHtml += `<div class="bag-container"><h3>BAG ${bagNum} (Paradas ${i+1} a ${i+lote.length})</h3>`;
+                
+                lote.forEach(p => {
+                    bagsHtml += `
+                    <div class="bag-item">
+                        <div>
+                            <strong>[Stop ${p.stop}]</strong>
+                            <small>${p.ruaPadrao}</small>
+                        </div>
+                        <div class="bag-vol">${p.pacotes} vol</div>
+                    </div>`;
+                });
+                bagsHtml += `</div>`;
+                bagNum++;
+            }
+            container.innerHTML = bagsHtml;
+        }
+
+        // --- LÓGICA SAGRADA ORIGINAL (GPS e Setas) ---
         function desenharStopsFundo() {
             camadaFundo.clearLayers();
-            rotaSpx.forEach((p, i) => {
-                let cor = p.status === 'concluido' ? '#888' : (p.status === 'pendente' ? '#ff0000' : '#333');
-                p.marker = L.circleMarker([p.lat, p.lon], { radius: 8, color: '#666', fillColor: cor, fillOpacity: 1, weight: 2 })
+            rotaSpx.forEach((p) => {
+                p.marker = L.circleMarker([p.lat, p.lon], { radius: 6, color: '#666', fillColor: '#333', fillOpacity: 1, weight: 1 })
                 .bindTooltip("Stop " + p.stop, { permanent: true, direction: 'top', className: 'stop-label', offset: [0, -5] })
                 .addTo(camadaFundo);
-
-                p.marker.on('click', (e) => {
-                    L.DomEvent.stopPropagation(e);
-                    const popupContent = `
-                        <div style="text-align:center">
-                            <b>STOP ${p.stop}</b><br>
-                            <button class="popup-btn" style="background:#28a745" onclick="mudarStatusManual(${i}, 'concluido')">CONCLUÍDO</button>
-                            <button class="popup-btn" style="background:#dc3545" onclick="mudarStatusManual(${i}, 'pendente')">PENDENTE</button>
-                        </div>
-                    `;
-                    L.popup().setLatLng([p.lat, p.lon]).setContent(popupContent).openOn(mapa);
-                });
             });
-        }
-
-        window.mudarStatusManual = function(index, status) {
-            rotaSpx[index].status = status;
-            desenharStopsFundo();
-            mapa.closePopup();
         }
 
         function iniciarGPS() {
             navigator.geolocation.watchPosition(async pos => {
                 minhaLat = pos.coords.latitude; minhaLon = pos.coords.longitude;
-                if (!markerUser) markerUser = L.circleMarker([minhaLat, minhaLon], { color: '#007AFF', fillOpacity: 1, radius: 8, zIndexOffset: 1000 }).addTo(mapa);
-                else markerUser.setLatLng([minhaLat, minhaLon]);
+                
+                if (!markerUser) {
+                    markerUser = L.circleMarker([minhaLat, minhaLon], { color: '#007AFF', fillOpacity: 1, radius: 8, zIndexOffset: 1000 }).addTo(mapa);
+                } else {
+                    markerUser.setLatLng([minhaLat, minhaLon]);
+                }
+
+                const desviou = ultimaLatReq && dist(minhaLat, minhaLon, ultimaLatReq, ultimaLonReq) > 30;
 
                 if (idxDestino < rotaSpx.length && !aguardandoConfirmacao) {
-                    if (passosNavegacao.length === 0 || dist(minhaLat, minhaLon, ultimaLatReq, ultimaLonReq) > 35) {
+                    if (passosNavegacao.length === 0 || desviou) {
                         await calcularRota();
                         ultimaLatReq = minhaLat; ultimaLonReq = minhaLon;
                     }
                     navegar();
                 }
                 mapa.panTo([minhaLat, minhaLon]);
-            }, (err) => { document.getElementById('rua-atual').innerText = "ERRO GPS: " + err.message; }, { enableHighAccuracy: true });
+            }, (err) => {
+                document.getElementById('rua-atual').innerText = "ERRO NO GPS: " + err.message;
+            }, { enableHighAccuracy: true });
         }
 
         async function calcularRota() {
-            if(!minhaLat || !minhaLon) return;
-            const d = rotaSpx[idxDestino];
-            
-            document.getElementById('stop-badge').innerText = `STOP ${d.stop} (${d.pacotes} vol)`;
-            
-            const listaHtml = d.listaEnderecos.map(addr => {
-                return `<div class="item-pacote-mini">${formatarEnderecoComNumeroDestaque(addr)}</div>`;
-            }).join('');
-            
-            document.getElementById('lista-pacotes-topo').innerHTML = listaHtml;
-            
-            if (markerDest) mapa.removeLayer(markerDest);
-            markerDest = L.circleMarker([d.lat, d.lon], { radius: 11, color: '#fff', fillColor: '#007AFF', fillOpacity: 1, weight: 3 }).addTo(mapa);
-
             try {
+                const d = rotaSpx[idxDestino];
+                document.getElementById('stop-badge').innerText = "STOP " + d.stop + " (" + d.pacotes + " vol)";
+                
+                if (markerDest) mapa.removeLayer(markerDest);
+                markerDest = L.circleMarker([d.lat, d.lon], { radius: 11, color: '#fff', fillColor: '#007AFF', fillOpacity: 1, weight: 3 }).addTo(mapa);
+
                 const url = `https://router.project-osrm.org/route/v1/driving/${minhaLon},${minhaLat};${d.lon},${d.lat}?steps=true&overview=full&geometries=geojson`;
                 const res = await fetch(url);
                 const data = await res.json();
@@ -345,59 +332,61 @@
                     if (polylineRota) mapa.removeLayer(polylineRota);
                     polylineRota = L.polyline(route.geometry.coordinates.map(c => [c[1], c[0]]), { color: '#007AFF', weight: 6, opacity: 0.8 }).addTo(mapa);
                 }
-            } catch (e) { document.getElementById('rua-atual').innerText = "ERRO API"; }
+            } catch (e) {
+                document.getElementById('rua-atual').innerText = "ERRO DE CONEXÃO/API";
+            }
         }
 
         function navegar() {
             if (!rotaSpx[idxDestino] || passosNavegacao.length === 0) return;
-            const dest = rotaSpx[idxDestino];
-            const df = dist(minhaLat, minhaLon, dest.lat, dest.lon);
+            const dFinal = dist(minhaLat, minhaLon, rotaSpx[idxDestino].lat, rotaSpx[idxDestino].lon);
             
-            if (df < 60) {
+            if (dFinal < 60) {
                 aguardandoConfirmacao = true;
                 releaseWakeLock();
+                document.getElementById('nav-ui').style.display = 'none';
                 document.getElementById('painel-acoes').style.display = 'flex';
+                document.getElementById('painel-topo').classList.add('modo-confirmacao');
                 document.getElementById('rua-atual').innerText = "VOCÊ CHEGOU!";
                 if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
                 return;
             }
 
             const passo = passosNavegacao[idxPasso];
-            const dc = dist(minhaLat, minhaLon, passo.lat, passo.lon);
+            if (!passo) return;
+            const dCurva = dist(minhaLat, minhaLon, passo.lat, passo.lon);
 
-            document.getElementById('distancia-curva').innerText = Math.round(dc) + " m";
-            
-            document.getElementById('rua-atual').innerText = dest.addr;
-            document.getElementById('distancia-final').innerText = df > 1000 ? (df/1000).toFixed(1) + " km" : Math.round(df) + " m";
+            document.getElementById('distancia-curva').innerText = Math.round(dCurva) + " m";
+            document.getElementById('distancia-final').innerText = dFinal > 1000 ? (dFinal/1000).toFixed(1) + " km" : Math.round(dFinal) + " m";
+            document.getElementById('rua-atual').innerText = passo.rua;
 
             const m = passo.manobra;
             if (m && m.includes("left")) document.getElementById('seta-instrucao').innerText = "⬅️";
             else if (m && m.includes("right")) document.getElementById('seta-instrucao').innerText = "➡️";
             else document.getElementById('seta-instrucao').innerText = "⬆️";
-
-            if (dc < 25 && idxPasso < passosNavegacao.length - 1) idxPasso++;
+            
+            if (dCurva < 25 && idxPasso < passosNavegacao.length - 1) idxPasso++;
         }
 
         function finalizarParada(status) {
-            rotaSpx[idxDestino].status = status;
-            desenharStopsFundo();
+            const p = rotaSpx[idxDestino];
+            p.status = status;
+            p.marker.setStyle({ fillColor: status === 'concluido' ? '#888' : '#ff0000', color: '#fff', weight: 2 });
 
-            idxDestino++;
             aguardandoConfirmacao = false;
             requestWakeLock();
             
+            idxDestino++;
+            passosNavegacao = [];
+            document.getElementById('nav-ui').style.display = 'block';
             document.getElementById('painel-acoes').style.display = 'none';
+            document.getElementById('painel-topo').classList.remove('modo-confirmacao');
             
-            if (idxDestino < rotaSpx.length) {
-                calcularRota();
-            } else { 
-                releaseWakeLock();
-                document.getElementById('rua-atual').innerText = "ROTA FINALIZADA"; 
-            }
+            if (idxDestino < rotaSpx.length) calcularRota();
+            else { releaseWakeLock(); document.getElementById('rua-atual').innerText = "ROTA FINALIZADA"; }
         }
 
         function dist(la1, lo1, la2, lo2) {
-            if(!la1 || !la2) return 999;
             const R = 6371000;
             const dLat = (la2-la1) * Math.PI/180;
             const dLon = (lo2-lo1) * Math.PI/180;
