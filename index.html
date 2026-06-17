@@ -30,11 +30,15 @@
         #tela-navegacao { display: none; flex-direction: column; height: 100vh; width: 100%; }
         
         /* Painel Azul Topo */
-        #painel-topo { background: #003399; padding: 15px; text-align: center; z-index: 1001; max-height: 35vh; overflow-y: auto; border-bottom: 2px solid #000;}
+        #painel-topo { background: #003399; padding: 15px; text-align: center; z-index: 1001; max-height: 35vh; overflow-y: auto; border-bottom: 2px solid #000; position: relative;}
         .modo-confirmacao { background: #FFCC00 !important; }
         #stop-badge { background: #000; color: #39FF14; padding: 5px 20px; border-radius: 20px; font-weight: bold; font-size: 20px; margin-bottom: 10px; display: inline-block; border: 2px solid #39FF14; }
         .endereco-item { font-size: 16px; color: #39FF14; font-weight: bold; text-transform: uppercase; margin-bottom: 10px; text-align: left; line-height: 1.4;}
         .num-box { background: #000; border: 2px solid #FFCC00; color: #FFCC00; padding: 2px 6px; border-radius: 5px; margin: 0 4px; }
+
+        /* NOVO: Botão de Menu Flutuante no Painel Topo */
+        #btn-menu-stops { position: absolute; top: 15px; right: 15px; width: 45px; height: 45px; background: #000; border: 2px solid #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 1005; box-shadow: 0 4px 8px rgba(0,0,0,0.4); }
+        #btn-menu-stops span { font-size: 22px; line-height: 1; }
 
         /* Mapa e Seta Flutuante */
         #map-wrapper { flex: 1; position: relative; width: 100%; }
@@ -63,7 +67,6 @@
 </head>
 <body>
 
-    <!-- TELA 1: UPLOAD -->
     <div id="controles-iniciais">
         <label class="btn-ini" id="btnLabel">
             📦 CARREGAR PLANILHA SPX
@@ -71,28 +74,33 @@
         </label>
     </div>
 
-    <!-- TELA 2: BIFURCAÇÃO -->
     <div id="modal-modo" class="modal-fullscreen">
         <h2>ESCOLHA O MODO DE ROTA</h2>
         <button class="btn-modo btn-otimizada" onclick="iniciarRotaOtimizada()">🚀 ROTA OTIMIZADA<br><small style="font-weight:normal;">(Agrupamento Inteligente)</small></button>
         <button class="btn-modo btn-padrao" onclick="iniciarRotaPadrao()">▶️ ROTA PADRÃO<br><small style="font-weight:normal;">(Ordem Original)</small></button>
     </div>
 
-    <!-- TELA 3: MODO DOCA -->
     <div id="modal-doca" class="modal-fullscreen">
         <h2>📦 MODO DOCA - SEPARAÇÃO</h2>
         <div id="lista-bags"></div>
         <button class="btn-modo btn-otimizada" style="margin-top:10px; margin-bottom:40px;" onclick="iniciarGPSPosDoca()">INICIAR VIAGEM 🚀</button>
     </div>
 
-    <!-- TELA 4: NAVEGAÇÃO RICA (V26) -->
+    <div id="modal-menu-stops" class="modal-fullscreen" style="z-index: 4000;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 15px;">
+            <h2 style="margin: 0;">📋 LISTA DE PARADAS</h2>
+            <button onclick="fecharMenuStops()" style="background:#dc3545; color:white; border:none; padding:10px 15px; border-radius:8px; font-weight:bold;">VOLTAR</button>
+        </div>
+        <div id="conteudo-lista-stops" style="padding-bottom: 30px;"></div>
+    </div>
+
     <div id="tela-navegacao">
         
         <div id="painel-topo">
+            <div id="btn-menu-stops" onclick="abrirMenuStops()"><span>📋</span></div>
             <div id="stop-badge">STOP -- (-- vol)</div>
             <div id="lista-enderecos">
-                <!-- Endereços injetados via JS -->
-            </div>
+                </div>
         </div>
 
         <div id="map-wrapper">
@@ -145,13 +153,12 @@
         function formatarEnderecos(listaEnderecos) {
             return listaEnderecos.map(end => {
                 let texto = end.toUpperCase();
-                // Encontra o primeiro número e coloca na caixinha amarela
                 texto = texto.replace(/(\d+)/, '<span class="num-box">$1</span>');
                 return `<div class="endereco-item">${texto}</div>`;
             }).join('');
         }
 
-        // --- LEITURA DA PLANILHA (COM FILTRO ÚNICO) ---
+        // --- LEITURA DA PLANILHA ---
         document.getElementById('fileInput').addEventListener('change', function(e) {
             const reader = new FileReader();
             requestWakeLock(); 
@@ -167,7 +174,6 @@
                         return normalized;
                     });
 
-                    // Agrupamento de dados
                     const contagemVolumes = {};
                     const listaEnderecosPorStop = {};
 
@@ -201,7 +207,7 @@
                                 ruaPadrao: extrairRuaPadrao(primEnd),
                                 stop: s,
                                 pacotes: contagemVolumes[s],
-                                enderecos: listaEnderecosPorStop[s], // Salva a lista completa para o painel azul
+                                enderecos: listaEnderecosPorStop[s], 
                                 status: 'neutro',
                                 marker: null
                             };
@@ -221,7 +227,7 @@
             reader.readAsBinaryString(e.target.files[0]);
         });
 
-        // --- FUNÇÕES DOS MODAIS ---
+        // --- FUNÇÕES DOS MODAIS DE INÍCIO ---
         function iniciarRotaPadrao() {
             document.getElementById('modal-modo').style.display = 'none';
             iniciarInterfaceNavegacao();
@@ -237,6 +243,46 @@
         function iniciarGPSPosDoca() {
             document.getElementById('modal-doca').style.display = 'none';
             iniciarInterfaceNavegacao();
+        }
+
+        // --- POPUP MENU DE PARADAS (NOVO) ---
+        function abrirMenuStops() {
+            let html = '';
+            rotaSpx.forEach((p, index) => {
+                // Controle de cores baseado no status
+                let corTexto = p.status === 'concluido' ? '#888' : (p.status === 'pendente' ? '#ff6666' : '#fff');
+                let corFundo = index === idxDestino ? '#003399' : '#111';
+                let borda = index === idxDestino ? 'border: 2px solid #39FF14;' : 'border: 1px solid #333;';
+                let iconeStatus = p.status === 'concluido' ? '✅' : (p.status === 'pendente' ? '❌' : (index === idxDestino ? '📍' : '📦'));
+
+                html += `<div style="background:${corFundo}; ${borda} border-radius:10px; padding:15px; margin-bottom:10px; text-align:left; color:${corTexto}; cursor:pointer;" onclick="pularParaStop(${index})">
+                    <div style="font-size: 18px; font-weight: bold; margin-bottom: 5px;">
+                        ${iconeStatus} STOP ${p.stop} <span style="float:right; font-size:14px; background:#333; padding:2px 8px; border-radius:10px;">${p.pacotes} vol</span>
+                    </div>
+                    <div style="font-size: 13px; opacity: 0.8;">${p.ruaPadrao}</div>
+                </div>`;
+            });
+            document.getElementById('conteudo-lista-stops').innerHTML = html;
+            document.getElementById('modal-menu-stops').style.display = 'block';
+        }
+
+        function fecharMenuStops() {
+            document.getElementById('modal-menu-stops').style.display = 'none';
+        }
+
+        function pularParaStop(index) {
+            fecharMenuStops();
+            idxDestino = index;
+            passosNavegacao = [];
+            aguardandoConfirmacao = false;
+            
+            // Restaura o visual caso tenha pulado durante a tela amarela de confirmação
+            document.getElementById('painel-rodape').style.display = 'block';
+            document.getElementById('seta-flutuante').style.display = 'block';
+            document.getElementById('painel-acoes').style.display = 'none';
+            document.getElementById('painel-topo').classList.remove('modo-confirmacao');
+            
+            calcularRota();
         }
 
         // --- MATEMÁTICA DA OTIMIZAÇÃO ---
@@ -316,7 +362,7 @@
             iniciarGPS();
         }
 
-        // --- NAVEGAÇÃO E GPS (INTOCÁVEIS) ---
+        // --- NAVEGAÇÃO E GPS (INTOCÁVEIS - 100% V26) ---
         function iniciarGPS() {
             navigator.geolocation.watchPosition(async pos => {
                 minhaLat = pos.coords.latitude; minhaLon = pos.coords.longitude;
@@ -346,7 +392,6 @@
             try {
                 const d = rotaSpx[idxDestino];
                 
-                // ATUALIZA O PAINEL AZUL SUPERIOR
                 document.getElementById('stop-badge').innerText = "STOP " + d.stop + " (" + d.pacotes + " vol)";
                 document.getElementById('lista-enderecos').innerHTML = formatarEnderecos(d.enderecos);
                 
@@ -375,7 +420,6 @@
             if (!rotaSpx[idxDestino] || passosNavegacao.length === 0) return;
             const dFinal = dist(minhaLat, minhaLon, rotaSpx[idxDestino].lat, rotaSpx[idxDestino].lon);
             
-            // ATUALIZA RODAPÉ PRETO (Distância Final)
             document.getElementById('rodape-dist').innerText = dFinal > 1000 ? (dFinal/1000).toFixed(1) + " km" : Math.round(dFinal) + " m";
 
             if (dFinal < 60) {
@@ -393,7 +437,6 @@
             if (!passo) return;
             const dCurva = dist(minhaLat, minhaLon, passo.lat, passo.lon);
 
-            // ATUALIZA RODAPÉ PRETO (Rua atual) E SETA FLUTUANTE
             document.getElementById('rodape-rua').innerText = passo.rua;
             document.getElementById('seta-dist').innerText = Math.round(dCurva) + " m";
 
