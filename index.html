@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SPX Ninja - V2.0 Oficial</title>
+    <title>SPX Ninja - V2.0 Oficial (Inteligência Max)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -99,8 +99,7 @@
         <div id="painel-topo">
             <div id="btn-menu-stops" onclick="abrirMenuStops()"><span>📋</span></div>
             <div id="stop-badge">STOP -- (-- vol)</div>
-            <div id="lista-enderecos">
-                </div>
+            <div id="lista-enderecos"></div>
         </div>
 
         <div id="map-wrapper">
@@ -245,11 +244,10 @@
             iniciarInterfaceNavegacao();
         }
 
-        // --- POPUP MENU DE PARADAS (NOVO) ---
+        // --- POPUP MENU DE PARADAS ---
         function abrirMenuStops() {
             let html = '';
             rotaSpx.forEach((p, index) => {
-                // Controle de cores baseado no status
                 let corTexto = p.status === 'concluido' ? '#888' : (p.status === 'pendente' ? '#ff6666' : '#fff');
                 let corFundo = index === idxDestino ? '#003399' : '#111';
                 let borda = index === idxDestino ? 'border: 2px solid #39FF14;' : 'border: 1px solid #333;';
@@ -276,7 +274,6 @@
             passosNavegacao = [];
             aguardandoConfirmacao = false;
             
-            // Restaura o visual caso tenha pulado durante a tela amarela de confirmação
             document.getElementById('painel-rodape').style.display = 'block';
             document.getElementById('seta-flutuante').style.display = 'block';
             document.getElementById('painel-acoes').style.display = 'none';
@@ -285,13 +282,42 @@
             calcularRota();
         }
 
-        // --- MATEMÁTICA DA OTIMIZAÇÃO ---
+        // --- PENTE-FINO (2-OPT) ---
+        function aplicar2Opt(rota) {
+            let melhorou = true;
+            let iteracoes = 0;
+            
+            while (melhorou && iteracoes < 50) {
+                melhorou = false;
+                for (let i = 1; i < rota.length - 2; i++) {
+                    for (let j = i + 1; j < rota.length - 1; j++) {
+                        
+                        let dAtual = dist(rota[i-1].lat, rota[i-1].lon, rota[i].lat, rota[i].lon) +
+                                     dist(rota[j].lat, rota[j].lon, rota[j+1].lat, rota[j+1].lon);
+                        
+                        let dNovo = dist(rota[i-1].lat, rota[i-1].lon, rota[j].lat, rota[j].lon) +
+                                    dist(rota[i].lat, rota[i].lon, rota[j+1].lat, rota[j+1].lon);
+
+                        if (dNovo < dAtual - 1) { 
+                            let trechoInvertido = rota.slice(i, j + 1).reverse();
+                            rota.splice(i, trechoInvertido.length, ...trechoInvertido);
+                            melhorou = true;
+                        }
+                    }
+                }
+                iteracoes++;
+            }
+            return rota;
+        }
+
+        // --- MATEMÁTICA DA OTIMIZAÇÃO MAX ---
         function otimizarRota() {
             if (rotaSpx.length <= 1) return;
+            
             let rotaOtimizada = [];
-            let atual = rotaSpx[0]; 
+            let pendentes = [...rotaSpx];
+            let atual = pendentes.shift(); 
             rotaOtimizada.push(atual);
-            let pendentes = rotaSpx.slice(1);
 
             while (pendentes.length > 0) {
                 let melhorProximo = null;
@@ -302,7 +328,16 @@
                 for (let i = 0; i < pendentes.length; i++) {
                     let candidato = pendentes[i];
                     let distReal = dist(atual.lat, atual.lon, candidato.lat, candidato.lon);
-                    let distCalculo = (ruaAtual === candidato.ruaPadrao && ruaAtual !== "DESCONHECIDO") ? distReal * 0.05 : distReal;
+                    let distCalculo = distReal;
+
+                    // Bônus de quarteirão (Até 300m na mesma rua)
+                    if (ruaAtual === candidato.ruaPadrao && ruaAtual !== "DESCONHECIDO" && distReal < 300) {
+                        distCalculo = distReal * 0.2; 
+                    } 
+                    // Prioridade para ruas paralelas coladas (até 80m)
+                    else if (distReal < 80) {
+                        distCalculo = distReal * 0.5; 
+                    }
 
                     if (distCalculo < menorDistancia) {
                         menorDistancia = distCalculo;
@@ -314,7 +349,9 @@
                 pendentes.splice(indexMelhor, 1);
                 atual = melhorProximo;
             }
-            rotaSpx = rotaOtimizada;
+
+            // Passa o pente-fino antes de salvar a rota
+            rotaSpx = aplicar2Opt(rotaOtimizada);
         }
 
         // --- MODO DOCA (SEPARAÇÃO) ---
@@ -362,7 +399,7 @@
             iniciarGPS();
         }
 
-        // --- NAVEGAÇÃO E GPS (INTOCÁVEIS - 100% V26) ---
+        // --- NAVEGAÇÃO E GPS ---
         function iniciarGPS() {
             navigator.geolocation.watchPosition(async pos => {
                 minhaLat = pos.coords.latitude; minhaLon = pos.coords.longitude;
