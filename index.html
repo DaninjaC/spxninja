@@ -127,6 +127,7 @@
         let minhaLat, minhaLon, mapa, markerUser, markerDest, polylineRota;
         let camadaFundo = L.layerGroup(), aguardandoConfirmacao = false, ultimaLatReq, ultimaLonReq;
         let wakeLock = null;
+        let distAnteriorCurva = Infinity; // NOVO: Memória inteligente da curva
 
         // --- GESTÃO DE TELA (WAKE LOCK) ---
         async function requestWakeLock() {
@@ -445,6 +446,7 @@
                         manobra: s.maneuver.modifier, rua: s.name || "Siga em frente"
                     }));
                     idxPasso = 0;
+                    distAnteriorCurva = Infinity; // NOVO: Reseta a memória ao recalcular
                     if (polylineRota) mapa.removeLayer(polylineRota);
                     polylineRota = L.polyline(route.geometry.coordinates.map(c => [c[1], c[0]]), { color: '#007AFF', weight: 6, opacity: 0.8 }).addTo(mapa);
                 }
@@ -482,7 +484,24 @@
             else if (m && m.includes("right")) document.getElementById('seta-icon').innerText = "➡️";
             else document.getElementById('seta-icon').innerText = "⬆️";
             
-            if (dCurva < 25 && idxPasso < passosNavegacao.length - 1) idxPasso++;
+            // NOVO: Lógica de Ápice da Curva (Só avança DEPOIS de dobrar a esquina)
+            if (dCurva > distAnteriorCurva + 3 && distAnteriorCurva < 40) {
+                if (idxPasso < passosNavegacao.length - 1) {
+                    idxPasso++;
+                    distAnteriorCurva = Infinity; 
+                }
+            } else {
+                // Grava a menor distância para encontrar o ápice
+                if (dCurva < distAnteriorCurva) {
+                    distAnteriorCurva = dCurva;
+                }
+                
+                // Trava de segurança: Se cravar em cima do ponto (< 8m), avança.
+                if (dCurva < 8 && idxPasso < passosNavegacao.length - 1) {
+                    idxPasso++;
+                    distAnteriorCurva = Infinity;
+                }
+            }
         }
 
         function finalizarParada(status) {
