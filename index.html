@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SPX Ninja - V2.0 Oficial (Bússola Integrada)</title>
+    <title>SPX Ninja - V3.0 (Auditoria Integrada)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -12,12 +12,15 @@
     <style>
         body { background-color: #000; color: #fff; font-family: sans-serif; margin: 0; padding: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
         
-        /* Modais Iniciais (Bifurcação e Doca) */
+        /* Modais Fullscreen */
         .modal-fullscreen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 3000; display: none; flex-direction: column; padding: 20px; box-sizing: border-box; overflow-y: auto; text-align: center;}
         .modal-fullscreen h2 { color: #39FF14; margin-top: 10px; margin-bottom: 20px; font-size: 24px;}
-        .btn-modo { width: 100%; padding: 25px 15px; border: none; border-radius: 12px; font-weight: bold; font-size: 20px; cursor: pointer; margin-bottom: 15px; color: #000; }
-        .btn-padrao { background: #ccc; }
+        
+        .btn-modo { width: 100%; padding: 20px 15px; border: none; border-radius: 12px; font-weight: bold; font-size: 18px; cursor: pointer; color: #000; margin-bottom: 10px;}
+        .btn-padrao { background: #ff4444; color: #fff; }
         .btn-otimizada { background: #39FF14; }
+        
+        /* Tela de Doca / Bags */
         .bag-container { background: #111; border: 1px solid #39FF14; border-radius: 10px; margin-bottom: 15px; padding: 15px; text-align: left; }
         .bag-container h3 { margin: 0 0 10px 0; color: #39FF14; border-bottom: 1px solid #333; padding-bottom: 5px;}
         .bag-item { padding: 8px 0; border-bottom: 1px dashed #333; display: flex; justify-content: space-between; align-items: center; }
@@ -26,46 +29,46 @@
         .bag-item small { color: #aaa; display: block; margin-top: 3px; font-size: 12px;}
         .bag-vol { background: #39FF14; color: #000; padding: 3px 8px; border-radius: 12px; font-weight: bold; font-size: 14px; }
 
-        /* Interface V26 Restaurada */
+        /* Interface Navegação */
         #tela-navegacao { display: none; flex-direction: column; height: 100vh; width: 100%; }
-        
-        /* Painel Azul Topo */
         #painel-topo { background: #003399; padding: 15px; text-align: center; z-index: 1001; max-height: 35vh; overflow-y: auto; border-bottom: 2px solid #000; position: relative;}
         .modo-confirmacao { background: #FFCC00 !important; }
         #stop-badge { background: #000; color: #39FF14; padding: 5px 20px; border-radius: 20px; font-weight: bold; font-size: 20px; margin-bottom: 10px; display: inline-block; border: 2px solid #39FF14; }
         .endereco-item { font-size: 16px; color: #39FF14; font-weight: bold; text-transform: uppercase; margin-bottom: 10px; text-align: left; line-height: 1.4;}
         .num-box { background: #000; border: 2px solid #FFCC00; color: #FFCC00; padding: 2px 6px; border-radius: 5px; margin: 0 4px; }
 
-        /* NOVO: Botão de Menu Flutuante no Painel Topo */
+        /* Botão Menu Paradas */
         #btn-menu-stops { position: absolute; top: 15px; right: 15px; width: 45px; height: 45px; background: #000; border: 2px solid #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 1005; box-shadow: 0 4px 8px rgba(0,0,0,0.4); }
         #btn-menu-stops span { font-size: 22px; line-height: 1; }
 
-        /* Mapa e Seta Flutuante */
+        /* Mapas Navegação e Rodapé */
         #map-wrapper { flex: 1; position: relative; width: 100%; }
         #map { width: 100%; height: 100%; background: #eee; }
         #seta-flutuante { position: absolute; top: 15px; left: 15px; z-index: 1000; background: #1877F2; border-radius: 15px; padding: 15px; text-align: center; color: white; border: 3px solid #fff; box-shadow: 0 4px 10px rgba(0,0,0,0.5); min-width: 100px;}
         #seta-icon { font-size: 60px; background: rgba(255,255,255,0.2); border-radius: 10px; padding: 10px; display: inline-block; line-height: 1; margin-bottom: 5px;}
         #seta-dist { font-size: 28px; font-weight: bold; }
-
-        /* Rodapé Preto */
         #painel-rodape { background: #111; padding: 15px; text-align: center; z-index: 1001; border-top: 2px solid #333;}
         #rodape-rua { color: #39FF14; font-weight: bold; font-size: 16px; text-transform: uppercase; margin-bottom: 5px; }
         #rodape-dist { font-size: 32px; font-weight: bold; color: #fff;}
 
-        /* Ações Concluído/Pendente */
+        /* Ações Status */
         #painel-acoes { display: none; gap: 10px; padding: 15px; background: #000; justify-content: center; z-index: 1002;}
         .btn-status { flex: 1; padding: 20px; border: none; border-radius: 10px; font-weight: bold; font-size: 18px; cursor: pointer; color: #fff; }
         .btn-check { background: #28a745; }
         .btn-fail { background: #dc3545; }
 
-        /* Estilo da Logo Ninja SPX Centralizada e Aumentada */
+        /* Estilo Início */
         #controles-iniciais { padding: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh;}
         .logo-ninja-img { display: block; margin: 0 auto 40px auto; width: 280px; max-width: 85%; height: auto; }
-
         .btn-ini { background: #39FF14; color: #000; padding: 20px; border-radius: 12px; font-weight: bold; font-size: 20px; cursor: pointer; text-align: center; width: 90%; max-width: 400px;}
         input[type="file"] { display: none; }
         .stop-label { background: rgba(0,0,0,0.8); color: #fff; border: 1px solid #39FF14; font-weight: bold; padding: 2px 4px; border-radius: 3px; font-size: 10px; }
         .leaflet-tile-container { filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%); }
+
+        /* CSS NOVO: Layout Auditoria Integrada */
+        .grid-mapas { display: flex; flex-direction: column; gap: 20px; width: 100%; padding-bottom: 30px; }
+        .col-mapa { background: #111; padding: 15px; border-radius: 10px; border: 1px solid #333; }
+        .mapa-container { height: 320px; width: 100%; background: #000; border-radius: 8px; margin-top: 10px; border: 1px solid #444;}
     </style>
 </head>
 <body>
@@ -76,12 +79,27 @@
             📦 CARREGAR PLANILHA SPX
             <input type="file" id="fileInput" accept=".xlsx, .xls, .csv">
         </label>
+        <div id="loading-msg" style="display:none; color:#FFCC00; font-weight:bold; margin-top:20px; font-size:18px;">⏳ Calculando rotas e desenhando mapas...</div>
     </div>
 
-    <div id="modal-modo" class="modal-fullscreen">
-        <h2>ESCOLHA O MODO DE ROTA</h2>
-        <button class="btn-modo btn-otimizada" onclick="iniciarRotaOtimizada()">🚀 ROTA OTIMIZADA<br><small style="font-weight:normal;">(Agrupamento Inteligente)</small></button>
-        <button class="btn-modo btn-padrao" onclick="iniciarRotaPadrao()">▶️ ROTA PADRÃO<br><small style="font-weight:normal;">(Ordem Original)</small></button>
+    <div id="modal-auditoria" class="modal-fullscreen">
+        <h2>ESCOLHA A ROTA E O MAPA</h2>
+        
+        <div class="grid-mapas">
+            <div class="col-mapa">
+                <button class="btn-modo btn-padrao" onclick="escolherRotaPadrao()">
+                    ▶️ CLIQUE AQUI: ROTA PADRÃO<br><small id="km-padrao" style="font-weight:normal;">KM Geométrico: Calculando...</small>
+                </button>
+                <div id="mapa-padrao" class="mapa-container"></div>
+            </div>
+
+            <div class="col-mapa">
+                <button class="btn-modo btn-otimizada" onclick="escolherRotaOtimizada()">
+                    🚀 CLIQUE AQUI: OTIMIZADA SPX<br><small id="km-otimizada" style="font-weight:normal;">KM Geométrico: Calculando...</small>
+                </button>
+                <div id="mapa-otimizado" class="mapa-container"></div>
+            </div>
+        </div>
     </div>
 
     <div id="modal-doca" class="modal-fullscreen">
@@ -99,13 +117,11 @@
     </div>
 
     <div id="tela-navegacao">
-        
         <div id="painel-topo">
             <div id="btn-menu-stops" onclick="abrirMenuStops()"><span>📋</span></div>
             <div id="stop-badge">STOP -- (-- vol)</div>
             <div id="lista-enderecos"></div>
         </div>
-
         <div id="map-wrapper">
             <div id="seta-flutuante">
                 <div id="seta-icon">⬆️</div>
@@ -113,31 +129,36 @@
             </div>
             <div id="map"></div>
         </div>
-
         <div id="painel-rodape">
             <div id="rodape-rua">AGUARDANDO GPS...</div>
             <div id="rodape-dist">---</div>
         </div>
-
         <div id="painel-acoes">
             <button class="btn-status btn-check" onclick="finalizarParada('concluido')">CONCLUÍDO</button>
             <button class="btn-status btn-fail" onclick="finalizarParada('pendente')">PENDENTE</button>
         </div>
-
     </div>
 
     <script>
-        let rotaSpx = [], passosNavegacao = [], idxDestino = 0, idxPasso = 0;
+        // --- Variáveis Globais ---
+        let rotaSpx = []; // A rota ativa selecionada pelo usuário
+        let rotaOriginalData = []; // Guarda a rota Shopee
+        let rotaOtimizadaData = []; // Guarda a rota Matemática
+
+        let passosNavegacao = [], idxDestino = 0, idxPasso = 0;
         let minhaLat, minhaLon, mapa, markerUser, markerDest, polylineRota;
         let camadaFundo = L.layerGroup(), aguardandoConfirmacao = false, ultimaLatReq, ultimaLonReq;
         let wakeLock = null;
         let distAnteriorCurva = Infinity; 
         
-        // --- NOVAS VARIÁVEIS DA BÚSSOLA (HEADING) ---
         let latAntGps = null, lonAntGps = null;
         let headingCarro = null; 
 
-        // --- GESTÃO DE TELA (WAKE LOCK) ---
+        // Variáveis Mapas Auditoria
+        let mapPadrao = null, mapOtimizado = null;
+        let layerPadrao = L.layerGroup(), layerOtimizado = L.layerGroup();
+
+        // --- SISTEMA ---
         async function requestWakeLock() {
             try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } 
             catch (err) { console.error(err); }
@@ -146,7 +167,18 @@
             if (wakeLock !== null) { wakeLock.release(); wakeLock = null; }
         }
 
-        // --- EXTRATOR DE RUAS ---
+        function dist(la1, lo1, la2, lo2) {
+            const R = 6371000;
+            const dLat = (la2-la1) * Math.PI/180;
+            const dLon = (lo2-lo1) * Math.PI/180;
+            const a = Math.sin(dLat/2)**2 + Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)*Math.sin(dLon/2)**2;
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        }
+
+        function formatarDistancia(metros) {
+            return metros > 1000 ? (metros/1000).toFixed(2) + " km" : Math.round(metros) + " m";
+        }
+
         function extrairRuaPadrao(enderecoBruto) {
             if (!enderecoBruto) return "DESCONHECIDO";
             let limpo = enderecoBruto.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -157,7 +189,6 @@
             return limpo.trim();
         }
 
-        // --- FORMATADOR DE ENDEREÇOS COM CAIXINHA AMARELA ---
         function formatarEnderecos(listaEnderecos) {
             return listaEnderecos.map(end => {
                 let texto = end.toUpperCase();
@@ -166,8 +197,120 @@
             }).join('');
         }
 
+        // --- INICIALIZADOR DE MAPAS DA AUDITORIA ---
+        function iniciarMapasAuditoria() {
+            if (!mapPadrao) {
+                mapPadrao = L.map('mapa-padrao', { zoomControl: false }).setView([-23.61, -46.57], 14);
+                L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(mapPadrao);
+                layerPadrao.addTo(mapPadrao);
+            }
+            if (!mapOtimizado) {
+                mapOtimizado = L.map('mapa-otimizado', { zoomControl: false }).setView([-23.61, -46.57], 14);
+                L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(mapOtimizado);
+                layerOtimizado.addTo(mapOtimizado);
+            }
+        }
+
+        // --- DESENHAR AUDITORIA (TRACEJADO) ---
+        function plotarLigacaoAuditoria(camada, mapaLocal, rota, corLinha) {
+            camada.clearLayers();
+            let coordenadas = [];
+            let distanciaCalculada = 0;
+
+            for (let i = 0; i < rota.length; i++) {
+                let p = rota[i];
+                coordenadas.push([p.lat, p.lon]);
+
+                if (i < rota.length - 1) {
+                    distanciaCalculada += dist(p.lat, p.lon, rota[i+1].lat, rota[i+1].lon);
+                }
+
+                let corPino = (i === 0) ? '#007AFF' : '#555'; 
+                L.circleMarker([p.lat, p.lon], { radius: 5, color: '#fff', fillColor: corPino, fillOpacity: 1, weight: 1 })
+                    .bindTooltip(i === 0 ? "INÍCIO (Stop " + p.stop + ")" : "Stop " + p.stop, { permanent: true, direction: 'right', className: 'stop-label', offset: [5, 0] })
+                    .addTo(camada);
+            }
+
+            if (coordenadas.length > 0) {
+                let polyline = L.polyline(coordenadas, { color: corLinha, weight: 3, opacity: 0.8 }).addTo(camada);
+                mapaLocal.fitBounds(polyline.getBounds(), { padding: [20, 20] });
+            }
+
+            return distanciaCalculada;
+        }
+
+        // --- MOTOR HÍBRIDO DE OTIMIZAÇÃO (Lógica Entregador + Pente Fino) ---
+        function aplicar2Opt(rota) {
+            let melhorou = true;
+            let iteracoes = 0;
+            while (melhorou && iteracoes < 50) {
+                melhorou = false;
+                for (let i = 1; i < rota.length - 2; i++) {
+                    for (let j = i + 1; j < rota.length - 1; j++) {
+                        let dAtual = dist(rota[i-1].lat, rota[i-1].lon, rota[i].lat, rota[i].lon) + dist(rota[j].lat, rota[j].lon, rota[j+1].lat, rota[j+1].lon);
+                        let dNovo = dist(rota[i-1].lat, rota[i-1].lon, rota[j].lat, rota[j].lon) + dist(rota[i].lat, rota[i].lon, rota[j+1].lat, rota[j+1].lon);
+                        if (dNovo < dAtual - 1) { 
+                            let trechoInvertido = rota.slice(i, j + 1).reverse();
+                            rota.splice(i, trechoInvertido.length, ...trechoInvertido);
+                            melhorou = true;
+                        }
+                    }
+                }
+                iteracoes++;
+            }
+            return rota;
+        }
+
+        function gerarRotaOtimizada(rotaBase) {
+            if (rotaBase.length <= 1) return rotaBase;
+            
+            let rotaOtimizada = [];
+            let pendentes = [...rotaBase];
+            let atual = pendentes.shift(); 
+            rotaOtimizada.push(atual);
+
+            while (pendentes.length > 0) {
+                let melhorProximo = null;
+                let menorCusto = Infinity;
+                let indexMelhor = -1;
+                let ruaAtual = atual.ruaPadrao;
+
+                for (let i = 0; i < pendentes.length; i++) {
+                    let candidato = pendentes[i];
+                    let dReta = dist(atual.lat, atual.lon, candidato.lat, candidato.lon);
+                    let custo = dReta;
+
+                    // 1. O MODO A PÉ (Lógica Auditoria: até 100m)
+                    if (dReta <= 100) {
+                        custo = dReta * 0.01; 
+                    } 
+                    // 2. LIMPAR A RUA (Bônus forte)
+                    else if (ruaAtual === candidato.ruaPadrao && ruaAtual !== "DESCONHECIDO") {
+                        custo = dReta * 0.3; 
+                    } 
+                    // 3. RUAS PARALELAS (Bônus leve)
+                    else if (dReta < 80) {
+                        custo = dReta * 0.5; 
+                    }
+
+                    if (custo < menorCusto) {
+                        menorCusto = custo;
+                        melhorProximo = candidato;
+                        indexMelhor = i;
+                    }
+                }
+                rotaOtimizada.push(melhorProximo);
+                pendentes.splice(indexMelhor, 1);
+                atual = melhorProximo;
+            }
+            return aplicar2Opt(rotaOtimizada);
+        }
+
         // --- LEITURA DA PLANILHA ---
         document.getElementById('fileInput').addEventListener('change', function(e) {
+            document.getElementById('btnLabel').style.display = 'none';
+            document.getElementById('loading-msg').style.display = 'block';
+            
             const reader = new FileReader();
             requestWakeLock(); 
 
@@ -197,52 +340,67 @@
 
                     const stopsUnicos = new Set();
 
-                    rotaSpx = json.filter(i => {
+                    // Prepara Rota Original da Shopee
+                    rotaOriginalData = json.filter(i => {
                             let s = i.stop || i.parada || i.sequence;
                             if (!s || isNaN(s) || stopsUnicos.has(s)) return false; 
-                            stopsUnicos.add(s); 
-                            return true;
+                            stopsUnicos.add(s); return true;
                         })
                         .sort((a, b) => (a.stop || a.parada) - (b.stop || b.parada))
                         .map(i => {
                             let s = i.stop || i.parada || i.sequence;
-                            let rawLat = String(i.latitude || i.lat).replace(',', '.');
-                            let rawLon = String(i.longitude || i.lon || i.lng).replace(',', '.');
-                            let primEnd = i["destination address"] || i.endereco || "";
                             return {
-                                lat: parseFloat(rawLat),
-                                lon: parseFloat(rawLon),
-                                ruaPadrao: extrairRuaPadrao(primEnd),
-                                stop: s,
-                                pacotes: contagemVolumes[s],
-                                enderecos: listaEnderecosPorStop[s], 
-                                status: 'neutro',
-                                marker: null
+                                lat: parseFloat(String(i.latitude || i.lat).replace(',', '.')),
+                                lon: parseFloat(String(i.longitude || i.lon || i.lng).replace(',', '.')),
+                                ruaPadrao: extrairRuaPadrao(i["destination address"] || i.endereco),
+                                stop: s, pacotes: contagemVolumes[s], enderecos: listaEnderecosPorStop[s], 
+                                status: 'neutro', marker: null
                             };
                         })
                         .filter(i => !isNaN(i.lat) && !isNaN(i.lon));
 
-                    if (rotaSpx.length > 0) {
-                        document.getElementById('controles-iniciais').style.display = 'none';
-                        document.getElementById('modal-modo').style.display = 'flex';
-                    } else {
-                        alert("Erro: Não encontrei colunas válidas.");
-                    }
+                    if (rotaOriginalData.length === 0) throw new Error("Sem coordenadas válidas.");
+
+                    // Calcula a Otimizada usando a Matemática Ninja
+                    rotaOtimizadaData = gerarRotaOtimizada(rotaOriginalData);
+
+                    // Transição de Telas
+                    document.getElementById('controles-iniciais').style.display = 'none';
+                    document.getElementById('modal-auditoria').style.display = 'flex';
+                    
+                    // Inicia Mapas Auditoria
+                    iniciarMapasAuditoria();
+                    
+                    setTimeout(() => {
+                        mapPadrao.invalidateSize();
+                        mapOtimizado.invalidateSize();
+
+                        let distPadrao = plotarLigacaoAuditoria(layerPadrao, mapPadrao, rotaOriginalData, '#ff4444');
+                        let distOtim = plotarLigacaoAuditoria(layerOtimizado, mapOtimizado, rotaOtimizadaData, '#39FF14');
+
+                        document.getElementById('km-padrao').innerText = `KM Geométrico: ${formatarDistancia(distPadrao)}`;
+                        document.getElementById('km-otimizada').innerText = `KM Geométrico: ${formatarDistancia(distOtim)}`;
+                    }, 400);
+
                 } catch (err) {
                     alert("Erro ao processar planilha: " + err.message);
+                    document.getElementById('loading-msg').style.display = 'none';
+                    document.getElementById('btnLabel').style.display = 'inline-block';
                 }
             };
             reader.readAsBinaryString(e.target.files[0]);
         });
 
-        function iniciarRotaPadrao() {
-            document.getElementById('modal-modo').style.display = 'none';
+        // --- AÇÕES DA AUDITORIA (BOTÕES ACIMA DOS MAPAS) ---
+        function escolherRotaPadrao() {
+            rotaSpx = [...rotaOriginalData];
+            document.getElementById('modal-auditoria').style.display = 'none';
             iniciarInterfaceNavegacao();
         }
 
-        function iniciarRotaOtimizada() {
-            document.getElementById('modal-modo').style.display = 'none';
-            otimizarRota();
+        function escolherRotaOtimizada() {
+            rotaSpx = [...rotaOtimizadaData];
+            document.getElementById('modal-auditoria').style.display = 'none';
             renderizarModoDoca();
             document.getElementById('modal-doca').style.display = 'flex';
         }
@@ -250,6 +408,29 @@
         function iniciarGPSPosDoca() {
             document.getElementById('modal-doca').style.display = 'none';
             iniciarInterfaceNavegacao();
+        }
+
+        // --- FUNÇÕES DE INTERFACE RESTANTES (IDÊNTICAS AO APLICATIVO) ---
+        function renderizarModoDoca() {
+            let container = document.getElementById('lista-bags');
+            container.innerHTML = '';
+            let bagsHtml = '';
+            let bagNum = 1;
+
+            for (let i = 0; i < rotaSpx.length; i += 10) {
+                let lote = rotaSpx.slice(i, i + 10);
+                bagsHtml += `<div class="bag-container"><h3>BAG ${bagNum} (Paradas ${i+1} a ${i+lote.length})</h3>`;
+                lote.forEach(p => {
+                    bagsHtml += `
+                    <div class="bag-item">
+                        <div><strong>[Stop ${p.stop}]</strong><small>${p.ruaPadrao}</small></div>
+                        <div class="bag-vol">${p.pacotes} vol</div>
+                    </div>`;
+                });
+                bagsHtml += `</div>`;
+                bagNum++;
+            }
+            container.innerHTML = bagsHtml;
         }
 
         function abrirMenuStops() {
@@ -289,96 +470,6 @@
             calcularRota();
         }
 
-        // --- PENTE-FINO (2-OPT) ---
-        function aplicar2Opt(rota) {
-            let melhorou = true;
-            let iteracoes = 0;
-            
-            while (melhorou && iteracoes < 50) {
-                melhorou = false;
-                for (let i = 1; i < rota.length - 2; i++) {
-                    for (let j = i + 1; j < rota.length - 1; j++) {
-                        
-                        let dAtual = dist(rota[i-1].lat, rota[i-1].lon, rota[i].lat, rota[i].lon) +
-                                     dist(rota[j].lat, rota[j].lon, rota[j+1].lat, rota[j+1].lon);
-                        
-                        let dNovo = dist(rota[i-1].lat, rota[i-1].lon, rota[j].lat, rota[j].lon) +
-                                    dist(rota[i].lat, rota[i].lon, rota[j+1].lat, rota[j+1].lon);
-
-                        if (dNovo < dAtual - 1) { 
-                            let trechoInvertido = rota.slice(i, j + 1).reverse();
-                            rota.splice(i, trechoInvertido.length, ...trechoInvertido);
-                            melhorou = true;
-                        }
-                    }
-                }
-                iteracoes++;
-            }
-            return rota;
-        }
-
-        // --- MATEMÁTICA DA OTIMIZAÇÃO ---
-        function otimizarRota() {
-            if (rotaSpx.length <= 1) return;
-            
-            let rotaOtimizada = [];
-            let pendentes = [...rotaSpx];
-            let atual = pendentes.shift(); 
-            rotaOtimizada.push(atual);
-
-            while (pendentes.length > 0) {
-                let melhorProximo = null;
-                let menorDistancia = Infinity;
-                let indexMelhor = -1;
-                let ruaAtual = atual.ruaPadrao;
-
-                for (let i = 0; i < pendentes.length; i++) {
-                    let candidato = pendentes[i];
-                    let distReal = dist(atual.lat, atual.lon, candidato.lat, candidato.lon);
-                    let distCalculo = distReal;
-
-                    if (ruaAtual === candidato.ruaPadrao && ruaAtual !== "DESCONHECIDO" && distReal < 300) {
-                        distCalculo = distReal * 0.2; 
-                    } 
-                    else if (distReal < 80) {
-                        distCalculo = distReal * 0.5; 
-                    }
-
-                    if (distCalculo < menorDistancia) {
-                        menorDistancia = distCalculo;
-                        melhorProximo = candidato;
-                        indexMelhor = i;
-                    }
-                }
-                rotaOtimizada.push(melhorProximo);
-                pendentes.splice(indexMelhor, 1);
-                atual = melhorProximo;
-            }
-            rotaSpx = aplicar2Opt(rotaOtimizada);
-        }
-
-        function renderizarModoDoca() {
-            let container = document.getElementById('lista-bags');
-            container.innerHTML = '';
-            let bagsHtml = '';
-            let bagNum = 1;
-
-            for (let i = 0; i < rotaSpx.length; i += 10) {
-                let lote = rotaSpx.slice(i, i + 10);
-                bagsHtml += `<div class="bag-container"><h3>BAG ${bagNum} (Paradas ${i+1} a ${i+lote.length})</h3>`;
-                lote.forEach(p => {
-                    bagsHtml += `
-                    <div class="bag-item">
-                        <div><strong>[Stop ${p.stop}]</strong><small>${p.ruaPadrao}</small></div>
-                        <div class="bag-vol">${p.pacotes} vol</div>
-                    </div>`;
-                });
-                bagsHtml += `</div>`;
-                bagNum++;
-            }
-            container.innerHTML = bagsHtml;
-        }
-
         function iniciarInterfaceNavegacao() {
             document.getElementById('tela-navegacao').style.display = 'flex';
             
@@ -400,14 +491,12 @@
             iniciarGPS();
         }
 
-        // --- CÁLCULO DE ÂNGULO DO CARRO ---
         function calcularAnguloCarro(lat1, lon1, lat2, lon2) {
             const toRad = Math.PI / 180;
             const toDeg = 180 / Math.PI;
             const dLon = (lon2 - lon1) * toRad;
             const y = Math.sin(dLon) * Math.cos(lat2 * toRad);
-            const x = Math.cos(lat1 * toRad) * Math.sin(lat2 * toRad) -
-                      Math.sin(lat1 * toRad) * Math.cos(lat2 * toRad) * Math.cos(dLon);
+            const x = Math.cos(lat1 * toRad) * Math.sin(lat2 * toRad) - Math.sin(lat1 * toRad) * Math.cos(lat2 * toRad) * Math.cos(dLon);
             let brng = Math.atan2(y, x) * toDeg;
             return Math.round((brng + 360) % 360);
         }
@@ -416,15 +505,11 @@
             navigator.geolocation.watchPosition(async pos => {
                 minhaLat = pos.coords.latitude; minhaLon = pos.coords.longitude;
                 
-                // --- INTELIGÊNCIA DE DIREÇÃO (GRAVA O SENTIDO DO CARRO) ---
                 if (pos.coords.speed && pos.coords.speed > 2 && pos.coords.heading !== null && !isNaN(pos.coords.heading)) {
                     headingCarro = Math.round(pos.coords.heading);
-                } 
-                else if (latAntGps !== null && lonAntGps !== null) {
+                } else if (latAntGps !== null && lonAntGps !== null) {
                     let distMovida = dist(latAntGps, lonAntGps, minhaLat, minhaLon);
-                    if (distMovida > 5) { 
-                        headingCarro = calcularAnguloCarro(latAntGps, lonAntGps, minhaLat, minhaLon);
-                    }
+                    if (distMovida > 5) headingCarro = calcularAnguloCarro(latAntGps, lonAntGps, minhaLat, minhaLon);
                 }
                 latAntGps = minhaLat; lonAntGps = minhaLon;
                 
@@ -460,19 +545,13 @@
                 markerDest = L.circleMarker([d.lat, d.lon], { radius: 11, color: '#fff', fillColor: '#007AFF', fillOpacity: 1, weight: 3 }).addTo(mapa);
 
                 let url = `https://router.project-osrm.org/route/v1/driving/${minhaLon},${minhaLat};${d.lon},${d.lat}?steps=true&overview=full&geometries=geojson`;
-                
-                // MÁGICA DA OSRM: Manda o satélite respeitar a frente do carro
-                if (headingCarro !== null) {
-                    url += `&bearings=${headingCarro},60;`; 
-                }
+                if (headingCarro !== null) url += `&bearings=${headingCarro},60;`; 
 
                 let res = await fetch(url);
                 let data = await res.json();
                 
-                // Fallback (Plano B): Se a rua for sem saída e for OBRIGATÓRIO dar ré
                 if (data.code !== 'Ok' && headingCarro !== null) {
-                    const urlFallback = `https://router.project-osrm.org/route/v1/driving/${minhaLon},${minhaLat};${d.lon},${d.lat}?steps=true&overview=full&geometries=geojson`;
-                    res = await fetch(urlFallback);
+                    res = await fetch(`https://router.project-osrm.org/route/v1/driving/${minhaLon},${minhaLat};${d.lon},${d.lat}?steps=true&overview=full&geometries=geojson`);
                     data = await res.json();
                 }
 
@@ -487,9 +566,7 @@
                     if (polylineRota) mapa.removeLayer(polylineRota);
                     polylineRota = L.polyline(route.geometry.coordinates.map(c => [c[1], c[0]]), { color: '#007AFF', weight: 6, opacity: 0.8 }).addTo(mapa);
                 }
-            } catch (e) {
-                console.log("Erro rota", e);
-            }
+            } catch (e) { console.log("Erro rota", e); }
         }
 
         function navegar() {
@@ -522,18 +599,10 @@
             else document.getElementById('seta-icon').innerText = "⬆️";
             
             if (dCurva > distAnteriorCurva + 3 && distAnteriorCurva < 40) {
-                if (idxPasso < passosNavegacao.length - 1) {
-                    idxPasso++;
-                    distAnteriorCurva = Infinity; 
-                }
+                if (idxPasso < passosNavegacao.length - 1) { idxPasso++; distAnteriorCurva = Infinity; }
             } else {
-                if (dCurva < distAnteriorCurva) {
-                    distAnteriorCurva = dCurva;
-                }
-                if (dCurva < 8 && idxPasso < passosNavegacao.length - 1) {
-                    idxPasso++;
-                    distAnteriorCurva = Infinity;
-                }
+                if (dCurva < distAnteriorCurva) distAnteriorCurva = dCurva;
+                if (dCurva < 8 && idxPasso < passosNavegacao.length - 1) { idxPasso++; distAnteriorCurva = Infinity; }
             }
         }
 
@@ -555,14 +624,6 @@
             
             if (idxDestino < rotaSpx.length) calcularRota();
             else { releaseWakeLock(); document.getElementById('rodape-rua').innerText = "ROTA FINALIZADA"; }
-        }
-
-        function dist(la1, lo1, la2, lo2) {
-            const R = 6371000;
-            const dLat = (la2-la1) * Math.PI/180;
-            const dLon = (lo2-lo1) * Math.PI/180;
-            const a = Math.sin(dLat/2)**2 + Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)*Math.sin(dLon/2)**2;
-            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
         }
     </script>
 </body>
