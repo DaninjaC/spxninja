@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SPX Ninja - V3.0 (Auditoria Integrada)</title>
+    <title>SPX Ninja - V3.0 (Auditoria Integrada + Telas de Info)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -20,6 +20,11 @@
         .btn-padrao { background: #ff4444; color: #fff; }
         .btn-otimizada { background: #39FF14; }
         
+        /* NOVO: Caixa de Informações (Telas Intermediárias) */
+        .info-container { background: #111; border: 1px solid #333; border-radius: 10px; padding: 20px; text-align: left; margin-bottom: 25px; line-height: 1.6; font-size: 16px; color: #ccc;}
+        .info-container p { margin-top: 0; margin-bottom: 15px; }
+        .info-container strong { color: #39FF14; }
+
         /* Tela de Doca / Bags */
         .bag-container { background: #111; border: 1px solid #39FF14; border-radius: 10px; margin-bottom: 15px; padding: 15px; text-align: left; }
         .bag-container h3 { margin: 0 0 10px 0; color: #39FF14; border-bottom: 1px solid #333; padding-bottom: 5px;}
@@ -65,7 +70,7 @@
         .stop-label { background: rgba(0,0,0,0.8); color: #fff; border: 1px solid #39FF14; font-weight: bold; padding: 2px 4px; border-radius: 3px; font-size: 10px; }
         .leaflet-tile-container { filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%); }
 
-        /* CSS NOVO: Layout Auditoria Integrada */
+        /* CSS Layout Auditoria Integrada */
         .grid-mapas { display: flex; flex-direction: column; gap: 20px; width: 100%; padding-bottom: 30px; }
         .col-mapa { background: #111; padding: 15px; border-radius: 10px; border: 1px solid #333; }
         .mapa-container { height: 320px; width: 100%; background: #000; border-radius: 8px; margin-top: 10px; border: 1px solid #444;}
@@ -100,6 +105,27 @@
                 <div id="mapa-otimizado" class="mapa-container"></div>
             </div>
         </div>
+    </div>
+
+    <div id="modal-info-padrao" class="modal-fullscreen">
+        <h2>▶️ MODO: ROTA PADRÃO</h2>
+        <div class="info-container">
+            <p>Você escolheu seguir a <strong>sequência original</strong> da transportadora.</p>
+            <p>Neste modo, o aplicativo não altera a ordem dos pacotes. Ele apenas guia você ponto a ponto, respeitando exatamente a lista oficial carregada no sistema.</p>
+            <p><em>(Você pode editar este texto depois no código fonte)</em></p>
+        </div>
+        <button class="btn-modo btn-padrao" onclick="avancarParaGPSPadrao()">INICIAR VIAGEM 🚀</button>
+    </div>
+
+    <div id="modal-info-otimizada" class="modal-fullscreen">
+        <h2>🚀 MODO: OTIMIZADA SPX</h2>
+        <div class="info-container">
+            <p>Você escolheu a <strong>Otimização Inteligente Ninja</strong>.</p>
+            <p>Nosso algoritmo identificou pacotes vizinhos e agrupou entregas na mesma calçada (Raio a Pé). O objetivo é limpar a via de uma só vez, evitando que você retorne para ruas onde já esteve.</p>
+            <p>Na próxima tela, você verá como organizar o seu carro separando os pacotes em "Bags".</p>
+            <p><em>(Você pode editar este texto depois no código fonte)</em></p>
+        </div>
+        <button class="btn-modo btn-otimizada" onclick="avancarParaDocaOtimizada()">IR PARA SEPARAÇÃO (BAGS) 📦</button>
     </div>
 
     <div id="modal-doca" class="modal-fullscreen">
@@ -280,12 +306,15 @@
                     let dReta = dist(atual.lat, atual.lon, candidato.lat, candidato.lon);
                     let custo = dReta;
 
+                    // 1. O MODO A PÉ (Lógica Auditoria: até 100m)
                     if (dReta <= 100) {
                         custo = dReta * 0.01; 
                     } 
+                    // 2. LIMPAR A RUA (Bônus forte)
                     else if (ruaAtual === candidato.ruaPadrao && ruaAtual !== "DESCONHECIDO") {
                         custo = dReta * 0.3; 
                     } 
+                    // 3. RUAS PARALELAS (Bônus leve)
                     else if (dReta < 80) {
                         custo = dReta * 0.5; 
                     }
@@ -337,6 +366,7 @@
 
                     const stopsUnicos = new Set();
 
+                    // Prepara Rota Original da Shopee
                     rotaOriginalData = json.filter(i => {
                             let s = i.stop || i.parada || i.sequence;
                             if (!s || isNaN(s) || stopsUnicos.has(s)) return false; 
@@ -357,11 +387,14 @@
 
                     if (rotaOriginalData.length === 0) throw new Error("Sem coordenadas válidas.");
 
+                    // Calcula a Otimizada usando a Matemática Ninja
                     rotaOtimizadaData = gerarRotaOtimizada(rotaOriginalData);
 
+                    // Transição de Telas
                     document.getElementById('controles-iniciais').style.display = 'none';
                     document.getElementById('modal-auditoria').style.display = 'flex';
                     
+                    // Inicia Mapas Auditoria
                     iniciarMapasAuditoria();
                     
                     setTimeout(() => {
@@ -384,18 +417,28 @@
             reader.readAsBinaryString(e.target.files[0]);
         });
 
-        // --- AÇÕES DA AUDITORIA (BOTÕES ACIMA DOS MAPAS) ---
+        // --- AÇÕES DA AUDITORIA (BOTÕES E TELAS DE INFORMAÇÃO) ---
         function escolherRotaPadrao() {
             rotaSpx = [...rotaOriginalData];
             document.getElementById('modal-auditoria').style.display = 'none';
-            iniciarInterfaceNavegacao();
+            document.getElementById('modal-info-padrao').style.display = 'flex'; // Abre tela info
+        }
+
+        function avancarParaGPSPadrao() {
+            document.getElementById('modal-info-padrao').style.display = 'none';
+            iniciarInterfaceNavegacao(); // Pula Bags e vai pro mapa
         }
 
         function escolherRotaOtimizada() {
             rotaSpx = [...rotaOtimizadaData];
             document.getElementById('modal-auditoria').style.display = 'none';
+            document.getElementById('modal-info-otimizada').style.display = 'flex'; // Abre tela info
+        }
+
+        function avancarParaDocaOtimizada() {
+            document.getElementById('modal-info-otimizada').style.display = 'none';
             renderizarModoDoca();
-            document.getElementById('modal-doca').style.display = 'flex';
+            document.getElementById('modal-doca').style.display = 'flex'; // Vai pra separação
         }
 
         function iniciarGPSPosDoca() {
@@ -409,7 +452,7 @@
             container.innerHTML = '';
             let bagsHtml = '';
             let bagNum = 1;
-            let globalIndex = 1; // NOVO: Contador da ordem exata da entrega
+            let globalIndex = 1;
 
             for (let i = 0; i < rotaSpx.length; i += 10) {
                 let lote = rotaSpx.slice(i, i + 10);
@@ -436,7 +479,6 @@
             rotaSpx.forEach((p, index) => {
                 let corTexto = p.status === 'concluido' ? '#888' : (p.status === 'pendente' ? '#ff6666' : '#fff');
                 
-                // NOVO: Lógica de cor zebrada a cada 10 pacotes
                 let corZebrada = Math.floor(index / 10) % 2 === 0 ? '#2a2a2a' : '#0a0a0a';
                 let corFundo = index === idxDestino ? '#003399' : corZebrada;
                 
@@ -541,7 +583,6 @@
             try {
                 const d = rotaSpx[idxDestino];
                 
-                // NOVO: Adicionado a numeração (Ex: #4) no Badge superior
                 document.getElementById('stop-badge').innerHTML = `<span style="color:#fff;">#${idxDestino + 1}</span> ➔ STOP ${d.stop} <small>(${d.pacotes} vol)</small>`;
                 
                 document.getElementById('lista-enderecos').innerHTML = formatarEnderecos(d.enderecos);
