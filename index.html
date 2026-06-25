@@ -141,9 +141,9 @@
 
     <script>
         // --- Variáveis Globais ---
-        let rotaSpx = []; // A rota ativa selecionada pelo usuário
-        let rotaOriginalData = []; // Guarda a rota Shopee
-        let rotaOtimizadaData = []; // Guarda a rota Matemática
+        let rotaSpx = []; 
+        let rotaOriginalData = []; 
+        let rotaOtimizadaData = []; 
 
         let passosNavegacao = [], idxDestino = 0, idxPasso = 0;
         let minhaLat, minhaLon, mapa, markerUser, markerDest, polylineRota;
@@ -280,15 +280,12 @@
                     let dReta = dist(atual.lat, atual.lon, candidato.lat, candidato.lon);
                     let custo = dReta;
 
-                    // 1. O MODO A PÉ (Lógica Auditoria: até 100m)
                     if (dReta <= 100) {
                         custo = dReta * 0.01; 
                     } 
-                    // 2. LIMPAR A RUA (Bônus forte)
                     else if (ruaAtual === candidato.ruaPadrao && ruaAtual !== "DESCONHECIDO") {
                         custo = dReta * 0.3; 
                     } 
-                    // 3. RUAS PARALELAS (Bônus leve)
                     else if (dReta < 80) {
                         custo = dReta * 0.5; 
                     }
@@ -340,7 +337,6 @@
 
                     const stopsUnicos = new Set();
 
-                    // Prepara Rota Original da Shopee
                     rotaOriginalData = json.filter(i => {
                             let s = i.stop || i.parada || i.sequence;
                             if (!s || isNaN(s) || stopsUnicos.has(s)) return false; 
@@ -361,14 +357,11 @@
 
                     if (rotaOriginalData.length === 0) throw new Error("Sem coordenadas válidas.");
 
-                    // Calcula a Otimizada usando a Matemática Ninja
                     rotaOtimizadaData = gerarRotaOtimizada(rotaOriginalData);
 
-                    // Transição de Telas
                     document.getElementById('controles-iniciais').style.display = 'none';
                     document.getElementById('modal-auditoria').style.display = 'flex';
                     
-                    // Inicia Mapas Auditoria
                     iniciarMapasAuditoria();
                     
                     setTimeout(() => {
@@ -410,22 +403,27 @@
             iniciarInterfaceNavegacao();
         }
 
-        // --- FUNÇÕES DE INTERFACE RESTANTES (IDÊNTICAS AO APLICATIVO) ---
+        // --- FUNÇÕES DE INTERFACE RESTANTES ---
         function renderizarModoDoca() {
             let container = document.getElementById('lista-bags');
             container.innerHTML = '';
             let bagsHtml = '';
             let bagNum = 1;
+            let globalIndex = 1; // NOVO: Contador da ordem exata da entrega
 
             for (let i = 0; i < rotaSpx.length; i += 10) {
                 let lote = rotaSpx.slice(i, i + 10);
-                bagsHtml += `<div class="bag-container"><h3>BAG ${bagNum} (Paradas ${i+1} a ${i+lote.length})</h3>`;
+                bagsHtml += `<div class="bag-container"><h3>BAG ${bagNum} (Pacotes ${i+1} a ${i+lote.length})</h3>`;
                 lote.forEach(p => {
                     bagsHtml += `
                     <div class="bag-item">
-                        <div><strong>[Stop ${p.stop}]</strong><small>${p.ruaPadrao}</small></div>
+                        <div>
+                            <strong><span style="color:#FFCC00;">#${globalIndex}</span> ➔ [Stop ${p.stop}]</strong>
+                            <small>${p.ruaPadrao}</small>
+                        </div>
                         <div class="bag-vol">${p.pacotes} vol</div>
                     </div>`;
+                    globalIndex++;
                 });
                 bagsHtml += `</div>`;
                 bagNum++;
@@ -437,13 +435,18 @@
             let html = '';
             rotaSpx.forEach((p, index) => {
                 let corTexto = p.status === 'concluido' ? '#888' : (p.status === 'pendente' ? '#ff6666' : '#fff');
-                let corFundo = index === idxDestino ? '#003399' : '#111';
+                
+                // NOVO: Lógica de cor zebrada a cada 10 pacotes
+                let corZebrada = Math.floor(index / 10) % 2 === 0 ? '#2a2a2a' : '#0a0a0a';
+                let corFundo = index === idxDestino ? '#003399' : corZebrada;
+                
                 let borda = index === idxDestino ? 'border: 2px solid #39FF14;' : 'border: 1px solid #333;';
                 let iconeStatus = p.status === 'concluido' ? '✅' : (p.status === 'pendente' ? '❌' : (index === idxDestino ? '📍' : '📦'));
 
                 html += `<div style="background:${corFundo}; ${borda} border-radius:10px; padding:15px; margin-bottom:10px; text-align:left; color:${corTexto}; cursor:pointer;" onclick="pularParaStop(${index})">
                     <div style="font-size: 18px; font-weight: bold; margin-bottom: 5px;">
-                        ${iconeStatus} STOP ${p.stop} <span style="float:right; font-size:14px; background:#333; padding:2px 8px; border-radius:10px;">${p.pacotes} vol</span>
+                        ${iconeStatus} <span style="color:#FFCC00;">#${index + 1}</span> ➔ STOP ${p.stop} 
+                        <span style="float:right; font-size:14px; background:#333; padding:2px 8px; border-radius:10px;">${p.pacotes} vol</span>
                     </div>
                     <div style="font-size: 13px; opacity: 0.8;">${p.ruaPadrao}</div>
                 </div>`;
@@ -538,7 +541,9 @@
             try {
                 const d = rotaSpx[idxDestino];
                 
-                document.getElementById('stop-badge').innerText = "STOP " + d.stop + " (" + d.pacotes + " vol)";
+                // NOVO: Adicionado a numeração (Ex: #4) no Badge superior
+                document.getElementById('stop-badge').innerHTML = `<span style="color:#fff;">#${idxDestino + 1}</span> ➔ STOP ${d.stop} <small>(${d.pacotes} vol)</small>`;
+                
                 document.getElementById('lista-enderecos').innerHTML = formatarEnderecos(d.enderecos);
                 
                 if (markerDest) mapa.removeLayer(markerDest);
