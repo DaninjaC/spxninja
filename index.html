@@ -58,7 +58,10 @@
         .btn-check { background: #28a745; }
         .btn-fail { background: #dc3545; }
 
+        /* Estilo da Logo Ninja SPX Centralizada */
         #controles-iniciais { padding: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh;}
+        .logo-ninja-img { display: block; margin: 0 auto 30px auto; height: 150px; width: auto; /* Mantém proporção */ }
+
         .btn-ini { background: #39FF14; color: #000; padding: 20px; border-radius: 12px; font-weight: bold; font-size: 20px; cursor: pointer; text-align: center; width: 90%; max-width: 400px;}
         input[type="file"] { display: none; }
         .stop-label { background: rgba(0,0,0,0.8); color: #fff; border: 1px solid #39FF14; font-weight: bold; padding: 2px 4px; border-radius: 3px; font-size: 10px; }
@@ -68,6 +71,7 @@
 <body>
 
     <div id="controles-iniciais">
+        <img src="ninjaspx.png" alt="SPX Ninja Logo" class="logo-ninja-img">
         <label class="btn-ini" id="btnLabel">
             📦 CARREGAR PLANILHA SPX
             <input type="file" id="fileInput" accept=".xlsx, .xls, .csv">
@@ -413,11 +417,9 @@
                 minhaLat = pos.coords.latitude; minhaLon = pos.coords.longitude;
                 
                 // --- INTELIGÊNCIA DE DIREÇÃO (GRAVA O SENTIDO DO CARRO) ---
-                // Tenta pegar a bússola nativa do celular (quando está mais rápido que 7km/h)
                 if (pos.coords.speed && pos.coords.speed > 2 && pos.coords.heading !== null && !isNaN(pos.coords.heading)) {
                     headingCarro = Math.round(pos.coords.heading);
                 } 
-                // Se estiver devagar/parando, calcula pela diferença das últimas coordenadas
                 else if (latAntGps !== null && lonAntGps !== null) {
                     let distMovida = dist(latAntGps, lonAntGps, minhaLat, minhaLon);
                     if (distMovida > 5) { 
@@ -425,7 +427,6 @@
                     }
                 }
                 latAntGps = minhaLat; lonAntGps = minhaLon;
-                // -----------------------------------------------------------
                 
                 if (!markerUser) {
                     markerUser = L.circleMarker([minhaLat, minhaLon], { color: '#007AFF', fillOpacity: 1, radius: 8, zIndexOffset: 1000 }).addTo(mapa);
@@ -460,7 +461,7 @@
 
                 let url = `https://router.project-osrm.org/route/v1/driving/${minhaLon},${minhaLat};${d.lon},${d.lat}?steps=true&overview=full&geometries=geojson`;
                 
-                // MÁGICA DA OSRM: Manda o satélite respeitar a frente do carro (tolerância de 60 graus)
+                // MÁGICA DA OSRM: Manda o satélite respeitar a frente do carro
                 if (headingCarro !== null) {
                     url += `&bearings=${headingCarro},60;`; 
                 }
@@ -468,7 +469,7 @@
                 let res = await fetch(url);
                 let data = await res.json();
                 
-                // Fallback (Plano B): Se a rua for sem saída e for OBRIGATÓRIO dar ré, ele tenta de novo sem a bússola
+                // Fallback (Plano B): Se a rua for sem saída e for OBRIGATÓRIO dar ré
                 if (data.code !== 'Ok' && headingCarro !== null) {
                     const urlFallback = `https://router.project-osrm.org/route/v1/driving/${minhaLon},${minhaLat};${d.lon},${d.lat}?steps=true&overview=full&geometries=geojson`;
                     res = await fetch(urlFallback);
