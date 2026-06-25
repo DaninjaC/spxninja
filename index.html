@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SPX Ninja - V2.0 Oficial (Inteligência Max)</title>
+    <title>SPX Ninja - V2.0 Oficial (Bússola Integrada)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -127,7 +127,11 @@
         let minhaLat, minhaLon, mapa, markerUser, markerDest, polylineRota;
         let camadaFundo = L.layerGroup(), aguardandoConfirmacao = false, ultimaLatReq, ultimaLonReq;
         let wakeLock = null;
-        let distAnteriorCurva = Infinity; // NOVO: Memória inteligente da curva
+        let distAnteriorCurva = Infinity; 
+        
+        // --- NOVAS VARIÁVEIS DA BÚSSOLA (HEADING) ---
+        let latAntGps = null, lonAntGps = null;
+        let headingCarro = null; 
 
         // --- GESTÃO DE TELA (WAKE LOCK) ---
         async function requestWakeLock() {
@@ -227,7 +231,6 @@
             reader.readAsBinaryString(e.target.files[0]);
         });
 
-        // --- FUNÇÕES DOS MODAIS DE INÍCIO ---
         function iniciarRotaPadrao() {
             document.getElementById('modal-modo').style.display = 'none';
             iniciarInterfaceNavegacao();
@@ -245,7 +248,6 @@
             iniciarInterfaceNavegacao();
         }
 
-        // --- POPUP MENU DE PARADAS ---
         function abrirMenuStops() {
             let html = '';
             rotaSpx.forEach((p, index) => {
@@ -311,7 +313,7 @@
             return rota;
         }
 
-        // --- MATEMÁTICA DA OTIMIZAÇÃO MAX ---
+        // --- MATEMÁTICA DA OTIMIZAÇÃO ---
         function otimizarRota() {
             if (rotaSpx.length <= 1) return;
             
@@ -331,11 +333,9 @@
                     let distReal = dist(atual.lat, atual.lon, candidato.lat, candidato.lon);
                     let distCalculo = distReal;
 
-                    // Bônus de quarteirão (Até 300m na mesma rua)
                     if (ruaAtual === candidato.ruaPadrao && ruaAtual !== "DESCONHECIDO" && distReal < 300) {
                         distCalculo = distReal * 0.2; 
                     } 
-                    // Prioridade para ruas paralelas coladas (até 80m)
                     else if (distReal < 80) {
                         distCalculo = distReal * 0.5; 
                     }
@@ -350,12 +350,9 @@
                 pendentes.splice(indexMelhor, 1);
                 atual = melhorProximo;
             }
-
-            // Passa o pente-fino antes de salvar a rota
             rotaSpx = aplicar2Opt(rotaOtimizada);
         }
 
-        // --- MODO DOCA (SEPARAÇÃO) ---
         function renderizarModoDoca() {
             let container = document.getElementById('lista-bags');
             container.innerHTML = '';
@@ -378,7 +375,6 @@
             container.innerHTML = bagsHtml;
         }
 
-        // --- INICIAR NAVEGAÇÃO RICA ---
         function iniciarInterfaceNavegacao() {
             document.getElementById('tela-navegacao').style.display = 'flex';
             
@@ -400,10 +396,36 @@
             iniciarGPS();
         }
 
-        // --- NAVEGAÇÃO E GPS ---
+        // --- CÁLCULO DE ÂNGULO DO CARRO ---
+        function calcularAnguloCarro(lat1, lon1, lat2, lon2) {
+            const toRad = Math.PI / 180;
+            const toDeg = 180 / Math.PI;
+            const dLon = (lon2 - lon1) * toRad;
+            const y = Math.sin(dLon) * Math.cos(lat2 * toRad);
+            const x = Math.cos(lat1 * toRad) * Math.sin(lat2 * toRad) -
+                      Math.sin(lat1 * toRad) * Math.cos(lat2 * toRad) * Math.cos(dLon);
+            let brng = Math.atan2(y, x) * toDeg;
+            return Math.round((brng + 360) % 360);
+        }
+
         function iniciarGPS() {
             navigator.geolocation.watchPosition(async pos => {
                 minhaLat = pos.coords.latitude; minhaLon = pos.coords.longitude;
+                
+                // --- INTELIGÊNCIA DE DIREÇÃO (GRAVA O SENTIDO DO CARRO) ---
+                // Tenta pegar a bússola nativa do celular (quando está mais rápido que 7km/h)
+                if (pos.coords.speed && pos.coords.speed > 2 && pos.coords.heading !== null && !isNaN(pos.coords.heading)) {
+                    headingCarro = Math.round(pos.coords.heading);
+                } 
+                // Se estiver devagar/parando, calcula pela diferença das últimas coordenadas
+                else if (latAntGps !== null && lonAntGps !== null) {
+                    let distMovida = dist(latAntGps, lonAntGps, minhaLat, minhaLon);
+                    if (distMovida > 5) { 
+                        headingCarro = calcularAnguloCarro(latAntGps, lonAntGps, minhaLat, minhaLon);
+                    }
+                }
+                latAntGps = minhaLat; lonAntGps = minhaLon;
+                // -----------------------------------------------------------
                 
                 if (!markerUser) {
                     markerUser = L.circleMarker([minhaLat, minhaLon], { color: '#007AFF', fillOpacity: 1, radius: 8, zIndexOffset: 1000 }).addTo(mapa);
@@ -436,9 +458,23 @@
                 if (markerDest) mapa.removeLayer(markerDest);
                 markerDest = L.circleMarker([d.lat, d.lon], { radius: 11, color: '#fff', fillColor: '#007AFF', fillOpacity: 1, weight: 3 }).addTo(mapa);
 
-                const url = `https://router.project-osrm.org/route/v1/driving/${minhaLon},${minhaLat};${d.lon},${d.lat}?steps=true&overview=full&geometries=geojson`;
-                const res = await fetch(url);
-                const data = await res.json();
+                let url = `https://router.project-osrm.org/route/v1/driving/${minhaLon},${minhaLat};${d.lon},${d.lat}?steps=true&overview=full&geometries=geojson`;
+                
+                // MÁGICA DA OSRM: Manda o satélite respeitar a frente do carro (tolerância de 60 graus)
+                if (headingCarro !== null) {
+                    url += `&bearings=${headingCarro},60;`; 
+                }
+
+                let res = await fetch(url);
+                let data = await res.json();
+                
+                // Fallback (Plano B): Se a rua for sem saída e for OBRIGATÓRIO dar ré, ele tenta de novo sem a bússola
+                if (data.code !== 'Ok' && headingCarro !== null) {
+                    const urlFallback = `https://router.project-osrm.org/route/v1/driving/${minhaLon},${minhaLat};${d.lon},${d.lat}?steps=true&overview=full&geometries=geojson`;
+                    res = await fetch(urlFallback);
+                    data = await res.json();
+                }
+
                 if (data.routes && data.routes[0]) {
                     const route = data.routes[0];
                     passosNavegacao = route.legs[0].steps.map(s => ({
@@ -446,7 +482,7 @@
                         manobra: s.maneuver.modifier, rua: s.name || "Siga em frente"
                     }));
                     idxPasso = 0;
-                    distAnteriorCurva = Infinity; // NOVO: Reseta a memória ao recalcular
+                    distAnteriorCurva = Infinity; 
                     if (polylineRota) mapa.removeLayer(polylineRota);
                     polylineRota = L.polyline(route.geometry.coordinates.map(c => [c[1], c[0]]), { color: '#007AFF', weight: 6, opacity: 0.8 }).addTo(mapa);
                 }
@@ -484,19 +520,15 @@
             else if (m && m.includes("right")) document.getElementById('seta-icon').innerText = "➡️";
             else document.getElementById('seta-icon').innerText = "⬆️";
             
-            // NOVO: Lógica de Ápice da Curva (Só avança DEPOIS de dobrar a esquina)
             if (dCurva > distAnteriorCurva + 3 && distAnteriorCurva < 40) {
                 if (idxPasso < passosNavegacao.length - 1) {
                     idxPasso++;
                     distAnteriorCurva = Infinity; 
                 }
             } else {
-                // Grava a menor distância para encontrar o ápice
                 if (dCurva < distAnteriorCurva) {
                     distAnteriorCurva = dCurva;
                 }
-                
-                // Trava de segurança: Se cravar em cima do ponto (< 8m), avança.
                 if (dCurva < 8 && idxPasso < passosNavegacao.length - 1) {
                     idxPasso++;
                     distAnteriorCurva = Infinity;
