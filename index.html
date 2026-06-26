@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SPX Ninja - V3.0 (Tráfego Real + Auditoria)</title>
+    <title>SPX Ninja - V4.0 (Fluxo de Trânsito Real)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -75,7 +75,7 @@
             📦 CARREGAR PLANILHA SPX
             <input type="file" id="fileInput" accept=".xlsx, .xls, .csv">
         </label>
-        <div id="loading-msg" style="display:none; color:#FFCC00; font-weight:bold; margin-top:20px; font-size:18px;">⏳ Baixando tráfego real e desenhando asfalto...<br><small>Isso pode levar alguns segundos.</small></div>
+        <div id="loading-msg" style="display:none; color:#FFCC00; font-weight:bold; margin-top:20px; font-size:18px;">⏳ Baixando tráfego real e organizando fluxo...<br><small>Isso pode levar alguns segundos.</small></div>
     </div>
 
     <div id="modal-auditoria" class="modal-fullscreen">
@@ -111,7 +111,7 @@
         <h2>🚀 MODO: OTIMIZADA SPX</h2>
         <div class="info-container">
             <p>Você escolheu a <strong>Otimização Inteligente Ninja</strong>.</p>
-            <p>Nosso algoritmo identificou pacotes vizinhos e agrupou entregas na mesma calçada (Raio a Pé). O sistema consultou o trânsito para limpar as ruas sem forçar retornos longos ou contramãos.</p>
+            <p>Nosso algoritmo agrupou pacotes da mesma rua e usou o satélite para <strong>organizar a rua a favor do trânsito</strong> (evitando contramão e retornos em quarteirões).</p>
             <p>Na próxima tela, você verá como organizar o seu carro separando os pacotes em "Bags".</p>
         </div>
         <button class="btn-modo btn-otimizada" onclick="avancarParaDocaOtimizada()">IR PARA SEPARAÇÃO (BAGS) 📦</button>
@@ -222,7 +222,7 @@
             }
         }
 
-        // --- NOVO: DESENHO DE ASFALTO REAL NA AUDITORIA ---
+        // --- DESENHO DE ASFALTO REAL NA AUDITORIA ---
         async function plotarAsfaltoAuditoria(camada, mapaLocal, rota, corLinha) {
             camada.clearLayers();
             let coordAsfalto = [];
@@ -236,7 +236,6 @@
                     .addTo(camada);
             }
 
-            // Consulta o OSRM para desenhar as ruas e calcular o asfalto real
             const TAMANHO_LOTE = 50;
             for (let i = 0; i < rota.length - 1; i += (TAMANHO_LOTE - 1)) {
                 let lote = rota.slice(i, i + TAMANHO_LOTE);
@@ -261,57 +260,112 @@
             return distanciaCalculada;
         }
 
-        // --- NOVO: MOTOR OTIMIZADO COM MATRIX DE TRÂNSITO ---
+        // --- NOVO MOTOR: FLUXO DE TRÂNSITO (SEM PENTE FINO DE LINHA RETA) ---
         function gerarRotaOtimizadaComMatrix(rotaBase, matrix) {
             if (rotaBase.length <= 1) return rotaBase;
             
-            let rotaOtimizada = [];
-            let pendentes = [...rotaBase];
-            let atual = pendentes.shift(); 
-            rotaOtimizada.push(atual);
+            let inicio = rotaBase[0];
+            let pendentes = rotaBase.slice(1);
+            
+            // 1. Agrupar os pacotes por Rua
+            let gruposPorRua = {};
+            pendentes.forEach(p => {
+                let rua = p.ruaPadrao;
+                if (!gruposPorRua[rua]) gruposPorRua[rua] = [];
+                gruposPorRua[rua].push(p);
+            });
 
-            while (pendentes.length > 0) {
-                let melhorProximo = null;
-                let menorCusto = Infinity;
-                let indexMelhor = -1;
-                let ruaAtual = atual.ruaPadrao;
-
-                for (let i = 0; i < pendentes.length; i++) {
-                    let candidato = pendentes[i];
-                    let dReta = dist(atual.lat, atual.lon, candidato.lat, candidato.lon);
+            // 2. Organizar internamente cada rua (Alinhar o fluxo do carro)
+            let blocos = [];
+            for (let rua in gruposPorRua) {
+                let paradas = gruposPorRua[rua];
+                
+                if (rua === "DESCONHECIDO" || paradas.length === 1) {
+                    paradas.forEach(p => blocos.push([p]));
+                } else {
+                    let melhorOrdem = [];
+                    let menorCustoTotal = Infinity;
                     
-                    // Busca a distância de condução na tabela do satélite
-                    let dDrive = dReta * 1.5; // Padrão se a matrix falhar
-                    if (matrix && matrix[atual.idOriginal] && matrix[atual.idOriginal][candidato.idOriginal] !== null) {
-                        dDrive = matrix[atual.idOriginal][candidato.idOriginal];
+                    // Testa iniciar por cada casa da rua para descobrir qual o "começo" da mão única
+                    for (let i = 0; i < paradas.length; i++) {
+                        let caminho = [paradas[i]];
+                        let naoVisitados = [...paradas];
+                        naoVisitados.splice(i, 1);
+                        let custoCaminho = 0;
+                        let nodoAtual = paradas[i];
+                        
+                        while (naoVisitados.length > 0) {
+                            let melhorProx = null;
+                            let menorD = Infinity;
+                            let idxProx = -1;
+                            
+                            for (let j = 0; j < naoVisitados.length; j++) {
+                                let cand = naoVisitados[j];
+                                let dR = dist(nodoAtual.lat, nodoAtual.lon, cand.lat, cand.lon);
+                                let dD = dR * 1.5; // Backup se não tiver matrix
+                                
+                                if (matrix && matrix[nodoAtual.idOriginal] && matrix[nodoAtual.idOriginal][cand.idOriginal] != null) {
+                                    dD = matrix[nodoAtual.idOriginal][cand.idOriginal];
+                                }
+                                
+                                // O Segredo da Caminhada: Se a casa tá colada (menos de 30m), vai a pé (ignora contramão do GPS)
+                                if (dR < 30) dD = dR * 0.01;
+                                
+                                if (dD < menorD) {
+                                    menorD = dD;
+                                    melhorProx = cand;
+                                    idxProx = j;
+                                }
+                            }
+                            custoCaminho += menorD;
+                            caminho.push(melhorProx);
+                            nodoAtual = melhorProx;
+                            naoVisitados.splice(idxProx, 1);
+                        }
+                        
+                        // Salva a sequência que andou menos de carro (Isso garante que ele seguiu o fluxo correto)
+                        if (custoCaminho < menorCustoTotal) {
+                            menorCustoTotal = custoCaminho;
+                            melhorOrdem = caminho;
+                        }
                     }
+                    blocos.push(melhorOrdem); // Salva o Bloco de Rua perfeitamente ordenado
+                }
+            }
 
-                    let custo = dDrive;
+            // 3. Conectar os Blocos de Rua (Varal Limpo de Bairro a Bairro)
+            let rotaOtimizada = [inicio];
+            let atual = inicio;
 
-                    // 1. O MODO A PÉ (Até 100m atravessando a esquina a pé)
-                    if (dReta <= 100) {
-                        custo = dReta * 0.01; 
-                    } 
-                    // 2. LIMPAR A RUA SEGUINDO O FLUXO DO CARRO
-                    // Só prioriza se o asfalto não for exigir um retorno maluco (ex: menor que 600m)
-                    else if (ruaAtual === candidato.ruaPadrao && ruaAtual !== "DESCONHECIDO" && dDrive < 600) {
-                        custo = dDrive * 0.2; 
-                    } 
-                    // 3. RUAS PARALELAS COLADAS
-                    else if (dReta < 80) {
-                        custo = dDrive * 0.5; 
+            while (blocos.length > 0) {
+                let melhorBlocoIdx = -1;
+                let menorCustoParaBloco = Infinity;
+
+                for (let i = 0; i < blocos.length; i++) {
+                    let bloco = blocos[i];
+                    let pontaDeEntrada = bloco[0]; // A entrada oficial da rua que calculamos
+                    
+                    let dRetaA = dist(atual.lat, atual.lon, pontaDeEntrada.lat, pontaDeEntrada.lon);
+                    let dDriveA = dRetaA * 1.5;
+                    
+                    if (matrix && matrix[atual.idOriginal] && matrix[atual.idOriginal][pontaDeEntrada.idOriginal] != null) {
+                        dDriveA = matrix[atual.idOriginal][pontaDeEntrada.idOriginal];
                     }
+                    
+                    if (dRetaA < 50) dDriveA = dRetaA * 0.01;
 
-                    if (custo < menorCusto) {
-                        menorCusto = custo;
-                        melhorProximo = candidato;
-                        indexMelhor = i;
+                    if (dDriveA < menorCustoParaBloco) {
+                        menorCustoParaBloco = dDriveA;
+                        melhorBlocoIdx = i;
                     }
                 }
-                rotaOtimizada.push(melhorProximo);
-                pendentes.splice(indexMelhor, 1);
-                atual = melhorProximo;
+
+                let blocoEscolhido = blocos[melhorBlocoIdx];
+                rotaOtimizada.push(...blocoEscolhido);
+                atual = blocoEscolhido[blocoEscolhido.length - 1]; // O carro termina na última casa daquele bloco
+                blocos.splice(melhorBlocoIdx, 1);
             }
+
             return rotaOtimizada;
         }
 
@@ -357,7 +411,7 @@
                         .map((i, index) => {
                             let s = i.stop || i.parada || i.sequence;
                             return {
-                                idOriginal: index, // ID para bater com a Matriz
+                                idOriginal: index, 
                                 lat: parseFloat(String(i.latitude || i.lat).replace(',', '.')),
                                 lon: parseFloat(String(i.longitude || i.lon || i.lng).replace(',', '.')),
                                 ruaPadrao: extrairRuaPadrao(i["destination address"] || i.endereco),
@@ -369,9 +423,9 @@
 
                     if (rotaOriginalData.length === 0) throw new Error("Sem coordenadas válidas.");
 
-                    // 1. SOLICITA O TRÂNSITO REAL PARA A OTIMIZAÇÃO (Matrix OSRM)
+                    // 1. Baixa a Matriz de Trânsito do Servidor (Até 100 stops simultâneos)
                     let matrizOSRM = null;
-                    if (rotaOriginalData.length <= 100) { // OSRM público trava acima de 100 pontos
+                    if (rotaOriginalData.length <= 100) { 
                         try {
                             let coords = rotaOriginalData.map(p => `${p.lon},${p.lat}`).join(';');
                             let res = await fetch(`https://router.project-osrm.org/table/v1/driving/${coords}?annotations=distance`);
@@ -387,7 +441,7 @@
                     document.getElementById('modal-auditoria').style.display = 'flex';
                     iniciarMapasAuditoria();
                     
-                    // 3. DESENHA O ASFALTO E MEDE O KM
+                    // 3. DESENHA O ASFALTO E MEDE O KM REAL
                     setTimeout(async () => {
                         mapPadrao.invalidateSize();
                         mapOtimizado.invalidateSize();
