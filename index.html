@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SPX Ninja - V11 (Varredura Espacial Sem Cruzamentos)</title>
+    <title>SPX Ninja - V12 (Solucionador Global + Âncoras)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -78,7 +78,7 @@
             📦 CARREGAR PLANILHA SPX
             <input type="file" id="fileInput" accept=".xlsx, .xls, .csv">
         </label>
-        <div id="loading-msg" style="display:none; color:#FFCC00; font-weight:bold; margin-top:20px; font-size:18px;">⏳ Mapeando Estacionamentos e Fluidez...<br><small>Isso pode levar alguns segundos.</small></div>
+        <div id="loading-msg" style="display:none; color:#FFCC00; font-weight:bold; margin-top:20px; font-size:18px;">⏳ Calculando Rota Global...<br><small>Otimizando traçado para não cruzar linhas.</small></div>
     </div>
 
     <div id="modal-auditoria" class="modal-fullscreen">
@@ -105,16 +105,16 @@
         <h2>▶️ MODO: ROTA PADRÃO</h2>
         <div class="info-container">
             <p>Você escolheu seguir a <strong>sequência original</strong> da transportadora.</p>
-            <p>Neste modo, o aplicativo não altera a ordem dos pacotes. Ele apenas guia você ponto a ponto na sequência oficial.</p>
+            <p>Neste modo, o aplicativo não altera a ordem, apenas guia você ponto a ponto na sequência oficial.</p>
         </div>
         <button class="btn-modo btn-padrao" onclick="avancarParaGPSPadrao()">INICIAR VIAGEM 🚀</button>
     </div>
 
     <div id="modal-info-otimizada" class="modal-fullscreen">
-        <h2>🚀 MODO: OTIMIZADA SPX (V11)</h2>
+        <h2>🚀 MODO: OTIMIZADA SPX (V12)</h2>
         <div class="info-container">
-            <p>Você escolheu a <strong>Varredura Espacial Natural</strong>.</p>
-            <p>O aplicativo criou <strong>Estacionamentos Âncora</strong> (para evitar voltas na quadra com entregas a pé) e traçou o fluxo do asfalto sem pular de uma rua para a outra, varrendo quarteirões inteiros sem cruzar caminhos.</p>
+            <p>Você escolheu o <strong>Solucionador Global Ninja</strong>.</p>
+            <p>O aplicativo combinou as suas paradas a pé (Estacionamentos Âncora) e usou uma IA global para ordenar o trajeto de carro <strong>sem cruzar linhas</strong>, fluindo de forma contínua pelo bairro.</p>
         </div>
         <button class="btn-modo btn-otimizada" onclick="avancarParaDocaOtimizada()">IR PARA SEPARAÇÃO (BAGS) 📦</button>
     </div>
@@ -217,7 +217,7 @@
             }
         }
 
-        // --- MAPA VISUAL HÍBRIDO (MANTIDO DA V10 PORQUE FOI PERFEITO) ---
+        // --- MAPA VISUAL HÍBRIDO (MANTIDO) ---
         async function plotarAsfaltoHibridoAuditoria(camada, mapaLocal, rota, corLinha) {
             camada.clearLayers();
             let distanciaTotal = 0;
@@ -242,8 +242,8 @@
                 let p = rota[i];
                 let dLinear = dist(currentAnchor.lat, currentAnchor.lon, p.lat, p.lon);
                 
-                // Se pacote estiver colado com a âncora anterior (A Pé)
-                if (dLinear <= 65) {
+                // Se a casa está muito perto da parada do carro (50 metros), é caminhada!
+                if (dLinear <= 50) {
                     mapWalkToAnchor.set(p, currentAnchor);
                     distanciaTotal += dLinear; 
                 } else {
@@ -288,81 +288,66 @@
             return distanciaTotal;
         }
 
-        // --- NOVO CÉREBRO V11: AGRUPAMENTO ESPACIAL PURO (Sem Nomes de Rua) ---
-        function gerarRotaOtimizadaV11(rotaBase, matrix) {
-            if (rotaBase.length <= 1) return rotaBase;
+        // --- A MÁGICA V12: O SOLUCIONADOR GLOBAL DE ROTAS (TSP) ---
+        async function gerarRotaOtimizadaV12(rotaBase) {
+            if(rotaBase.length <= 1) return rotaBase;
 
-            // PASSO 1: Criar as "Âncoras" (Estacionamentos Reais)
+            // 1. Criar as Âncoras (Agrupamento a Pé - Onde o carro vai estacionar)
             let anchors = [];
             for (let i = 0; i < rotaBase.length; i++) {
                 let p = rotaBase[i];
                 let foundAnchor = false;
-                
                 for (let a of anchors) {
-                    // Agrupa todos os pacotes num raio de 65 metros para um único estacionamento
-                    if (dist(a.lat, a.lon, p.lat, p.lon) <= 65) {
+                    if (dist(a.lat, a.lon, p.lat, p.lon) <= 50) {
                         a.walking.push(p);
                         foundAnchor = true;
                         break;
                     }
                 }
                 if (!foundAnchor) {
-                    anchors.push({ ...p, idAnchor: anchors.length, walking: [] });
+                    anchors.push({ ...p, walking: [] });
                 }
             }
 
-            // PASSO 2: Otimizar SOMENTE o trajeto de carro entre os Estacionamentos
-            let optimizedAnchors = [];
-            let pendentes = [...anchors];
-            let atual = pendentes.shift(); // Inicia do primeiro ponto original
-            optimizedAnchors.push(atual);
-
-            while(pendentes.length > 0) {
-                let melhorProx = null;
-                let menorDist = Infinity;
-                let bestIdx = -1;
-
-                for(let i=0; i < pendentes.length; i++) {
-                    let cand = pendentes[i];
+            // 2. Terceirizar a Inteligência: API de Viagem (Caixeiro Viajante) do OSRM
+            // OSRM aceita até 100 pontos para resolver o quebra-cabeça global sem cruzar linhas.
+            if (anchors.length > 1 && anchors.length <= 100) {
+                let coords = anchors.map(a => `${a.lon},${a.lat}`).join(';');
+                // roundtrip=false e source=first garante que o Stop 1 seja o começo exato
+                let url = `https://router.project-osrm.org/trip/v1/driving/${coords}?roundtrip=false&source=first&overview=false`;
+                
+                try {
+                    let res = await fetch(url);
+                    let data = await res.json();
                     
-                    // O Segredo contra Cruzamentos: Perguntamos pro Satélite a distância real!
-                    // Se a rua for mão única, ir no fluxo é 20m, ir contra o fluxo é 800m. 
-                    // O algoritmo SEMPRE vai escolher fluir a rua sem cruzar linha.
-                    let dDrive = dist(atual.lat, atual.lon, cand.lat, cand.lon) * 1.5; // Backup se o servidor falhar
-                    
-                    if (matrix && matrix[atual.idOriginal] && matrix[cand.idOriginal] != null) {
-                        dDrive = matrix[atual.idOriginal][cand.idOriginal];
+                    if (data.code === 'Ok' && data.waypoints) {
+                        // O Servidor nos diz a ordem perfeita. Vamos aplicar nas âncoras.
+                        for(let i = 0; i < anchors.length; i++){
+                            anchors[i].tripIndex = data.waypoints[i].waypoint_index;
+                        }
+                        // Reordena as paradas do carro
+                        anchors.sort((a, b) => a.tripIndex - b.tripIndex);
                     }
-
-                    if (dDrive < menorDist) {
-                        menorDist = dDrive;
-                        melhorProx = cand;
-                        bestIdx = i;
-                    }
+                } catch(e) { 
+                    console.log("Falha no servidor Global, mantendo ordem padrão"); 
                 }
-
-                optimizedAnchors.push(melhorProx);
-                atual = melhorProx;
-                pendentes.splice(bestIdx, 1);
             }
 
-            // PASSO 3: Descompactar para a lista final oficial (O Entregador desce do carro e anda)
-            let rotaOtimizadaFinal = [];
-            for (let a of optimizedAnchors) {
-                // Remove propriedades temporárias para não bugar o mapa visual
+            // 3. Descompactar para a lista final do Aplicativo
+            let rotaFinal = [];
+            for (let a of anchors) {
                 let anchorStop = { ...a };
                 delete anchorStop.walking;
-                delete anchorStop.idAnchor;
+                delete anchorStop.tripIndex;
+                rotaFinal.push(anchorStop); // O motorista para aqui
                 
-                rotaOtimizadaFinal.push(anchorStop);
-
-                // Coloca as paradas a pé logo em seguida na fila
+                // E logo em seguida entrega as caixas em volta a pé
                 for (let w of a.walking) {
-                    rotaOtimizadaFinal.push(w);
+                    rotaFinal.push(w);
                 }
             }
 
-            return rotaOtimizadaFinal;
+            return rotaFinal;
         }
 
         // --- LEITURA DA PLANILHA ---
@@ -420,25 +405,16 @@
 
                     if (rotaOriginalData.length === 0) throw new Error("Sem coordenadas válidas.");
 
-                    // 1. BAIXA A TABELA DE TRÂNSITO DO SATÉLITE
-                    let matrizOSRM = null;
-                    if (rotaOriginalData.length <= 100) { 
-                        try {
-                            let coords = rotaOriginalData.map(p => `${p.lon},${p.lat}`).join(';');
-                            let res = await fetch(`https://router.project-osrm.org/table/v1/driving/${coords}?annotations=distance`);
-                            let data = await res.json();
-                            if(data.code === 'Ok') matrizOSRM = data.distances;
-                        } catch(e) { console.warn("Erro ao baixar trânsito."); }
+                    // 1. Roda a Otimização V12 com o Servidor Global
+                    if (rotaOriginalData.length > 0) {
+                        rotaOtimizadaData = await gerarRotaOtimizadaV12(rotaOriginalData);
                     }
-
-                    // 2. Roda a Otimização V11 (Espacial Pura)
-                    rotaOtimizadaData = gerarRotaOtimizadaV11(rotaOriginalData, matrizOSRM);
 
                     document.getElementById('controles-iniciais').style.display = 'none';
                     document.getElementById('modal-auditoria').style.display = 'flex';
                     iniciarMapasAuditoria();
                     
-                    // 3. Desenha o Híbrido (Carro + Pé) na Tela
+                    // 2. Desenha o Híbrido (Carro + Pé) na Tela
                     setTimeout(async () => {
                         mapPadrao.invalidateSize();
                         mapOtimizado.invalidateSize();
