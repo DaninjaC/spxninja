@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SPX Ninja - V9.0 (Varredura Contínua Perfeita)</title>
+    <title>SPX Ninja - V10 (Híbrido Definitivo - Carro + Pé)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -65,6 +65,10 @@
         .grid-mapas { display: flex; flex-direction: column; gap: 20px; width: 100%; padding-bottom: 30px; }
         .col-mapa { background: #111; padding: 15px; border-radius: 10px; border: 1px solid #333; }
         .mapa-container { height: 320px; width: 100%; background: #000; border-radius: 8px; margin-top: 10px; border: 1px solid #444;}
+        
+        /* Legenda de Carro vs A Pé */
+        .legenda { font-size: 13px; color: #ddd; margin-top: 8px; text-align: left; font-weight: bold; padding-bottom: 5px;}
+        .legenda span { display: inline-block; width: 25px; height: 4px; margin-right: 5px; vertical-align: middle;}
     </style>
 </head>
 <body>
@@ -75,7 +79,7 @@
             📦 CARREGAR PLANILHA SPX
             <input type="file" id="fileInput" accept=".xlsx, .xls, .csv">
         </label>
-        <div id="loading-msg" style="display:none; color:#FFCC00; font-weight:bold; margin-top:20px; font-size:18px;">⏳ Construindo Rota Contínua...<br><small>Alinhando as ruas e desenhando asfalto.</small></div>
+        <div id="loading-msg" style="display:none; color:#FFCC00; font-weight:bold; margin-top:20px; font-size:18px;">⏳ Aplicando Bússola e Âncoras...<br><small>Isso pode levar alguns segundos.</small></div>
     </div>
 
     <div id="modal-auditoria" class="modal-fullscreen">
@@ -83,14 +87,17 @@
         <div class="grid-mapas">
             <div class="col-mapa">
                 <button class="btn-modo btn-padrao" onclick="escolherRotaPadrao()">
-                    ▶️ ROTA PADRÃO SHOPEE<br><small id="km-padrao" style="font-weight:normal;">Asfalto Contínuo: Calculando...</small>
+                    ▶️ ROTA PADRÃO SHOPEE<br><small id="km-padrao" style="font-weight:normal;">Realidade (Carro + Pé): Calculando...</small>
                 </button>
+                <div class="legenda"><span style="background: #ff4444;"></span> Carro &nbsp;&nbsp; | &nbsp;&nbsp; <span style="background: #FFCC00; border-bottom: 3px dashed #000; height: 1px;"></span> A Pé</div>
                 <div id="mapa-padrao" class="mapa-container"></div>
             </div>
+            
             <div class="col-mapa">
                 <button class="btn-modo btn-otimizada" onclick="escolherRotaOtimizada()">
-                    🚀 OTIMIZADA SPX NINJA<br><small id="km-otimizada" style="font-weight:normal;">Asfalto Contínuo: Calculando...</small>
+                    🚀 OTIMIZADA SPX NINJA<br><small id="km-otimizada" style="font-weight:normal;">Realidade (Carro + Pé): Calculando...</small>
                 </button>
+                <div class="legenda"><span style="background: #39FF14;"></span> Carro &nbsp;&nbsp; | &nbsp;&nbsp; <span style="background: #FFCC00; border-bottom: 3px dashed #000; height: 1px;"></span> A Pé</div>
                 <div id="mapa-otimizado" class="mapa-container"></div>
             </div>
         </div>
@@ -100,16 +107,17 @@
         <h2>▶️ MODO: ROTA PADRÃO</h2>
         <div class="info-container">
             <p>Você escolheu seguir a <strong>sequência original</strong> da transportadora.</p>
-            <p>O aplicativo não altera a ordem, apenas guia você ponto a ponto.</p>
+            <p>Neste modo, o aplicativo não altera a ordem dos pacotes. Ele apenas guia você ponto a ponto na sequência oficial.</p>
         </div>
         <button class="btn-modo btn-padrao" onclick="avancarParaGPSPadrao()">INICIAR VIAGEM 🚀</button>
     </div>
 
     <div id="modal-info-otimizada" class="modal-fullscreen">
-        <h2>🚀 MODO: OTIMIZADA SPX</h2>
+        <h2>🚀 MODO: OTIMIZADA SPX (V10 Híbrida)</h2>
         <div class="info-container">
-            <p>Você escolheu a <strong>Varredura Contínua V9</strong>.</p>
-            <p>O algoritmo entra pelas <strong>extremidades das ruas</strong> e as varre em linha reta como um zíper. Ele só abandona a rua se o próximo pacote estiver muito distante, priorizando travessas próximas e acabando com os retornos.</p>
+            <p>Você escolheu o algoritmo definitivo de <strong>Varredura com Bússola</strong>.</p>
+            <p>O aplicativo agrupou pacotes da mesma rua e usou a ordem original apenas para <strong>garantir a mão do trânsito</strong> sem criar voltas falsas.</p>
+            <p>Abaixo, separe os pacotes pelas <strong>Bags</strong> na ordem da lista.</p>
         </div>
         <button class="btn-modo btn-otimizada" onclick="avancarParaDocaOtimizada()">IR PARA SEPARAÇÃO (BAGS) 📦</button>
     </div>
@@ -169,7 +177,6 @@
             if (wakeLock !== null) { wakeLock.release(); wakeLock = null; }
         }
 
-        // Matemática
         function dist(la1, lo1, la2, lo2) {
             const R = 6371000;
             const dLat = (la2-la1) * Math.PI/180;
@@ -213,127 +220,134 @@
             }
         }
 
-        // --- DESENHO DE ASFALTO CONTÍNUO (Sem Desconexões) ---
-        async function plotarAsfaltoContinuo(camada, mapaLocal, rota, corLinha) {
+        // --- A MÁGICA VISUAL: ESTACIONAMENTO ÂNCORA (Fim do Paradoxo da Calçada) ---
+        async function plotarAsfaltoHibridoAuditoria(camada, mapaLocal, rota, corLinha) {
             camada.clearLayers();
-            let coordFinal = [];
-            let distTotal = 0;
+            let distanciaTotal = 0;
+            let boundsCoords = [];
 
-            // Plota os pontos
+            if (rota.length === 0) return 0;
+
+            // 1. Plotar os pinos na tela
             for (let i = 0; i < rota.length; i++) {
                 let p = rota[i];
+                boundsCoords.push([p.lat, p.lon]);
                 let corPino = (i === 0) ? '#007AFF' : '#555'; 
                 L.circleMarker([p.lat, p.lon], { radius: 5, color: '#fff', fillColor: corPino, fillOpacity: 1, weight: 1 })
                     .bindTooltip(i === 0 ? "INÍCIO (Stop " + p.stop + ")" : "Stop " + p.stop, { permanent: true, direction: 'right', className: 'stop-label', offset: [5, 0] })
                     .addTo(camada);
             }
 
-            // Manda blocos sobrepostos para o servidor, garantindo que as linhas fiquem 100% conectadas
-            let loteSize = 25;
-            for (let i = 0; i < rota.length - 1; i += (loteSize - 1)) {
-                let lote = rota.slice(i, i + loteSize);
-                let coords = lote.map(p => `${p.lon},${p.lat}`).join(';');
+            // 2. Lógica de Estacionamento Âncora (Onde o carro realmente para)
+            let anchors = [rota[0]];
+            let mapWalkToAnchor = new Map(); 
+            let currentAnchor = rota[0];
+
+            for (let i = 1; i < rota.length; i++) {
+                let p = rota[i];
+                let dLinear = dist(currentAnchor.lat, currentAnchor.lon, p.lat, p.lon);
+                
+                // Se o pacote está a mais de 60 metros, o entregador entra no carro e dirige até lá. (Nova Âncora)
+                if (dLinear > 60) {
+                    anchors.push(p);
+                    currentAnchor = p;
+                } else {
+                    // Se o pacote está perto (< 60m), ele faz a pé!
+                    mapWalkToAnchor.set(p, currentAnchor);
+                    distanciaTotal += dLinear; 
+                }
+            }
+
+            // 3. Desenhar o trajeto a pé (Linha Amarela Tracejada)
+            mapWalkToAnchor.forEach((anchor, p) => {
+                L.polyline([[anchor.lat, anchor.lon], [p.lat, p.lon]], { color: '#FFCC00', weight: 3, dashArray: '5, 8', opacity: 1 }).addTo(camada);
+            });
+
+            // 4. Traçar a Rota de Carro no Asfalto (Apenas entre as âncoras!)
+            let coordAsfalto = [];
+            const TAMANHO_LOTE = 40; 
+            for (let i = 0; i < anchors.length - 1; i += (TAMANHO_LOTE - 1)) {
+                let lote = anchors.slice(i, i + TAMANHO_LOTE);
+                let stringCoords = lote.map(p => `${p.lon},${p.lat}`).join(';');
                 try {
-                    let res = await fetch(`https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson`);
+                    let url = `https://router.project-osrm.org/route/v1/driving/${stringCoords}?overview=full&geometries=geojson`;
+                    let res = await fetch(url);
                     let data = await res.json();
                     if (data.routes && data.routes[0]) {
-                        distTotal += data.routes[0].distance;
-                        let c = data.routes[0].geometry.coordinates.map(pt => [pt[1], pt[0]]);
-                        coordFinal.push(...c);
+                        distanciaTotal += data.routes[0].distance;
+                        let coordsMapeadas = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+                        coordAsfalto.push(...coordsMapeadas);
                     } else {
-                        // Se falhar, liga direto para não perder o ponto
-                        coordFinal.push(...lote.map(p => [p.lat, p.lon]));
+                        coordAsfalto.push(...lote.map(p => [p.lat, p.lon]));
                     }
                 } catch (e) {
-                    coordFinal.push(...lote.map(p => [p.lat, p.lon]));
+                    coordAsfalto.push(...lote.map(p => [p.lat, p.lon]));
                 }
             }
 
-            if (coordFinal.length > 0) {
-                let polyline = L.polyline(coordFinal, { color: corLinha, weight: 4, opacity: 0.8 }).addTo(camada);
-                mapaLocal.fitBounds(polyline.getBounds(), { padding: [20, 20] });
+            // 5. Renderizar o trajeto do carro
+            if (coordAsfalto.length > 0) {
+                L.polyline(coordAsfalto, { color: corLinha, weight: 4, opacity: 0.9 }).addTo(camada);
             }
 
-            return distTotal;
-        }
-
-        // --- A MÁGICA: O MOTOR V9 (VARREDURA PELAS EXTREMIDADES DA RUA) ---
-        // Função para achar as duas casas mais distantes numa rua (As Pontas)
-        function getExtremosDaRua(pontosDaRua) {
-            if (pontosDaRua.length <= 1) return { a: pontosDaRua[0], b: pontosDaRua[0] };
-            let maxD = -1, pA = pontosDaRua[0], pB = pontosDaRua[0];
-            for(let i=0; i<pontosDaRua.length; i++){
-                for(let j=i+1; j<pontosDaRua.length; j++){
-                    let d = dist(pontosDaRua[i].lat, pontosDaRua[i].lon, pontosDaRua[j].lat, pontosDaRua[j].lon);
-                    if(d > maxD) { maxD = d; pA = pontosDaRua[i]; pB = pontosDaRua[j]; }
-                }
+            if (boundsCoords.length > 0) {
+                mapaLocal.fitBounds(L.polyline(boundsCoords).getBounds(), { padding: [30, 30] });
             }
-            return { a: pA, b: pB };
+
+            return distanciaTotal;
         }
 
-        function gerarRotaVarreduraContinua(rotaBase) {
+        // --- A MÁGICA MATEMÁTICA V10: OTIMIZAÇÃO HÍBRIDA (Bússola Shopee) ---
+        function gerarRotaOtimizadaHibrida(rotaBase) {
             if (rotaBase.length <= 1) return rotaBase;
             
-            let pendentes = [...rotaBase];
-            let rota = [pendentes.shift()]; // O Stop 1 é o início sagrado
+            let rotaOtimizada = [];
+            let pendentes = [...rotaBase]; 
             
+            let atual = pendentes.shift(); 
+            rotaOtimizada.push(atual);
+
             while (pendentes.length > 0) {
-                let atual = rota[rota.length - 1]; // Ponto onde o carro está agora
-                
-                // 1. O carro já está em uma rua. Tem pacotes pendentes nessa mesma rua perto?
-                let pacotesMesmaRua = pendentes.filter(p => p.ruaPadrao === atual.ruaPadrao && p.ruaPadrao !== "DESCONHECIDO");
-                
-                let proxMesmaRua = null;
-                let menorDMesmaRua = Infinity;
-                for(let p of pacotesMesmaRua) {
-                    let d = dist(atual.lat, atual.lon, p.lat, p.lon);
-                    if(d < menorDMesmaRua) { menorDMesmaRua = d; proxMesmaRua = p; }
+                let melhorProximo = null;
+                let menorCusto = Infinity;
+                let indexMelhor = -1;
+
+                // 1. Qual é o pacote mais próximo do carro agora?
+                for (let i = 0; i < pendentes.length; i++) {
+                    let cand = pendentes[i];
+                    let dReta = dist(atual.lat, atual.lon, cand.lat, cand.lon);
+                    
+                    if (dReta < menorCusto) {
+                        menorCusto = dReta;
+                        melhorProximo = cand;
+                        indexMelhor = i;
+                    }
                 }
                 
-                // Se achou uma casa na mesma rua a menos de 600m, continua a varredura perfeitamente!
-                if (proxMesmaRua && menorDMesmaRua < 600) {
-                    rota.push(proxMesmaRua);
-                    pendentes = pendentes.filter(p => p !== proxMesmaRua);
-                } 
-                // 2. Acabou a rua (ou o próximo fica a 3km de distância). Hora de PULAR para outra rua!
-                else {
-                    // Agrupa todos os pacotes que restam pelas suas ruas
-                    let ruasAgrupadas = {};
-                    for(let p of pendentes) {
-                        if (!ruasAgrupadas[p.ruaPadrao]) ruasAgrupadas[p.ruaPadrao] = [];
-                        ruasAgrupadas[p.ruaPadrao].push(p);
-                    }
-
-                    let melhorProxSalto = null;
-                    let menorDistanciaSalto = Infinity;
-
-                    for(let nomeRua in ruasAgrupadas) {
-                        let pontosNaRua = ruasAgrupadas[nomeRua];
-                        
-                        if (nomeRua === "DESCONHECIDO") {
-                            for(let p of pontosNaRua) {
-                                let d = dist(atual.lat, atual.lon, p.lat, p.lon);
-                                if (d < menorDistanciaSalto) { menorDistanciaSalto = d; melhorProxSalto = p; }
-                            }
-                        } else {
-                            // AQUI ESTÁ O SEGREDO: O algoritmo NÃO DEIXA entrar na rua pelo meio!
-                            // Ele descobre os extremos da rua e só calcula a distância para eles.
-                            let extremos = getExtremosDaRua(pontosNaRua);
-                            let distParaExtremoA = dist(atual.lat, atual.lon, extremos.a.lat, extremos.a.lon);
-                            let distParaExtremoB = dist(atual.lat, atual.lon, extremos.b.lat, extremos.b.lon);
-                            
-                            if (distParaExtremoA < menorDistanciaSalto) { menorDistanciaSalto = distParaExtremoA; melhorProxSalto = extremos.a; }
-                            if (distParaExtremoB < menorDistanciaSalto) { menorDistanciaSalto = distParaExtremoB; melhorProxSalto = extremos.b; }
-                        }
-                    }
+                let ruaDestino = melhorProximo.ruaPadrao;
+                
+                // 2. Se a rua tem nome, pega TODOS os pacotes dela em um raio seguro (evita juntar a ponta norte com a ponta sul da cidade)
+                if (ruaDestino !== "DESCONHECIDO") {
+                    let pacotesRua = pendentes.filter(p => p.ruaPadrao === ruaDestino && dist(melhorProximo.lat, melhorProximo.lon, p.lat, p.lon) < 600);
                     
-                    // Pula exatamente para a Ponta da rua mais próxima
-                    rota.push(melhorProxSalto);
-                    pendentes = pendentes.filter(p => p !== melhorProxSalto);
+                    // 3. A BÚSSOLA OCULTA: Ordena os pacotes da rua pela Ordem Original da Shopee (idOriginal)
+                    // Isso GARANTE que o carro vai entrar pelo lado certo da rua e seguir a mão única, sem causar retornos!
+                    pacotesRua.sort((a, b) => a.idOriginal - b.idOriginal);
+                    
+                    rotaOtimizada.push(...pacotesRua);
+                    atual = pacotesRua[pacotesRua.length - 1]; // O carro termina na última casa da rua
+                    
+                    // Remove do pendentes
+                    pendentes = pendentes.filter(p => !pacotesRua.includes(p));
+                } else {
+                    // Rua sem nome, vai pulando de um em um
+                    rotaOtimizada.push(melhorProximo);
+                    pendentes.splice(indexMelhor, 1);
+                    atual = melhorProximo;
                 }
             }
             
-            return rota;
+            return rotaOtimizada;
         }
 
         // --- LEITURA DA PLANILHA ---
@@ -379,7 +393,7 @@
                         .map((i, index) => {
                             let s = i.stop || i.parada || i.sequence;
                             return {
-                                idOriginal: index, 
+                                idOriginal: index, // A BÚSSOLA OCULTA: Salva a ordem exata em que a Shopee montou a lista
                                 lat: parseFloat(String(i.latitude || i.lat).replace(',', '.')),
                                 lon: parseFloat(String(i.longitude || i.lon || i.lng).replace(',', '.')),
                                 ruaPadrao: extrairRuaPadrao(i["destination address"] || i.endereco),
@@ -391,23 +405,23 @@
 
                     if (rotaOriginalData.length === 0) throw new Error("Sem coordenadas válidas.");
 
-                    // 1. Roda a Otimização Definitiva V9 (Varredura Contínua)
-                    rotaOtimizadaData = gerarRotaVarreduraContinua(rotaOriginalData);
+                    // 1. Roda a Otimização Híbrida
+                    rotaOtimizadaData = gerarRotaOtimizadaHibrida(rotaOriginalData);
 
                     document.getElementById('controles-iniciais').style.display = 'none';
                     document.getElementById('modal-auditoria').style.display = 'flex';
                     iniciarMapasAuditoria();
                     
-                    // 2. Desenha o Asfalto Real e Contínuo
+                    // 2. Desenha o mapa híbrido (Carro verde + Passos amarelos)
                     setTimeout(async () => {
                         mapPadrao.invalidateSize();
                         mapOtimizado.invalidateSize();
 
-                        let distPadrao = await plotarAsfaltoContinuo(layerPadrao, mapPadrao, rotaOriginalData, '#ff4444');
-                        let distOtim = await plotarAsfaltoContinuo(layerOtimizado, mapOtimizado, rotaOtimizadaData, '#39FF14');
+                        let distPadrao = await plotarAsfaltoHibridoAuditoria(layerPadrao, mapPadrao, rotaOriginalData, '#ff4444');
+                        let distOtim = await plotarAsfaltoHibridoAuditoria(layerOtimizado, mapOtimizado, rotaOtimizadaData, '#39FF14');
 
-                        document.getElementById('km-padrao').innerText = `Asfalto Contínuo: ${formatarDistancia(distPadrao)}`;
-                        document.getElementById('km-otimizada').innerText = `Asfalto Contínuo: ${formatarDistancia(distOtim)}`;
+                        document.getElementById('km-padrao').innerText = `Realidade (Carro + Pé): ${formatarDistancia(distPadrao)}`;
+                        document.getElementById('km-otimizada').innerText = `Realidade (Carro + Pé): ${formatarDistancia(distOtim)}`;
                     }, 200);
 
                 } catch (err) {
@@ -419,6 +433,7 @@
             reader.readAsBinaryString(e.target.files[0]);
         });
 
+        // --- AÇÕES DA AUDITORIA ---
         function escolherRotaPadrao() {
             rotaSpx = [...rotaOriginalData];
             document.getElementById('modal-auditoria').style.display = 'none';
@@ -447,6 +462,7 @@
             iniciarInterfaceNavegacao();
         }
 
+        // --- FUNÇÕES DE INTERFACE RESTANTES ---
         function renderizarModoDoca() {
             let container = document.getElementById('lista-bags');
             container.innerHTML = '';
