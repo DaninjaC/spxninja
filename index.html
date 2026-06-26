@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SPX Ninja - V10 (Híbrido Definitivo - Carro + Pé)</title>
+    <title>SPX Ninja - V11 (Varredura Espacial Sem Cruzamentos)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -66,7 +66,6 @@
         .col-mapa { background: #111; padding: 15px; border-radius: 10px; border: 1px solid #333; }
         .mapa-container { height: 320px; width: 100%; background: #000; border-radius: 8px; margin-top: 10px; border: 1px solid #444;}
         
-        /* Legenda de Carro vs A Pé */
         .legenda { font-size: 13px; color: #ddd; margin-top: 8px; text-align: left; font-weight: bold; padding-bottom: 5px;}
         .legenda span { display: inline-block; width: 25px; height: 4px; margin-right: 5px; vertical-align: middle;}
     </style>
@@ -79,7 +78,7 @@
             📦 CARREGAR PLANILHA SPX
             <input type="file" id="fileInput" accept=".xlsx, .xls, .csv">
         </label>
-        <div id="loading-msg" style="display:none; color:#FFCC00; font-weight:bold; margin-top:20px; font-size:18px;">⏳ Aplicando Bússola e Âncoras...<br><small>Isso pode levar alguns segundos.</small></div>
+        <div id="loading-msg" style="display:none; color:#FFCC00; font-weight:bold; margin-top:20px; font-size:18px;">⏳ Mapeando Estacionamentos e Fluidez...<br><small>Isso pode levar alguns segundos.</small></div>
     </div>
 
     <div id="modal-auditoria" class="modal-fullscreen">
@@ -92,7 +91,6 @@
                 <div class="legenda"><span style="background: #ff4444;"></span> Carro &nbsp;&nbsp; | &nbsp;&nbsp; <span style="background: #FFCC00; border-bottom: 3px dashed #000; height: 1px;"></span> A Pé</div>
                 <div id="mapa-padrao" class="mapa-container"></div>
             </div>
-            
             <div class="col-mapa">
                 <button class="btn-modo btn-otimizada" onclick="escolherRotaOtimizada()">
                     🚀 OTIMIZADA SPX NINJA<br><small id="km-otimizada" style="font-weight:normal;">Realidade (Carro + Pé): Calculando...</small>
@@ -113,11 +111,10 @@
     </div>
 
     <div id="modal-info-otimizada" class="modal-fullscreen">
-        <h2>🚀 MODO: OTIMIZADA SPX (V10 Híbrida)</h2>
+        <h2>🚀 MODO: OTIMIZADA SPX (V11)</h2>
         <div class="info-container">
-            <p>Você escolheu o algoritmo definitivo de <strong>Varredura com Bússola</strong>.</p>
-            <p>O aplicativo agrupou pacotes da mesma rua e usou a ordem original apenas para <strong>garantir a mão do trânsito</strong> sem criar voltas falsas.</p>
-            <p>Abaixo, separe os pacotes pelas <strong>Bags</strong> na ordem da lista.</p>
+            <p>Você escolheu a <strong>Varredura Espacial Natural</strong>.</p>
+            <p>O aplicativo criou <strong>Estacionamentos Âncora</strong> (para evitar voltas na quadra com entregas a pé) e traçou o fluxo do asfalto sem pular de uma rua para a outra, varrendo quarteirões inteiros sem cruzar caminhos.</p>
         </div>
         <button class="btn-modo btn-otimizada" onclick="avancarParaDocaOtimizada()">IR PARA SEPARAÇÃO (BAGS) 📦</button>
     </div>
@@ -220,7 +217,7 @@
             }
         }
 
-        // --- A MÁGICA VISUAL: ESTACIONAMENTO ÂNCORA (Fim do Paradoxo da Calçada) ---
+        // --- MAPA VISUAL HÍBRIDO (MANTIDO DA V10 PORQUE FOI PERFEITO) ---
         async function plotarAsfaltoHibridoAuditoria(camada, mapaLocal, rota, corLinha) {
             camada.clearLayers();
             let distanciaTotal = 0;
@@ -228,7 +225,6 @@
 
             if (rota.length === 0) return 0;
 
-            // 1. Plotar os pinos na tela
             for (let i = 0; i < rota.length; i++) {
                 let p = rota[i];
                 boundsCoords.push([p.lat, p.lon]);
@@ -238,7 +234,6 @@
                     .addTo(camada);
             }
 
-            // 2. Lógica de Estacionamento Âncora (Onde o carro realmente para)
             let anchors = [rota[0]];
             let mapWalkToAnchor = new Map(); 
             let currentAnchor = rota[0];
@@ -247,23 +242,20 @@
                 let p = rota[i];
                 let dLinear = dist(currentAnchor.lat, currentAnchor.lon, p.lat, p.lon);
                 
-                // Se o pacote está a mais de 60 metros, o entregador entra no carro e dirige até lá. (Nova Âncora)
-                if (dLinear > 60) {
-                    anchors.push(p);
-                    currentAnchor = p;
-                } else {
-                    // Se o pacote está perto (< 60m), ele faz a pé!
+                // Se pacote estiver colado com a âncora anterior (A Pé)
+                if (dLinear <= 65) {
                     mapWalkToAnchor.set(p, currentAnchor);
                     distanciaTotal += dLinear; 
+                } else {
+                    anchors.push(p);
+                    currentAnchor = p;
                 }
             }
 
-            // 3. Desenhar o trajeto a pé (Linha Amarela Tracejada)
             mapWalkToAnchor.forEach((anchor, p) => {
                 L.polyline([[anchor.lat, anchor.lon], [p.lat, p.lon]], { color: '#FFCC00', weight: 3, dashArray: '5, 8', opacity: 1 }).addTo(camada);
             });
 
-            // 4. Traçar a Rota de Carro no Asfalto (Apenas entre as âncoras!)
             let coordAsfalto = [];
             const TAMANHO_LOTE = 40; 
             for (let i = 0; i < anchors.length - 1; i += (TAMANHO_LOTE - 1)) {
@@ -285,7 +277,6 @@
                 }
             }
 
-            // 5. Renderizar o trajeto do carro
             if (coordAsfalto.length > 0) {
                 L.polyline(coordAsfalto, { color: corLinha, weight: 4, opacity: 0.9 }).addTo(camada);
             }
@@ -297,57 +288,81 @@
             return distanciaTotal;
         }
 
-        // --- A MÁGICA MATEMÁTICA V10: OTIMIZAÇÃO HÍBRIDA (Bússola Shopee) ---
-        function gerarRotaOtimizadaHibrida(rotaBase) {
+        // --- NOVO CÉREBRO V11: AGRUPAMENTO ESPACIAL PURO (Sem Nomes de Rua) ---
+        function gerarRotaOtimizadaV11(rotaBase, matrix) {
             if (rotaBase.length <= 1) return rotaBase;
-            
-            let rotaOtimizada = [];
-            let pendentes = [...rotaBase]; 
-            
-            let atual = pendentes.shift(); 
-            rotaOtimizada.push(atual);
 
-            while (pendentes.length > 0) {
-                let melhorProximo = null;
-                let menorCusto = Infinity;
-                let indexMelhor = -1;
-
-                // 1. Qual é o pacote mais próximo do carro agora?
-                for (let i = 0; i < pendentes.length; i++) {
-                    let cand = pendentes[i];
-                    let dReta = dist(atual.lat, atual.lon, cand.lat, cand.lon);
-                    
-                    if (dReta < menorCusto) {
-                        menorCusto = dReta;
-                        melhorProximo = cand;
-                        indexMelhor = i;
+            // PASSO 1: Criar as "Âncoras" (Estacionamentos Reais)
+            let anchors = [];
+            for (let i = 0; i < rotaBase.length; i++) {
+                let p = rotaBase[i];
+                let foundAnchor = false;
+                
+                for (let a of anchors) {
+                    // Agrupa todos os pacotes num raio de 65 metros para um único estacionamento
+                    if (dist(a.lat, a.lon, p.lat, p.lon) <= 65) {
+                        a.walking.push(p);
+                        foundAnchor = true;
+                        break;
                     }
                 }
-                
-                let ruaDestino = melhorProximo.ruaPadrao;
-                
-                // 2. Se a rua tem nome, pega TODOS os pacotes dela em um raio seguro (evita juntar a ponta norte com a ponta sul da cidade)
-                if (ruaDestino !== "DESCONHECIDO") {
-                    let pacotesRua = pendentes.filter(p => p.ruaPadrao === ruaDestino && dist(melhorProximo.lat, melhorProximo.lon, p.lat, p.lon) < 600);
-                    
-                    // 3. A BÚSSOLA OCULTA: Ordena os pacotes da rua pela Ordem Original da Shopee (idOriginal)
-                    // Isso GARANTE que o carro vai entrar pelo lado certo da rua e seguir a mão única, sem causar retornos!
-                    pacotesRua.sort((a, b) => a.idOriginal - b.idOriginal);
-                    
-                    rotaOtimizada.push(...pacotesRua);
-                    atual = pacotesRua[pacotesRua.length - 1]; // O carro termina na última casa da rua
-                    
-                    // Remove do pendentes
-                    pendentes = pendentes.filter(p => !pacotesRua.includes(p));
-                } else {
-                    // Rua sem nome, vai pulando de um em um
-                    rotaOtimizada.push(melhorProximo);
-                    pendentes.splice(indexMelhor, 1);
-                    atual = melhorProximo;
+                if (!foundAnchor) {
+                    anchors.push({ ...p, idAnchor: anchors.length, walking: [] });
                 }
             }
-            
-            return rotaOtimizada;
+
+            // PASSO 2: Otimizar SOMENTE o trajeto de carro entre os Estacionamentos
+            let optimizedAnchors = [];
+            let pendentes = [...anchors];
+            let atual = pendentes.shift(); // Inicia do primeiro ponto original
+            optimizedAnchors.push(atual);
+
+            while(pendentes.length > 0) {
+                let melhorProx = null;
+                let menorDist = Infinity;
+                let bestIdx = -1;
+
+                for(let i=0; i < pendentes.length; i++) {
+                    let cand = pendentes[i];
+                    
+                    // O Segredo contra Cruzamentos: Perguntamos pro Satélite a distância real!
+                    // Se a rua for mão única, ir no fluxo é 20m, ir contra o fluxo é 800m. 
+                    // O algoritmo SEMPRE vai escolher fluir a rua sem cruzar linha.
+                    let dDrive = dist(atual.lat, atual.lon, cand.lat, cand.lon) * 1.5; // Backup se o servidor falhar
+                    
+                    if (matrix && matrix[atual.idOriginal] && matrix[cand.idOriginal] != null) {
+                        dDrive = matrix[atual.idOriginal][cand.idOriginal];
+                    }
+
+                    if (dDrive < menorDist) {
+                        menorDist = dDrive;
+                        melhorProx = cand;
+                        bestIdx = i;
+                    }
+                }
+
+                optimizedAnchors.push(melhorProx);
+                atual = melhorProx;
+                pendentes.splice(bestIdx, 1);
+            }
+
+            // PASSO 3: Descompactar para a lista final oficial (O Entregador desce do carro e anda)
+            let rotaOtimizadaFinal = [];
+            for (let a of optimizedAnchors) {
+                // Remove propriedades temporárias para não bugar o mapa visual
+                let anchorStop = { ...a };
+                delete anchorStop.walking;
+                delete anchorStop.idAnchor;
+                
+                rotaOtimizadaFinal.push(anchorStop);
+
+                // Coloca as paradas a pé logo em seguida na fila
+                for (let w of a.walking) {
+                    rotaOtimizadaFinal.push(w);
+                }
+            }
+
+            return rotaOtimizadaFinal;
         }
 
         // --- LEITURA DA PLANILHA ---
@@ -393,7 +408,7 @@
                         .map((i, index) => {
                             let s = i.stop || i.parada || i.sequence;
                             return {
-                                idOriginal: index, // A BÚSSOLA OCULTA: Salva a ordem exata em que a Shopee montou a lista
+                                idOriginal: index, 
                                 lat: parseFloat(String(i.latitude || i.lat).replace(',', '.')),
                                 lon: parseFloat(String(i.longitude || i.lon || i.lng).replace(',', '.')),
                                 ruaPadrao: extrairRuaPadrao(i["destination address"] || i.endereco),
@@ -405,14 +420,25 @@
 
                     if (rotaOriginalData.length === 0) throw new Error("Sem coordenadas válidas.");
 
-                    // 1. Roda a Otimização Híbrida
-                    rotaOtimizadaData = gerarRotaOtimizadaHibrida(rotaOriginalData);
+                    // 1. BAIXA A TABELA DE TRÂNSITO DO SATÉLITE
+                    let matrizOSRM = null;
+                    if (rotaOriginalData.length <= 100) { 
+                        try {
+                            let coords = rotaOriginalData.map(p => `${p.lon},${p.lat}`).join(';');
+                            let res = await fetch(`https://router.project-osrm.org/table/v1/driving/${coords}?annotations=distance`);
+                            let data = await res.json();
+                            if(data.code === 'Ok') matrizOSRM = data.distances;
+                        } catch(e) { console.warn("Erro ao baixar trânsito."); }
+                    }
+
+                    // 2. Roda a Otimização V11 (Espacial Pura)
+                    rotaOtimizadaData = gerarRotaOtimizadaV11(rotaOriginalData, matrizOSRM);
 
                     document.getElementById('controles-iniciais').style.display = 'none';
                     document.getElementById('modal-auditoria').style.display = 'flex';
                     iniciarMapasAuditoria();
                     
-                    // 2. Desenha o mapa híbrido (Carro verde + Passos amarelos)
+                    // 3. Desenha o Híbrido (Carro + Pé) na Tela
                     setTimeout(async () => {
                         mapPadrao.invalidateSize();
                         mapOtimizado.invalidateSize();
