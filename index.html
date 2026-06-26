@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SPX Ninja - V7.0 (Filtro de Contramão + Asfalto Real)</title>
+    <title>SPX Ninja - V8.0 (Estacionamento Âncora + Modo a Pé)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -65,6 +65,9 @@
         .grid-mapas { display: flex; flex-direction: column; gap: 20px; width: 100%; padding-bottom: 30px; }
         .col-mapa { background: #111; padding: 15px; border-radius: 10px; border: 1px solid #333; }
         .mapa-container { height: 320px; width: 100%; background: #000; border-radius: 8px; margin-top: 10px; border: 1px solid #444;}
+        
+        .legenda { font-size: 12px; color: #aaa; margin-top: 5px; text-align: left; }
+        .legenda span { display: inline-block; width: 20px; height: 4px; margin-right: 5px; vertical-align: middle;}
     </style>
 </head>
 <body>
@@ -75,7 +78,7 @@
             📦 CARREGAR PLANILHA SPX
             <input type="file" id="fileInput" accept=".xlsx, .xls, .csv">
         </label>
-        <div id="loading-msg" style="display:none; color:#FFCC00; font-weight:bold; margin-top:20px; font-size:18px;">⏳ Verificando Mão Única e Traçando Asfalto...<br><small>Aguarde uns segundos.</small></div>
+        <div id="loading-msg" style="display:none; color:#FFCC00; font-weight:bold; margin-top:20px; font-size:18px;">⏳ Calculando Trânsito e Estacionamentos...<br><small>Aguarde uns segundos.</small></div>
     </div>
 
     <div id="modal-auditoria" class="modal-fullscreen">
@@ -83,14 +86,16 @@
         <div class="grid-mapas">
             <div class="col-mapa">
                 <button class="btn-modo btn-padrao" onclick="escolherRotaPadrao()">
-                    ▶️ ROTA PADRÃO SHOPEE<br><small id="km-padrao" style="font-weight:normal;">Asfalto Real: Calculando...</small>
+                    ▶️ ROTA PADRÃO SHOPEE<br><small id="km-padrao" style="font-weight:normal;">Realidade (Carro + Pé): Calculando...</small>
                 </button>
+                <div class="legenda"><span style="background: #ff4444;"></span> Trajeto de Carro &nbsp;&nbsp; | &nbsp;&nbsp; <span style="background: #FFCC00; border-bottom: 2px dashed #000;"></span> Entrega a Pé</div>
                 <div id="mapa-padrao" class="mapa-container"></div>
             </div>
             <div class="col-mapa">
                 <button class="btn-modo btn-otimizada" onclick="escolherRotaOtimizada()">
-                    🚀 OTIMIZADA SPX NINJA<br><small id="km-otimizada" style="font-weight:normal;">Asfalto Real: Calculando...</small>
+                    🚀 OTIMIZADA SPX NINJA<br><small id="km-otimizada" style="font-weight:normal;">Realidade (Carro + Pé): Calculando...</small>
                 </button>
+                <div class="legenda"><span style="background: #39FF14;"></span> Trajeto de Carro &nbsp;&nbsp; | &nbsp;&nbsp; <span style="background: #FFCC00; border-bottom: 2px dashed #000;"></span> Entrega a Pé</div>
                 <div id="mapa-otimizado" class="mapa-container"></div>
             </div>
         </div>
@@ -100,7 +105,7 @@
         <h2>▶️ MODO: ROTA PADRÃO</h2>
         <div class="info-container">
             <p>Você escolheu seguir a <strong>sequência original</strong> da transportadora.</p>
-            <p>Neste modo, o aplicativo não altera a ordem dos pacotes. Ele apenas guia você ponto a ponto.</p>
+            <p>O aplicativo não altera a ordem, apenas guia você ponto a ponto.</p>
         </div>
         <button class="btn-modo btn-padrao" onclick="avancarParaGPSPadrao()">INICIAR VIAGEM 🚀</button>
     </div>
@@ -108,8 +113,8 @@
     <div id="modal-info-otimizada" class="modal-fullscreen">
         <h2>🚀 MODO: OTIMIZADA SPX</h2>
         <div class="info-container">
-            <p>Você escolheu a <strong>Otimização de Trânsito V7</strong>.</p>
-            <p>O algoritmo <strong>testou a mão da rua</strong> via satélite. Se um pacote da mesma rua estiver na contramão, ele abandona a via e deixa o pacote para depois, garantindo que o carro sempre ande para frente.</p>
+            <p>Você escolheu a <strong>Otimização Inteligente V8</strong>.</p>
+            <p>O aplicativo criou <strong>Estacionamentos Âncora</strong>: Se os pacotes estão próximos, ele estaciona o carro em um ponto central e entende que você fará a entrega a pé (Linha Amarela), evitando voltas no quarteirão e retornos falsos do GPS.</p>
         </div>
         <button class="btn-modo btn-otimizada" onclick="avancarParaDocaOtimizada()">IR PARA SEPARAÇÃO (BAGS) 📦</button>
     </div>
@@ -152,19 +157,12 @@
     </div>
 
     <script>
-        let rotaSpx = []; 
-        let rotaOriginalData = []; 
-        let rotaOtimizadaData = []; 
-
+        let rotaSpx = [], rotaOriginalData = [], rotaOtimizadaData = []; 
         let passosNavegacao = [], idxDestino = 0, idxPasso = 0;
         let minhaLat, minhaLon, mapa, markerUser, markerDest, polylineRota;
         let camadaFundo = L.layerGroup(), aguardandoConfirmacao = false, ultimaLatReq, ultimaLonReq;
-        let wakeLock = null;
-        let distAnteriorCurva = Infinity; 
-        
-        let latAntGps = null, lonAntGps = null;
-        let headingCarro = null; 
-
+        let wakeLock = null, distAnteriorCurva = Infinity; 
+        let latAntGps = null, lonAntGps = null, headingCarro = null; 
         let mapPadrao = null, mapOtimizado = null;
         let layerPadrao = L.layerGroup(), layerOtimizado = L.layerGroup();
 
@@ -220,47 +218,92 @@
             }
         }
 
-        // --- RELIGANDO O ASFALTO PARA PROVAR QUE RESPEITA A MÃO ÚNICA ---
+        // --- CHAMADA DO OSRM PARA DESENHAR O ASFALTO DE UM BLOCO ---
+        async function fetchAndDrawOSRM(chunk, camada, corLinha) {
+            let distancia = 0;
+            let stringCoords = chunk.map(p => `${p.lon},${p.lat}`).join(';');
+            try {
+                let url = `https://router.project-osrm.org/route/v1/driving/${stringCoords}?overview=full&geometries=geojson`;
+                let res = await fetch(url);
+                let data = await res.json();
+                if (data.routes && data.routes[0]) {
+                    distancia += data.routes[0].distance;
+                    let coordsMapeadas = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+                    L.polyline(coordsMapeadas, { color: corLinha, weight: 4, opacity: 0.8 }).addTo(camada);
+                } else {
+                    L.polyline(chunk.map(p => [p.lat, p.lon]), { color: corLinha, weight: 4, opacity: 0.5 }).addTo(camada);
+                }
+            } catch(e) { 
+                L.polyline(chunk.map(p => [p.lat, p.lon]), { color: corLinha, weight: 4, opacity: 0.5 }).addTo(camada);
+            }
+            return distancia;
+        }
+
+        // --- A GRANDE SOLUÇÃO: DESENHO HÍBRIDO (CARRO + A PÉ) ---
         async function plotarAsfaltoAuditoria(camada, mapaLocal, rota, corLinha) {
             camada.clearLayers();
-            let coordAsfalto = [];
             let distanciaCalculada = 0;
+            let boundsCoords = [];
 
+            // Coloca as bolinhas (Stops)
             for (let i = 0; i < rota.length; i++) {
                 let p = rota[i];
+                boundsCoords.push([p.lat, p.lon]);
                 let corPino = (i === 0) ? '#007AFF' : '#555'; 
                 L.circleMarker([p.lat, p.lon], { radius: 5, color: '#fff', fillColor: corPino, fillOpacity: 1, weight: 1 })
                     .bindTooltip(i === 0 ? "INÍCIO (Stop " + p.stop + ")" : "Stop " + p.stop, { permanent: true, direction: 'right', className: 'stop-label', offset: [5, 0] })
                     .addTo(camada);
             }
 
-            // OSRM: Busca as ruas reais
-            const TAMANHO_LOTE = 50;
-            for (let i = 0; i < rota.length - 1; i += (TAMANHO_LOTE - 1)) {
-                let lote = rota.slice(i, i + TAMANHO_LOTE);
-                let stringCoords = lote.map(p => `${p.lon},${p.lat}`).join(';');
-                try {
-                    let url = `https://router.project-osrm.org/route/v1/driving/${stringCoords}?overview=full&geometries=geojson`;
-                    let res = await fetch(url);
-                    let data = await res.json();
-                    if (data.routes && data.routes[0]) {
-                        distanciaCalculada += data.routes[0].distance;
-                        let coordsMapeadas = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
-                        coordAsfalto.push(...coordsMapeadas);
+            // O Segredo: Cortar os pedaços que são feitos A PÉ (Evita os círculos gigantes)
+            let currentDrivingChunk = [];
+            
+            for (let i = 0; i < rota.length - 1; i++) {
+                let p1 = rota[i];
+                let p2 = rota[i+1];
+                let dLinear = dist(p1.lat, p1.lon, p2.lat, p2.lon);
+                
+                // Se for muito perto (< 70m), ele assume que você ESTACIONOU e foi A PÉ
+                if (dLinear < 70) {
+                    if (currentDrivingChunk.length > 0) {
+                        currentDrivingChunk.push(p1); // Termina a viagem de carro neste ponto
+                        distanciaCalculada += await fetchAndDrawOSRM(currentDrivingChunk, camada, corLinha);
+                        currentDrivingChunk = []; // O motorista desceu do carro
                     }
-                } catch (e) { console.error("Erro rota asfalto", e); }
+                    
+                    // Desenha uma linha tracejada amarela ligando a caminhada (sem usar rua de mão única)
+                    L.polyline([[p1.lat, p1.lon], [p2.lat, p2.lon]], { color: '#FFCC00', weight: 3, dashArray: '5, 8', opacity: 1 }).addTo(camada);
+                    distanciaCalculada += dLinear;
+                    
+                } else {
+                    // É LONGE: Tem que ir de carro.
+                    if (currentDrivingChunk.length === 0) currentDrivingChunk.push(p1); // Motorista entrou no carro
+                    
+                    // Se o pacote de rotas do GPS ficar grande, envia e limpa para não travar o servidor
+                    if (currentDrivingChunk.length >= 40) {
+                        currentDrivingChunk.push(p2);
+                        distanciaCalculada += await fetchAndDrawOSRM(currentDrivingChunk, camada, corLinha);
+                        currentDrivingChunk = [p2];
+                    } else if (i === rota.length - 2) {
+                        currentDrivingChunk.push(p2); // É a última entrega
+                    }
+                }
+            }
+            
+            // Desenha qualquer resto de rota de carro que tenha sobrado
+            if (currentDrivingChunk.length > 1) {
+                distanciaCalculada += await fetchAndDrawOSRM(currentDrivingChunk, camada, corLinha);
             }
 
-            if (coordAsfalto.length > 0) {
-                let polyline = L.polyline(coordAsfalto, { color: corLinha, weight: 4, opacity: 0.8 }).addTo(camada);
-                mapaLocal.fitBounds(polyline.getBounds(), { padding: [20, 20] });
+            if (boundsCoords.length > 0) {
+                mapaLocal.fitBounds(L.polyline(boundsCoords).getBounds(), { padding: [20, 20] });
             }
 
             return distanciaCalculada;
         }
 
-        // --- NOVO CÉREBRO V7: O FILTRO DE CONTRAMÃO (Híbrido) ---
-        function gerarRotaOtimizadaV7(rotaBase, matrix) {
+        // --- MOTOR OTIMIZADO V8 (Filtro de Contramão com Agrupamento Físico) ---
+        function gerarRotaOtimizadaV8(rotaBase, matrix) {
             if (rotaBase.length <= 1) return rotaBase;
             
             let rotaOtimizada = [];
@@ -276,35 +319,30 @@
 
                 for (let i = 0; i < pendentes.length; i++) {
                     let cand = pendentes[i];
-                    
-                    // Distância em linha reta
                     let dReta = dist(atual.lat, atual.lon, cand.lat, cand.lon);
                     
-                    // Distância de Carro no Asfalto (Extraída da Matriz GPS)
-                    let dDrive = dReta * 1.5; // Chute de segurança caso o servidor falhe
+                    let dDrive = dReta * 1.5; 
                     if (matrix && matrix[atual.idOriginal] && matrix[atual.idOriginal][cand.idOriginal] != null) {
                         dDrive = matrix[atual.idOriginal][cand.idOriginal];
                     }
 
                     let custo = dDrive;
 
-                    // 1. MODO A PÉ (< 60m). Se a casa for vizinha, ignora qualquer contramão do GPS. Vai a pé!
-                    if (dReta <= 60) {
+                    // 1. MODO A PÉ (< 70m). Se a casa for vizinha, agrupa de imediato!
+                    if (dReta <= 70) {
                         custo = dReta * 0.01; 
                     } 
-                    // 2. BÔNUS DE RUA SEGURO (A MÁGICA ACONTECE AQUI)
+                    // 2. BÔNUS DE RUA SEGURO
                     else if (ruaAtual !== "DESCONHECIDO" && ruaAtual === cand.ruaPadrao) {
-                        // O aplicativo pergunta: "O asfalto cobra menos de 450 metros para chegar lá?"
+                        // O asfalto cobra menos de 450 metros para chegar lá?
                         if (dDrive < 450) {
-                            // Se sim, é porque está na mão certa. Dá bônus forte para manter na rua!
-                            custo = dDrive * 0.2; 
+                            custo = dDrive * 0.2; // Sim, mantém na rua!
                         } else {
-                            // Se custa mais de 450m (ex: 800m), é porque é RETORNO/CONTRAMÃO!
-                            // Abandona a casa agora. Dá uma nota alta para o aplicativo procurar a rua de trás em vez disso.
+                            // Custa mais de 450m. É CONTRAMÃO. Abandona a casa por enquanto.
                             custo = dDrive * 0.9; 
                         }
                     }
-                    // 3. RUAS PARALELAS E ESQUINAS VIZINHAS
+                    // 3. RUAS PARALELAS E ESQUINAS
                     else if (dReta < 150) {
                         custo = dDrive * 0.5; 
                     }
@@ -379,7 +417,7 @@
 
                     if (rotaOriginalData.length === 0) throw new Error("Sem coordenadas válidas.");
 
-                    // 1. BAIXA A TABELA DE TRÂNSITO DO SATÉLITE (A Matrix)
+                    // 1. BAIXA A TABELA DE TRÂNSITO DO SATÉLITE
                     let matrizOSRM = null;
                     if (rotaOriginalData.length <= 100) { 
                         try {
@@ -387,17 +425,17 @@
                             let res = await fetch(`https://router.project-osrm.org/table/v1/driving/${coords}?annotations=distance`);
                             let data = await res.json();
                             if(data.code === 'Ok') matrizOSRM = data.distances;
-                        } catch(e) { console.warn("Erro ao baixar trânsito, usando fallback."); }
+                        } catch(e) { console.warn("Erro ao baixar trânsito."); }
                     }
 
-                    // 2. Roda a inteligência V7 (Filtro de Contramão)
-                    rotaOtimizadaData = gerarRotaOtimizadaV7(rotaOriginalData, matrizOSRM);
+                    // 2. Roda a inteligência V8
+                    rotaOtimizadaData = gerarRotaOtimizadaV8(rotaOriginalData, matrizOSRM);
 
                     document.getElementById('controles-iniciais').style.display = 'none';
                     document.getElementById('modal-auditoria').style.display = 'flex';
                     iniciarMapasAuditoria();
                     
-                    // 3. Desenha o Asfalto Real na Tela
+                    // 3. Desenha o Híbrido (Carro + Pé) na Tela
                     setTimeout(async () => {
                         mapPadrao.invalidateSize();
                         mapOtimizado.invalidateSize();
@@ -405,8 +443,8 @@
                         let distPadrao = await plotarAsfaltoAuditoria(layerPadrao, mapPadrao, rotaOriginalData, '#ff4444');
                         let distOtim = await plotarAsfaltoAuditoria(layerOtimizado, mapOtimizado, rotaOtimizadaData, '#39FF14');
 
-                        document.getElementById('km-padrao').innerText = `Asfalto Real: ${formatarDistancia(distPadrao)}`;
-                        document.getElementById('km-otimizada').innerText = `Asfalto Real: ${formatarDistancia(distOtim)}`;
+                        document.getElementById('km-padrao').innerText = `Realidade (Carro + Pé): ${formatarDistancia(distPadrao)}`;
+                        document.getElementById('km-otimizada').innerText = `Realidade (Carro + Pé): ${formatarDistancia(distOtim)}`;
                     }, 200);
 
                 } catch (err) {
@@ -418,7 +456,6 @@
             reader.readAsBinaryString(e.target.files[0]);
         });
 
-        // --- AÇÕES DA AUDITORIA ---
         function escolherRotaPadrao() {
             rotaSpx = [...rotaOriginalData];
             document.getElementById('modal-auditoria').style.display = 'none';
@@ -447,7 +484,6 @@
             iniciarInterfaceNavegacao();
         }
 
-        // --- FUNÇÕES DE INTERFACE RESTANTES ---
         function renderizarModoDoca() {
             let container = document.getElementById('lista-bags');
             container.innerHTML = '';
