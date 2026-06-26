@@ -628,7 +628,7 @@
             
             document.getElementById('rodape-dist').innerText = dFinal > 1000 ? (dFinal/1000).toFixed(1) + " km" : Math.round(dFinal) + " m";
 
-            if (dFinal < 60) {
+            if (dFinal < 20) {
                 aguardandoConfirmacao = true;
                 releaseWakeLock();
                 document.getElementById('painel-rodape').style.display = 'none';
