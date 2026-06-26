@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SPX Ninja - V5.0 (Varredor Geométrico + Modo a Pé)</title>
+    <title>SPX Ninja - V6.0 (Varredura Dinâmica Pura)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -75,21 +75,23 @@
             📦 CARREGAR PLANILHA SPX
             <input type="file" id="fileInput" accept=".xlsx, .xls, .csv">
         </label>
-        <div id="loading-msg" style="display:none; color:#FFCC00; font-weight:bold; margin-top:20px; font-size:18px;">⏳ Construindo Varal Geométrico...<br><small>Ajustando ruas e eliminando retornos.</small></div>
+        <div id="loading-msg" style="display:none; color:#FFCC00; font-weight:bold; margin-top:20px; font-size:18px;">⏳ Calculando Varredura Dinâmica...</div>
     </div>
 
     <div id="modal-auditoria" class="modal-fullscreen">
         <h2>ESCOLHA A ROTA E O MAPA</h2>
+        
         <div class="grid-mapas">
             <div class="col-mapa">
                 <button class="btn-modo btn-padrao" onclick="escolherRotaPadrao()">
-                    ▶️ ROTA PADRÃO SHOPEE<br><small id="km-padrao" style="font-weight:normal;">Asfalto Real: Calculando...</small>
+                    ▶️ ROTA PADRÃO SHOPEE<br><small id="km-padrao" style="font-weight:normal;">Distância Sequencial: Calculando...</small>
                 </button>
                 <div id="mapa-padrao" class="mapa-container"></div>
             </div>
+
             <div class="col-mapa">
                 <button class="btn-modo btn-otimizada" onclick="escolherRotaOtimizada()">
-                    🚀 OTIMIZADA SPX NINJA<br><small id="km-otimizada" style="font-weight:normal;">Asfalto Real: Calculando...</small>
+                    🚀 OTIMIZADA SPX NINJA<br><small id="km-otimizada" style="font-weight:normal;">Distância Sequencial: Calculando...</small>
                 </button>
                 <div id="mapa-otimizado" class="mapa-container"></div>
             </div>
@@ -100,7 +102,7 @@
         <h2>▶️ MODO: ROTA PADRÃO</h2>
         <div class="info-container">
             <p>Você escolheu seguir a <strong>sequência original</strong> da transportadora.</p>
-            <p>Neste modo, o aplicativo não altera a ordem dos pacotes. Ele apenas guia você ponto a ponto, respeitando exatamente a lista oficial.</p>
+            <p>Neste modo, o aplicativo não altera a ordem dos pacotes. Ele apenas guia você ponto a ponto, respeitando exatamente a lista oficial carregada no sistema.</p>
         </div>
         <button class="btn-modo btn-padrao" onclick="avancarParaGPSPadrao()">INICIAR VIAGEM 🚀</button>
     </div>
@@ -109,7 +111,7 @@
         <h2>🚀 MODO: OTIMIZADA SPX</h2>
         <div class="info-container">
             <p>Você escolheu a <strong>Otimização Inteligente Ninja</strong>.</p>
-            <p>O algoritmo encontrou o início de cada rua e alinhou as casas geometricamente para criar um fluxo perfeito. Entregas próximas na mesma calçada são agrupadas para entrega a pé.</p>
+            <p>O algoritmo faz uma <strong>Varredura Dinâmica</strong>: Ele prioriza limpar a rua atual em que você está. Mas, se o próximo pacote da rua estiver muito longe, ele de forma inteligente vira a esquina para pegar pacotes mais próximos em outras vias.</p>
         </div>
         <button class="btn-modo btn-otimizada" onclick="avancarParaDocaOtimizada()">IR PARA SEPARAÇÃO (BAGS) 📦</button>
     </div>
@@ -176,7 +178,7 @@
             if (wakeLock !== null) { wakeLock.release(); wakeLock = null; }
         }
 
-        // MATEMÁTICA PURA
+        // Matemática Pura (Linha Reta)
         function dist(la1, lo1, la2, lo2) {
             const R = 6371000;
             const dLat = (la2-la1) * Math.PI/180;
@@ -186,7 +188,9 @@
         }
 
         function formatarDistancia(metros) {
-            return metros > 1000 ? (metros/1000).toFixed(2) + " km" : Math.round(metros) + " m";
+            // Adiciona um fator multiplicador (1.3) para estimar o asfalto real, já que estamos desenhando linhas retas
+            let estimadoAsfalto = metros * 1.3;
+            return estimadoAsfalto > 1000 ? (estimadoAsfalto/1000).toFixed(2) + " km" : Math.round(estimadoAsfalto) + " m";
         }
 
         function extrairRuaPadrao(enderecoBruto) {
@@ -220,87 +224,39 @@
             }
         }
 
-        // --- NOVO: SIMULADOR DE CAMINHADA (Remove os Círculos do GPS) ---
-        async function plotarInteligenteAuditoria(camada, mapaLocal, rota, corLinha) {
+        // --- DESENHO LIMPO NA TELA DE AUDITORIA (SEM FALSO POSITIVO DO OSRM) ---
+        function plotarLigacaoAuditoriaLivre(camada, mapaLocal, rota, corLinha) {
             camada.clearLayers();
-            let coordFinal = [];
-            let distanciaCalculada = 0;
+            let coordenadas = [];
+            let distanciaTotalLinear = 0;
 
             for (let i = 0; i < rota.length; i++) {
                 let p = rota[i];
+                coordenadas.push([p.lat, p.lon]);
+
+                if (i < rota.length - 1) {
+                    distanciaTotalLinear += dist(p.lat, p.lon, rota[i+1].lat, rota[i+1].lon);
+                }
+
                 let corPino = (i === 0) ? '#007AFF' : '#555'; 
                 L.circleMarker([p.lat, p.lon], { radius: 5, color: '#fff', fillColor: corPino, fillOpacity: 1, weight: 1 })
                     .bindTooltip(i === 0 ? "INÍCIO (Stop " + p.stop + ")" : "Stop " + p.stop, { permanent: true, direction: 'right', className: 'stop-label', offset: [5, 0] })
                     .addTo(camada);
             }
 
-            for (let i = 0; i < rota.length - 1; i++) {
-                let p1 = rota[i];
-                let p2 = rota[i+1];
-                let dLinear = dist(p1.lat, p1.lon, p2.lat, p2.lon);
-
-                // SE FOR PERTO (< 80m): Desenha linha reta, assumindo que o entregador andou a pé. Isso zera o erro de U-Turn do GPS.
-                if (dLinear < 80) {
-                    coordFinal.push([p1.lat, p1.lon], [p2.lat, p2.lon]);
-                    distanciaCalculada += dLinear;
-                } 
-                // SE FOR LONGE: Traça o asfalto via satélite para chegar no próximo bairro/rua.
-                else {
-                    try {
-                        let url = `https://router.project-osrm.org/route/v1/driving/${p1.lon},${p1.lat};${p2.lon},${p2.lat}?overview=full&geometries=geojson&continue_straight=true`;
-                        let res = await fetch(url);
-                        let data = await res.json();
-                        if(data.routes && data.routes[0]) {
-                            distanciaCalculada += data.routes[0].distance;
-                            let coordsMapeadas = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
-                            coordFinal.push(...coordsMapeadas);
-                        } else {
-                            coordFinal.push([p1.lat, p1.lon], [p2.lat, p2.lon]);
-                            distanciaCalculada += dLinear;
-                        }
-                    } catch (e) {
-                        coordFinal.push([p1.lat, p1.lon], [p2.lat, p2.lon]);
-                        distanciaCalculada += dLinear;
-                    }
-                }
+            if (coordenadas.length > 0) {
+                // Desenha a linha reta para provar a ordem exata sem o satélite quebrar a rua
+                let polyline = L.polyline(coordenadas, { color: corLinha, weight: 3, opacity: 0.8 }).addTo(camada);
+                mapaLocal.fitBounds(polyline.getBounds(), { padding: [30, 30] });
             }
 
-            if (coordFinal.length > 0) {
-                let polyline = L.polyline(coordFinal, { color: corLinha, weight: 4, opacity: 0.8 }).addTo(camada);
-                mapaLocal.fitBounds(polyline.getBounds(), { padding: [20, 20] });
-            }
-
-            return distanciaCalculada;
+            return distanciaTotalLinear;
         }
 
-        // --- A GRANDE SOLUÇÃO V5: ORDENAÇÃO GEOMÉTRICA DE RUA (FIM DAS VOLTAS) ---
-        function alinharRuaComoVaral(pacotesNaRua, posCarroAtual) {
-            if (pacotesNaRua.length <= 1) return pacotesNaRua;
+        // --- NOVO CÉREBRO V6: VARREDURA DINÂMICA (Ponto a Ponto) ---
+        function gerarRotaOtimizadaV6(rotaBase) {
+            if (rotaBase.length <= 1) return rotaBase;
             
-            // 1. Descobre as duas "pontas" da rua (as casas mais distantes uma da outra)
-            let maxDist = -1; let pontaA = null; let pontaB = null;
-            for(let i=0; i<pacotesNaRua.length; i++){
-                for(let j=i+1; j<pacotesNaRua.length; j++){
-                    let d = dist(pacotesNaRua[i].lat, pacotesNaRua[i].lon, pacotesNaRua[j].lat, pacotesNaRua[j].lon);
-                    if(d > maxDist) { maxDist = d; pontaA = pacotesNaRua[i]; pontaB = pacotesNaRua[j]; }
-                }
-            }
-
-            // 2. Verifica qual ponta está mais perto do carro
-            let distA = dist(posCarroAtual.lat, posCarroAtual.lon, pontaA.lat, pontaA.lon);
-            let distB = dist(posCarroAtual.lat, posCarroAtual.lon, pontaB.lat, pontaB.lon);
-            let pontoDeEntradaDaRua = (distA < distB) ? pontaA : pontaB;
-
-            // 3. Ordena TODAS as casas da rua sequencialmente a partir desse ponto de entrada (Escadinha pura)
-            pacotesNaRua.sort((a, b) => {
-                return dist(pontoDeEntradaDaRua.lat, pontoDeEntradaDaRua.lon, a.lat, a.lon) -
-                       dist(pontoDeEntradaDaRua.lat, pontoDeEntradaDaRua.lon, b.lat, b.lon);
-            });
-            
-            return pacotesNaRua;
-        }
-
-        function gerarRotaOtimizadaV5(rotaBase) {
             let rotaOtimizada = [];
             let pendentes = [...rotaBase];
             let atual = pendentes.shift(); 
@@ -312,15 +268,30 @@
                 let indexMelhor = -1;
                 let ruaAtual = atual.ruaPadrao;
 
-                // Encontra a próxima rua/bairro
                 for (let i = 0; i < pendentes.length; i++) {
                     let cand = pendentes[i];
                     let dReta = dist(atual.lat, atual.lon, cand.lat, cand.lon);
                     let custo = dReta;
 
-                    if (dReta <= 80) custo = dReta * 0.01; // Modo a pé (colado)
-                    else if (ruaAtual !== "DESCONHECIDO" && ruaAtual === cand.ruaPadrao) custo = dReta * 0.2; // Bônus de mesma rua
-                    else if (dReta <= 200) custo = dReta * 0.5; // Paralelas
+                    // 1. PRIORIDADE ABSOLUTA: Modo a pé (está muito perto, pega logo)
+                    if (dReta <= 80) {
+                        custo = dReta * 0.01; 
+                    } 
+                    // 2. REGRA DINÂMICA DE RUA (A mágica que você pediu)
+                    else if (ruaAtual !== "DESCONHECIDO" && ruaAtual === cand.ruaPadrao) {
+                        if (dReta < 450) {
+                            // Se o próximo na mesma rua está a menos de 450m, MANTÉM NA RUA (Bônus forte)
+                            custo = dReta * 0.2; 
+                        } else {
+                            // Se o pacote da mesma rua está muito longe, dá um bônus fraco.
+                            // Isso permite que se tiver um pacote a 100m na rua paralela, o algoritmo "saia da rua" pra pegar o da paralela.
+                            custo = dReta * 0.8; 
+                        }
+                    }
+                    // 3. RUAS PARALELAS E ESQUINAS
+                    else if (dReta < 150) {
+                        custo = dReta * 0.5; 
+                    }
 
                     if (custo < menorCusto) {
                         menorCusto = custo;
@@ -328,32 +299,12 @@
                         indexMelhor = i;
                     }
                 }
-
-                // Se o pacote faz parte de uma rua com vários pacotes, captura a rua inteira
-                let ruaDestino = melhorProximo.ruaPadrao;
-                if (ruaDestino !== "DESCONHECIDO" && ruaDestino !== ruaAtual) {
-                    let pacotesDestaRua = pendentes.filter(p => p.ruaPadrao === ruaDestino);
-                    if (pacotesDestaRua.length > 1) {
-                        // Passa na máquina de escadinha (ordena a rua inteira matematicamente)
-                        let ruaAlinhada = alinharRuaComoVaral(pacotesDestaRua, atual);
-                        
-                        // Joga a rua inteira na rota final
-                        rotaOtimizada.push(...ruaAlinhada);
-                        atual = ruaAlinhada[ruaAlinhada.length - 1]; // O carro termina na última casa da rua
-                        
-                        // Limpa os pacotes dessa rua da lista de pendentes
-                        pendentes = pendentes.filter(p => p.ruaPadrao !== ruaDestino);
-                        continue; 
-                    }
-                }
-
-                // Se for um pacote isolado, adiciona normal
+                
                 rotaOtimizada.push(melhorProximo);
                 pendentes.splice(indexMelhor, 1);
                 atual = melhorProximo;
             }
             
-            // NOTA: O Pente-fino (2-opt) foi DELETADO de propósito, pois era ele que quebrava o fluxo da rua.
             return rotaOtimizada;
         }
 
@@ -400,6 +351,7 @@
                         .map((i, index) => {
                             let s = i.stop || i.parada || i.sequence;
                             return {
+                                idOriginal: index, 
                                 lat: parseFloat(String(i.latitude || i.lat).replace(',', '.')),
                                 lon: parseFloat(String(i.longitude || i.lon || i.lng).replace(',', '.')),
                                 ruaPadrao: extrairRuaPadrao(i["destination address"] || i.endereco),
@@ -411,23 +363,23 @@
 
                     if (rotaOriginalData.length === 0) throw new Error("Sem coordenadas válidas.");
 
-                    // Roda a nova inteligência V5
-                    rotaOtimizadaData = gerarRotaOtimizadaV5(rotaOriginalData);
+                    // Roda a nova inteligência V6 (A mais limpa e eficiente até agora)
+                    rotaOtimizadaData = gerarRotaOtimizadaV6(rotaOriginalData);
 
                     document.getElementById('controles-iniciais').style.display = 'none';
                     document.getElementById('modal-auditoria').style.display = 'flex';
                     iniciarMapasAuditoria();
                     
-                    // Desenha os mapas com o simulador de caminhada
-                    setTimeout(async () => {
+                    // Desenha os mapas com Linha Reta Pura (Fim da Ilusão do GPS)
+                    setTimeout(() => {
                         mapPadrao.invalidateSize();
                         mapOtimizado.invalidateSize();
 
-                        let distPadrao = await plotarInteligenteAuditoria(layerPadrao, mapPadrao, rotaOriginalData, '#ff4444');
-                        let distOtim = await plotarInteligenteAuditoria(layerOtimizado, mapOtimizado, rotaOtimizadaData, '#39FF14');
+                        let distPadrao = plotarLigacaoAuditoriaLivre(layerPadrao, mapPadrao, rotaOriginalData, '#ff4444');
+                        let distOtim = plotarLigacaoAuditoriaLivre(layerOtimizado, mapOtimizado, rotaOtimizadaData, '#39FF14');
 
-                        document.getElementById('km-padrao').innerText = `Trajeto Combinado (A Pé + Carro): ${formatarDistancia(distPadrao)}`;
-                        document.getElementById('km-otimizada').innerText = `Trajeto Combinado (A Pé + Carro): ${formatarDistancia(distOtim)}`;
+                        document.getElementById('km-padrao').innerText = `Distância Sequencial: ${formatarDistancia(distPadrao)}`;
+                        document.getElementById('km-otimizada').innerText = `Distância Sequencial: ${formatarDistancia(distOtim)}`;
                     }, 200);
 
                 } catch (err) {
