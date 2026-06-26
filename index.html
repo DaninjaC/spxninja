@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SPX Ninja - V12 (Solucionador Global + Âncoras)</title>
+    <title>SPX Ninja - Versão de Campo (Foco na Ordem)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -78,22 +78,22 @@
             📦 CARREGAR PLANILHA SPX
             <input type="file" id="fileInput" accept=".xlsx, .xls, .csv">
         </label>
-        <div id="loading-msg" style="display:none; color:#FFCC00; font-weight:bold; margin-top:20px; font-size:18px;">⏳ Calculando Rota Global...<br><small>Otimizando traçado para não cruzar linhas.</small></div>
+        <div id="loading-msg" style="display:none; color:#FFCC00; font-weight:bold; margin-top:20px; font-size:18px;">⏳ Calculando Ordem de Campo...<br><small>Aplicando varredura de rua e travas de contramão.</small></div>
     </div>
 
     <div id="modal-auditoria" class="modal-fullscreen">
-        <h2>ESCOLHA A ROTA E O MAPA</h2>
+        <h2>ESCOLHA A ROTA (TESTE DE CAMPO)</h2>
         <div class="grid-mapas">
             <div class="col-mapa">
                 <button class="btn-modo btn-padrao" onclick="escolherRotaPadrao()">
-                    ▶️ ROTA PADRÃO SHOPEE<br><small id="km-padrao" style="font-weight:normal;">Realidade (Carro + Pé): Calculando...</small>
+                    ▶️ ROTA PADRÃO SHOPEE
                 </button>
                 <div class="legenda"><span style="background: #ff4444;"></span> Carro &nbsp;&nbsp; | &nbsp;&nbsp; <span style="background: #FFCC00; border-bottom: 3px dashed #000; height: 1px;"></span> A Pé</div>
                 <div id="mapa-padrao" class="mapa-container"></div>
             </div>
             <div class="col-mapa">
                 <button class="btn-modo btn-otimizada" onclick="escolherRotaOtimizada()">
-                    🚀 OTIMIZADA SPX NINJA<br><small id="km-otimizada" style="font-weight:normal;">Realidade (Carro + Pé): Calculando...</small>
+                    🚀 OTIMIZADA SPX NINJA
                 </button>
                 <div class="legenda"><span style="background: #39FF14;"></span> Carro &nbsp;&nbsp; | &nbsp;&nbsp; <span style="background: #FFCC00; border-bottom: 3px dashed #000; height: 1px;"></span> A Pé</div>
                 <div id="mapa-otimizado" class="mapa-container"></div>
@@ -105,16 +105,18 @@
         <h2>▶️ MODO: ROTA PADRÃO</h2>
         <div class="info-container">
             <p>Você escolheu seguir a <strong>sequência original</strong> da transportadora.</p>
-            <p>Neste modo, o aplicativo não altera a ordem, apenas guia você ponto a ponto na sequência oficial.</p>
         </div>
         <button class="btn-modo btn-padrao" onclick="avancarParaGPSPadrao()">INICIAR VIAGEM 🚀</button>
     </div>
 
     <div id="modal-info-otimizada" class="modal-fullscreen">
-        <h2>🚀 MODO: OTIMIZADA SPX (V12)</h2>
+        <h2>🚀 MODO: OTIMIZADA SPX (Versão de Campo)</h2>
         <div class="info-container">
-            <p>Você escolheu o <strong>Solucionador Global Ninja</strong>.</p>
-            <p>O aplicativo combinou as suas paradas a pé (Estacionamentos Âncora) e usou uma IA global para ordenar o trajeto de carro <strong>sem cruzar linhas</strong>, fluindo de forma contínua pelo bairro.</p>
+            <p>Foco total na <strong>Ordem Funcional</strong>:</p>
+            <p>1. Agrupamento a pé (70m).</p>
+            <p>2. Varredura da rua priorizada (até 800m de distância na via).</p>
+            <p>3. Filtro de contramão (abandona a rua se o retorno for maior que 600m).</p>
+            <p>Ignore desenhos falsos no mapa. Confie na ordem da lista abaixo!</p>
         </div>
         <button class="btn-modo btn-otimizada" onclick="avancarParaDocaOtimizada()">IR PARA SEPARAÇÃO (BAGS) 📦</button>
     </div>
@@ -174,16 +176,13 @@
             if (wakeLock !== null) { wakeLock.release(); wakeLock = null; }
         }
 
+        // Matemática Pura
         function dist(la1, lo1, la2, lo2) {
             const R = 6371000;
             const dLat = (la2-la1) * Math.PI/180;
             const dLon = (lo2-lo1) * Math.PI/180;
             const a = Math.sin(dLat/2)**2 + Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)*Math.sin(dLon/2)**2;
             return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-        }
-
-        function formatarDistancia(metros) {
-            return metros > 1000 ? (metros/1000).toFixed(2) + " km" : Math.round(metros) + " m";
         }
 
         function extrairRuaPadrao(enderecoBruto) {
@@ -217,20 +216,18 @@
             }
         }
 
-        // --- MAPA VISUAL HÍBRIDO (MANTIDO) ---
-        async function plotarAsfaltoHibridoAuditoria(camada, mapaLocal, rota, corLinha) {
+        // Desenho no mapa (Mantido básico só para visualização)
+        async function plotarDesenho(camada, mapaLocal, rota, corLinha) {
             camada.clearLayers();
-            let distanciaTotal = 0;
             let boundsCoords = [];
-
-            if (rota.length === 0) return 0;
+            if (rota.length === 0) return;
 
             for (let i = 0; i < rota.length; i++) {
                 let p = rota[i];
                 boundsCoords.push([p.lat, p.lon]);
                 let corPino = (i === 0) ? '#007AFF' : '#555'; 
                 L.circleMarker([p.lat, p.lon], { radius: 5, color: '#fff', fillColor: corPino, fillOpacity: 1, weight: 1 })
-                    .bindTooltip(i === 0 ? "INÍCIO (Stop " + p.stop + ")" : "Stop " + p.stop, { permanent: true, direction: 'right', className: 'stop-label', offset: [5, 0] })
+                    .bindTooltip(i === 0 ? "INÍCIO" : "Stop " + p.stop, { permanent: true, direction: 'right', className: 'stop-label', offset: [5, 0] })
                     .addTo(camada);
             }
 
@@ -241,11 +238,8 @@
             for (let i = 1; i < rota.length; i++) {
                 let p = rota[i];
                 let dLinear = dist(currentAnchor.lat, currentAnchor.lon, p.lat, p.lon);
-                
-                // Se a casa está muito perto da parada do carro (50 metros), é caminhada!
-                if (dLinear <= 50) {
+                if (dLinear <= 70) {
                     mapWalkToAnchor.set(p, currentAnchor);
-                    distanciaTotal += dLinear; 
                 } else {
                     anchors.push(p);
                     currentAnchor = p;
@@ -266,7 +260,6 @@
                     let res = await fetch(url);
                     let data = await res.json();
                     if (data.routes && data.routes[0]) {
-                        distanciaTotal += data.routes[0].distance;
                         let coordsMapeadas = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
                         coordAsfalto.push(...coordsMapeadas);
                     } else {
@@ -280,68 +273,93 @@
             if (coordAsfalto.length > 0) {
                 L.polyline(coordAsfalto, { color: corLinha, weight: 4, opacity: 0.9 }).addTo(camada);
             }
-
             if (boundsCoords.length > 0) {
                 mapaLocal.fitBounds(L.polyline(boundsCoords).getBounds(), { padding: [30, 30] });
             }
-
-            return distanciaTotal;
         }
 
-        // --- A MÁGICA V12: O SOLUCIONADOR GLOBAL DE ROTAS (TSP) ---
-        async function gerarRotaOtimizadaV12(rotaBase) {
-            if(rotaBase.length <= 1) return rotaBase;
+        // --- MOTOR DE TESTE DE CAMPO (A Lógica que você pediu) ---
+        function gerarRotaDeCampo(rotaBase, matrix) {
+            if (rotaBase.length <= 1) return rotaBase;
 
-            // 1. Criar as Âncoras (Agrupamento a Pé - Onde o carro vai estacionar)
+            // 1. AGRUPAMENTO A PÉ (Âncoras de 70m)
             let anchors = [];
             for (let i = 0; i < rotaBase.length; i++) {
                 let p = rotaBase[i];
-                let foundAnchor = false;
+                let found = false;
                 for (let a of anchors) {
-                    if (dist(a.lat, a.lon, p.lat, p.lon) <= 50) {
+                    if (dist(a.lat, a.lon, p.lat, p.lon) <= 70) {
                         a.walking.push(p);
-                        foundAnchor = true;
+                        found = true;
                         break;
                     }
                 }
-                if (!foundAnchor) {
+                if (!found) {
                     anchors.push({ ...p, walking: [] });
                 }
             }
 
-            // 2. Terceirizar a Inteligência: API de Viagem (Caixeiro Viajante) do OSRM
-            // OSRM aceita até 100 pontos para resolver o quebra-cabeça global sem cruzar linhas.
-            if (anchors.length > 1 && anchors.length <= 100) {
-                let coords = anchors.map(a => `${a.lon},${a.lat}`).join(';');
-                // roundtrip=false e source=first garante que o Stop 1 seja o começo exato
-                let url = `https://router.project-osrm.org/trip/v1/driving/${coords}?roundtrip=false&source=first&overview=false`;
-                
-                try {
-                    let res = await fetch(url);
-                    let data = await res.json();
-                    
-                    if (data.code === 'Ok' && data.waypoints) {
-                        // O Servidor nos diz a ordem perfeita. Vamos aplicar nas âncoras.
-                        for(let i = 0; i < anchors.length; i++){
-                            anchors[i].tripIndex = data.waypoints[i].waypoint_index;
+            let rotaOtimizada = [];
+            let pendentes = [...anchors];
+            let atual = pendentes.shift();
+            rotaOtimizada.push(atual);
+
+            while (pendentes.length > 0) {
+                let melhorProximo = null;
+                let ruaAtual = atual.ruaPadrao;
+
+                // 2. PRIORIDADE: VARRER A RUA ATUAL (Raio de 800m)
+                if (ruaAtual !== "DESCONHECIDO") {
+                    let vizinhosRua = pendentes.filter(p => 
+                        p.ruaPadrao === ruaAtual && dist(atual.lat, atual.lon, p.lat, p.lon) < 800
+                    );
+
+                    if (vizinhosRua.length > 0) {
+                        let menorDRua = Infinity;
+                        for(let v of vizinhosRua) {
+                            let dD = dist(atual.lat, atual.lon, v.lat, v.lon) * 1.5;
+                            if (matrix && matrix[atual.idOriginal] && matrix[atual.idOriginal][v.idOriginal] != null) {
+                                dD = matrix[atual.idOriginal][v.idOriginal];
+                            }
+                            if (dD < menorDRua) {
+                                menorDRua = dD;
+                                melhorProximo = v;
+                            }
                         }
-                        // Reordena as paradas do carro
-                        anchors.sort((a, b) => a.tripIndex - b.tripIndex);
+
+                        // 3. FILTRO DE CONTRAMÃO: Abandona a rua se o asfalto for longe demais (voltas)
+                        if (menorDRua > 600) {
+                            melhorProximo = null; 
+                        }
                     }
-                } catch(e) { 
-                    console.log("Falha no servidor Global, mantendo ordem padrão"); 
                 }
+
+                // 4. MUDANÇA DE RUA: Pega o mais perto absoluto
+                if (!melhorProximo) {
+                    let menorDistGeral = Infinity;
+                    for (let cand of pendentes) {
+                        let dD = dist(atual.lat, atual.lon, cand.lat, cand.lon) * 1.5;
+                        if (matrix && matrix[atual.idOriginal] && matrix[atual.idOriginal][cand.idOriginal] != null) {
+                            dD = matrix[atual.idOriginal][cand.idOriginal];
+                        }
+                        if (dD < menorDistGeral) {
+                            menorDistGeral = dD;
+                            melhorProximo = cand;
+                        }
+                    }
+                }
+
+                rotaOtimizada.push(melhorProximo);
+                pendentes = pendentes.filter(p => p.idOriginal !== melhorProximo.idOriginal);
+                atual = melhorProximo;
             }
 
-            // 3. Descompactar para a lista final do Aplicativo
+            // Descompacta as âncoras para a lista final do aplicativo
             let rotaFinal = [];
-            for (let a of anchors) {
+            for (let a of rotaOtimizada) {
                 let anchorStop = { ...a };
                 delete anchorStop.walking;
-                delete anchorStop.tripIndex;
-                rotaFinal.push(anchorStop); // O motorista para aqui
-                
-                // E logo em seguida entrega as caixas em volta a pé
+                rotaFinal.push(anchorStop);
                 for (let w of a.walking) {
                     rotaFinal.push(w);
                 }
@@ -350,7 +368,7 @@
             return rotaFinal;
         }
 
-        // --- LEITURA DA PLANILHA ---
+        // --- PROCESSAMENTO DA PLANILHA ---
         document.getElementById('fileInput').addEventListener('change', async function(e) {
             document.getElementById('btnLabel').style.display = 'none';
             document.getElementById('loading-msg').style.display = 'block';
@@ -405,25 +423,30 @@
 
                     if (rotaOriginalData.length === 0) throw new Error("Sem coordenadas válidas.");
 
-                    // 1. Roda a Otimização V12 com o Servidor Global
-                    if (rotaOriginalData.length > 0) {
-                        rotaOtimizadaData = await gerarRotaOtimizadaV12(rotaOriginalData);
+                    // Baixa Tabela de Trânsito
+                    let matrizOSRM = null;
+                    if (rotaOriginalData.length <= 100) { 
+                        try {
+                            let coords = rotaOriginalData.map(p => `${p.lon},${p.lat}`).join(';');
+                            let res = await fetch(`https://router.project-osrm.org/table/v1/driving/${coords}?annotations=distance`);
+                            let data = await res.json();
+                            if(data.code === 'Ok') matrizOSRM = data.distances;
+                        } catch(e) { console.warn("Aviso: Trânsito OSRM offline, usando distâncias retas."); }
                     }
+
+                    // Roda Lógica de Campo Final
+                    rotaOtimizadaData = gerarRotaDeCampo(rotaOriginalData, matrizOSRM);
 
                     document.getElementById('controles-iniciais').style.display = 'none';
                     document.getElementById('modal-auditoria').style.display = 'flex';
                     iniciarMapasAuditoria();
                     
-                    // 2. Desenha o Híbrido (Carro + Pé) na Tela
+                    // Desenha só por referência
                     setTimeout(async () => {
                         mapPadrao.invalidateSize();
                         mapOtimizado.invalidateSize();
-
-                        let distPadrao = await plotarAsfaltoHibridoAuditoria(layerPadrao, mapPadrao, rotaOriginalData, '#ff4444');
-                        let distOtim = await plotarAsfaltoHibridoAuditoria(layerOtimizado, mapOtimizado, rotaOtimizadaData, '#39FF14');
-
-                        document.getElementById('km-padrao').innerText = `Realidade (Carro + Pé): ${formatarDistancia(distPadrao)}`;
-                        document.getElementById('km-otimizada').innerText = `Realidade (Carro + Pé): ${formatarDistancia(distOtim)}`;
+                        await plotarDesenho(layerPadrao, mapPadrao, rotaOriginalData, '#ff4444');
+                        await plotarDesenho(layerOtimizado, mapOtimizado, rotaOtimizadaData, '#39FF14');
                     }, 200);
 
                 } catch (err) {
@@ -435,7 +458,7 @@
             reader.readAsBinaryString(e.target.files[0]);
         });
 
-        // --- AÇÕES DA AUDITORIA ---
+        // --- AÇÕES DA INTERFACE ---
         function escolherRotaPadrao() {
             rotaSpx = [...rotaOriginalData];
             document.getElementById('modal-auditoria').style.display = 'none';
@@ -464,7 +487,6 @@
             iniciarInterfaceNavegacao();
         }
 
-        // --- FUNÇÕES DE INTERFACE RESTANTES ---
         function renderizarModoDoca() {
             let container = document.getElementById('lista-bags');
             container.innerHTML = '';
