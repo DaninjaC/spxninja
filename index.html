@@ -358,11 +358,11 @@
             return { km: distanciaTotalReal / 1000, min: duracaoTotalReal / 60, estimado: usouEstimativa };
         }
 
-        // --- MOTOR DE TESTE DE CAMPO (A Lógica Intacta e Blindada) ---
+        // --- MOTOR DE TESTE DE CAMPO ---
         function gerarRotaDeCampo(rotaBase, matrix) {
             if (rotaBase.length <= 1) return rotaBase;
 
-            // 1. AGRUPAMENTO A PÉ (Âncoras de 70m)
+            // 1. AGRUPAMENTO A PÉ (Âncoras de 70m) — igual antes
             let anchors = [];
             for (let i = 0; i < rotaBase.length; i++) {
                 let p = rotaBase[i];
@@ -379,6 +379,88 @@
                 }
             }
 
+            let rotaOtimizada;
+            if (matrix) {
+                // MOTOR REAL: vizinho-mais-próximo + 2-opt usando distância REAL de estrada (OSRM),
+                // não linha reta e não nome de rua. Como a matriz do OSRM já respeita mão de direção,
+                // o resultado tende a ser naturalmente dirigível sem contramão, sem precisar adivinhar por regras.
+                rotaOtimizada = otimizarComMatrizReal(anchors, matrix);
+            } else {
+                // FALLBACK: sem matriz real (planilha > 100 paradas ou OSRM indisponível),
+                // usa a heurística antiga por rua/raio/sequência.
+                rotaOtimizada = otimizarPorCamadas(anchors);
+            }
+
+            let rotaFinal = [];
+            for (let a of rotaOtimizada) {
+                let anchorStop = { ...a };
+                delete anchorStop.walking;
+                rotaFinal.push(anchorStop);
+                for (let w of a.walking) {
+                    rotaFinal.push(w);
+                }
+            }
+
+            return rotaFinal;
+        }
+
+        // Custo real entre duas paradas: usa a matriz OSRM quando existe o par, senão cai pra linha reta
+        function custoReal(a, b, matrix) {
+            if (matrix && matrix[a.idOriginal] && matrix[a.idOriginal][b.idOriginal] != null) {
+                return matrix[a.idOriginal][b.idOriginal];
+            }
+            return dist(a.lat, a.lon, b.lat, b.lon);
+        }
+
+        // Vizinho-mais-próximo (guloso) usando distância real, depois refinado com 2-opt
+        function otimizarComMatrizReal(anchors, matrix) {
+            let pendentes = [...anchors];
+            let atual = pendentes.shift();
+            let rota = [atual];
+
+            while (pendentes.length > 0) {
+                let melhorIdx = 0, menorCusto = Infinity;
+                for (let k = 0; k < pendentes.length; k++) {
+                    const c = custoReal(atual, pendentes[k], matrix);
+                    if (c < menorCusto) { menorCusto = c; melhorIdx = k; }
+                }
+                atual = pendentes[melhorIdx];
+                rota.push(atual);
+                pendentes.splice(melhorIdx, 1);
+            }
+
+            return aplicar2opt(rota, matrix);
+        }
+
+        // Refinamento 2-opt: troca pares de trechos que se cruzam/desperdiçam distância real,
+        // mantendo o ponto de partida (primeira parada) fixo.
+        function aplicar2opt(rota, matrix, maxIter = 300) {
+            if (rota.length < 4) return rota;
+            let r = [...rota];
+            let melhorou = true, iter = 0;
+
+            while (melhorou && iter < maxIter) {
+                melhorou = false;
+                iter++;
+                for (let i = 0; i < r.length - 2; i++) {
+                    for (let j = i + 2; j < r.length; j++) {
+                        const a = r[i], b = r[i + 1], c = r[j];
+                        const d = (j + 1 < r.length) ? r[j + 1] : null;
+                        const antes = custoReal(a, b, matrix) + (d ? custoReal(c, d, matrix) : 0);
+                        const depois = custoReal(a, c, matrix) + (d ? custoReal(b, d, matrix) : 0);
+                        if (depois < antes - 1) { // margem de 1m evita loop por arredondamento
+                            const seg = r.slice(i + 1, j + 1).reverse();
+                            r = [...r.slice(0, i + 1), ...seg, ...r.slice(j + 1)];
+                            melhorou = true;
+                        }
+                    }
+                }
+            }
+            return r;
+        }
+
+        // FALLBACK (sem matriz real do OSRM): heurística por rua/raio/sequência original
+        function otimizarPorCamadas(anchors) {
             let rotaOtimizada = [];
             let pendentes = [...anchors];
             let atual = pendentes.shift();
@@ -413,8 +495,6 @@
                 }
 
                 // CAMADA 3: RESGATE POR PROXIMIDADE GEOGRÁFICA REAL
-                // (antes usava proximidade de número de sequência, o que causava saltos longos
-                //  em linha reta quando o próximo número da sequência estava geograficamente longe)
                 if (!melhorProximo) {
                     let menorDResgate = Infinity;
                     for (let cand of pendentes) {
@@ -431,17 +511,7 @@
                 atual = melhorProximo;
             }
 
-            let rotaFinal = [];
-            for (let a of rotaOtimizada) {
-                let anchorStop = { ...a };
-                delete anchorStop.walking;
-                rotaFinal.push(anchorStop);
-                for (let w of a.walking) {
-                    rotaFinal.push(w);
-                }
-            }
-
-            return rotaFinal;
+            return rotaOtimizada;
         }
 
         // --- PROCESSAMENTO DA PLANILHA ---
