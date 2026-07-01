@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SPX Ninja - Versão de Campo (Foco na Ordem)</title>
+    <title>SPX Ninja - V-Final (Varredura + Radar 50m)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -31,7 +31,7 @@
         .bag-item small { color: #aaa; display: block; margin-top: 3px; font-size: 12px;}
         .bag-vol { background: #39FF14; color: #000; padding: 3px 8px; border-radius: 12px; font-weight: bold; font-size: 14px; }
 
-        #tela-navegacao { display: none; flex-direction: column; height: 100vh; width: 100%; }
+        #tela-navegacao { display: none; flex-direction: column; height: 100vh; width: 100%; position: relative;}
         #painel-topo { background: #003399; padding: 15px; text-align: center; z-index: 1001; max-height: 35vh; overflow-y: auto; border-bottom: 2px solid #000; position: relative;}
         .modo-confirmacao { background: #FFCC00 !important; }
         #stop-badge { background: #000; color: #39FF14; padding: 5px 20px; border-radius: 20px; font-weight: bold; font-size: 20px; margin-bottom: 10px; display: inline-block; border: 2px solid #39FF14; }
@@ -68,6 +68,27 @@
         
         .legenda { font-size: 13px; color: #ddd; margin-top: 8px; text-align: left; font-weight: bold; padding-bottom: 5px;}
         .legenda span { display: inline-block; width: 25px; height: 4px; margin-right: 5px; vertical-align: middle;}
+
+        /* CSS DO NOVO ALERTA DE RADAR */
+        #radar-alert {
+            display: none;
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 2005;
+            background: #dc3545;
+            color: #fff;
+            padding: 12px 25px;
+            border-radius: 30px;
+            font-weight: bold;
+            font-size: 22px;
+            border: 3px solid #fff;
+            box-shadow: 0 6px 15px rgba(0,0,0,0.6);
+            align-items: center;
+            gap: 10px;
+            text-transform: uppercase;
+        }
     </style>
 </head>
 <body>
@@ -78,7 +99,7 @@
             📦 CARREGAR PLANILHA SPX
             <input type="file" id="fileInput" accept=".xlsx, .xls, .csv">
         </label>
-        <div id="loading-msg" style="display:none; color:#FFCC00; font-weight:bold; margin-top:20px; font-size:18px;">⏳ Calculando Ordem de Campo...<br><small>Aplicando varredura de rua e travas de contramão.</small></div>
+        <div id="loading-msg" style="display:none; color:#FFCC00; font-weight:bold; margin-top:20px; font-size:18px;">⏳ Calculando Ordem de Campo...<br><small>Baixando Radares e Aplicando Varredura.</small></div>
     </div>
 
     <div id="modal-auditoria" class="modal-fullscreen">
@@ -136,7 +157,8 @@
     </div>
 
     <div id="tela-navegacao">
-        <div id="painel-topo">
+        
+        <div id="radar-alert">📸 RADAR 50m</div> <div id="painel-topo">
             <div id="btn-menu-stops" onclick="abrirMenuStops()"><span>📋</span></div>
             <div id="stop-badge">STOP -- (-- vol)</div>
             <div id="lista-enderecos"></div>
@@ -168,12 +190,72 @@
         let mapPadrao = null, mapOtimizado = null;
         let layerPadrao = L.layerGroup(), layerOtimizado = L.layerGroup();
 
+        // Variáveis Globais do Radar
+        let listaRadares = [];
+        let radarAtivo = null;
+        let audioCtx = null;
+
         async function requestWakeLock() {
             try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } 
             catch (err) { console.error(err); }
         }
         function releaseWakeLock() {
             if (wakeLock !== null) { wakeLock.release(); wakeLock = null; }
+        }
+
+        // --- INICIALIZAÇÃO DE ÁUDIO (Exigência do Navegador) ---
+        function initAudio() {
+            try {
+                window.AudioContext = window.AudioContext || window.webkitAudioContext;
+                if (!audioCtx) audioCtx = new AudioContext();
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+            } catch(e) { console.log("Áudio não suportado"); }
+        }
+
+        function playBipeRadar() {
+            if (!audioCtx) return;
+            try {
+                let osc = audioCtx.createOscillator();
+                let gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.type = 'square'; // Som eletrônico agudo
+                osc.frequency.value = 880;
+                gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+                osc.start(audioCtx.currentTime);
+                osc.stop(audioCtx.currentTime + 0.3);
+            } catch(e) {}
+        }
+
+        // --- DOWNLOAD SILENCIOSO DOS RADARES ---
+        async function baixarRadaresDaRegiao(rota) {
+            if (!rota || rota.length === 0) return;
+            try {
+                let lats = rota.map(p => p.lat);
+                let lons = rota.map(p => p.lon);
+                // Cria uma "Caixa" com folga de segurança ao redor do bairro
+                let minLat = Math.min(...lats) - 0.015; 
+                let maxLat = Math.max(...lats) + 0.015;
+                let minLon = Math.min(...lons) - 0.015;
+                let maxLon = Math.max(...lons) + 0.015;
+
+                // Consulta a API pública do Overpass
+                let query = `[out:json][timeout:15];node["highway"="speed_camera"](${minLat},${minLon},${maxLat},${maxLon});out;`;
+                let url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
+                
+                let res = await fetch(url);
+                let data = await res.json();
+                
+                if (data && data.elements) {
+                    listaRadares = data.elements.map(e => ({
+                        lat: e.lat,
+                        lon: e.lon,
+                        speed: e.tags.maxspeed || ""
+                    }));
+                    console.log(`Radar Armado: ${listaRadares.length} câmeras carregadas na região.`);
+                }
+            } catch(e) { console.error("Erro ao buscar radares silenciosos:", e); }
         }
 
         // Matemática Pura
@@ -277,8 +359,8 @@
             }
         }
 
-        // --- MOTOR DE TESTE DE CAMPO (A Lógica que você pediu) ---
-        function gerarRotaDeCampo(rotaBase) {
+        // --- MOTOR DE TESTE DE CAMPO (A Lógica Intacta e Blindada) ---
+        function gerarRotaDeCampo(rotaBase, matrix) {
             if (rotaBase.length <= 1) return rotaBase;
 
             // 1. AGRUPAMENTO A PÉ (Âncoras de 70m)
@@ -307,27 +389,23 @@
                 let melhorProximo = null;
                 let ruaAtual = atual.ruaPadrao;
 
-                // CAMADA 1: VARREDURA ABSOLUTA DA RUA (Pelo sentido da Shopee)
+                // CAMADA 1: VARREDURA ABSOLUTA DA RUA
                 if (ruaAtual !== "DESCONHECIDO") {
-                    // Pega vizinhos da mesma rua num raio de segurança de 1.2km (para não pular para o final da avenida)
                     let vizinhosRua = pendentes.filter(p => 
                         p.ruaPadrao === ruaAtual && dist(atual.lat, atual.lon, p.lat, p.lon) < 1200
                     );
 
                     if (vizinhosRua.length > 0) {
-                        // O SEGREDO: Ordena pela proximidade do número original da Shopee! 
-                        // Isso força o carro a seguir a mão da rua perfeitamente, sem precisar consultar o GPS e criar loops.
                         vizinhosRua.sort((a, b) => Math.abs(a.idOriginal - atual.idOriginal) - Math.abs(b.idOriginal - atual.idOriginal));
                         melhorProximo = vizinhosRua[0];
                     }
                 }
 
-                // CAMADA 2: RADAR DE VIZINHANÇA (O que tem colado nas esquinas?)
+                // CAMADA 2: RADAR DE VIZINHANÇA
                 if (!melhorProximo) {
                     let menorDRadial = Infinity;
                     for (let cand of pendentes) {
                         let dReta = dist(atual.lat, atual.lon, cand.lat, cand.lon);
-                        // Raio de 250 metros: se tiver algo bem perto, vai direto
                         if (dReta < 250 && dReta < menorDRadial) {
                             menorDRadial = dReta;
                             melhorProximo = cand;
@@ -335,8 +413,7 @@
                     }
                 }
 
-                // CAMADA 3: RESGATE DA SEQUÊNCIA ORIGINAL (O Parceiro Equivalente)
-                // Se a rua acabou e não tem nada na esquina, ele acha o número equivalente (Ex: terminou no 15, acha o 14 ou 16)
+                // CAMADA 3: RESGATE DA SEQUÊNCIA ORIGINAL
                 if (!melhorProximo) {
                     pendentes.sort((a, b) => Math.abs(a.idOriginal - atual.idOriginal) - Math.abs(b.idOriginal - atual.idOriginal));
                     melhorProximo = pendentes[0];
@@ -347,7 +424,6 @@
                 atual = melhorProximo;
             }
 
-            // Descompacta as âncoras para a lista final do aplicativo
             let rotaFinal = [];
             for (let a of rotaOtimizada) {
                 let anchorStop = { ...a };
@@ -416,14 +492,26 @@
 
                     if (rotaOriginalData.length === 0) throw new Error("Sem coordenadas válidas.");
 
-                    // Roda a Otimização Final em Camadas (Sem dependência de API externa para a ordem!)
-                    rotaOtimizadaData = gerarRotaDeCampo(rotaOriginalData);
+                    let matrizOSRM = null;
+                    if (rotaOriginalData.length <= 100) { 
+                        try {
+                            let coords = rotaOriginalData.map(p => `${p.lon},${p.lat}`).join(';');
+                            let res = await fetch(`https://router.project-osrm.org/table/v1/driving/${coords}?annotations=distance`);
+                            let data = await res.json();
+                            if(data.code === 'Ok') matrizOSRM = data.distances;
+                        } catch(e) { console.warn("Aviso: Trânsito OSRM offline, usando distâncias retas."); }
+                    }
+
+                    // Roda a Otimização de Campo
+                    rotaOtimizadaData = gerarRotaDeCampo(rotaOriginalData, matrizOSRM);
+                    
+                    // DISPARA O DOWNLOAD DOS RADARES (Invisível, em segundo plano)
+                    baixarRadaresDaRegiao(rotaOriginalData);
 
                     document.getElementById('controles-iniciais').style.display = 'none';
                     document.getElementById('modal-auditoria').style.display = 'flex';
                     iniciarMapasAuditoria();
                     
-                    // Desenha só por referência visual
                     setTimeout(async () => {
                         mapPadrao.invalidateSize();
                         mapOtimizado.invalidateSize();
@@ -448,6 +536,7 @@
         }
 
         function avancarParaGPSPadrao() {
+            initAudio(); // Ativa permissão de som no clique do usuário
             document.getElementById('modal-info-padrao').style.display = 'none';
             iniciarInterfaceNavegacao(); 
         }
@@ -465,6 +554,7 @@
         }
 
         function iniciarGPSPosDoca() {
+            initAudio(); // Ativa permissão de som no clique do usuário
             document.getElementById('modal-doca').style.display = 'none';
             iniciarInterfaceNavegacao();
         }
@@ -584,6 +674,43 @@
                     markerUser.setLatLng([minhaLat, minhaLon]);
                 }
 
+                // --- NOVO: MÓDULO RASTREADOR DE RADAR (50m) ---
+                if (listaRadares.length > 0) {
+                    let radarProxDaVez = null;
+                    let menorDistRadar = Infinity;
+                    
+                    // Procura o radar mais próximo de você
+                    for (let r of listaRadares) {
+                        let dRadar = dist(minhaLat, minhaLon, r.lat, r.lon);
+                        if (dRadar <= 50 && dRadar < menorDistRadar) {
+                            menorDistRadar = dRadar;
+                            radarProxDaVez = r;
+                        }
+                    }
+
+                    let alertaHtml = document.getElementById('radar-alert');
+                    
+                    if (radarProxDaVez) {
+                        // Entrou na bolha de 50 metros. É um radar novo?
+                        if (radarAtivo !== radarProxDaVez) {
+                            radarAtivo = radarProxDaVez; // Trava para não bipar de novo
+                            playBipeRadar(); // Dá o Bip sonoro
+                            
+                            // Monta a Plaquinha
+                            let velText = radarProxDaVez.speed ? ` ${radarProxDaVez.speed} km/h` : '';
+                            alertaHtml.innerHTML = `📸 RADAR${velText}`;
+                            alertaHtml.style.display = 'flex';
+                        }
+                    } else {
+                        // Não tem nenhum radar a menos de 50m. Se tinha um ativo, esconde a placa.
+                        if (radarAtivo) {
+                            radarAtivo = null; // Desarma para o próximo
+                            alertaHtml.style.display = 'none';
+                        }
+                    }
+                }
+                // ----------------------------------------------
+
                 const desviou = ultimaLatReq && dist(minhaLat, minhaLon, ultimaLatReq, ultimaLonReq) > 30;
 
                 if (idxDestino < rotaSpx.length && !aguardandoConfirmacao) {
@@ -640,7 +767,7 @@
             
             document.getElementById('rodape-dist').innerText = dFinal > 1000 ? (dFinal/1000).toFixed(1) + " km" : Math.round(dFinal) + " m";
 
-            // A MUDANÇA SOLICITADA: DE 60 PARA 20 METROS PARA ACIONAR A CHEGADA
+            // ALERTA DE CHEGADA: Ajustado de 60m para rigorosos 20 metros
             if (dFinal < 20) {
                 aguardandoConfirmacao = true;
                 releaseWakeLock();
