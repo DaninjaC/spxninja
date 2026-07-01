@@ -114,8 +114,8 @@
         <div class="info-container">
             <p>Foco total na <strong>Ordem Funcional</strong>:</p>
             <p>1. Agrupamento a pé (70m).</p>
-            <p>2. Varredura da rua priorizada (até 800m de distância na via).</p>
-            <p>3. Filtro de contramão (abandona a rua se o retorno for maior que 600m).</p>
+            <p>2. Varredura da rua priorizada e no sentido correto da via.</p>
+            <p>3. Filtro Geográfico e Retorno Sequencial para quebra de bairro.</p>
             <p>Ignore desenhos falsos no mapa. Confie na ordem da lista abaixo!</p>
         </div>
         <button class="btn-modo btn-otimizada" onclick="avancarParaDocaOtimizada()">IR PARA SEPARAÇÃO (BAGS) 📦</button>
@@ -216,7 +216,6 @@
             }
         }
 
-        // Desenho no mapa (Mantido básico só para visualização)
         async function plotarDesenho(camada, mapaLocal, rota, corLinha) {
             camada.clearLayers();
             let boundsCoords = [];
@@ -279,7 +278,7 @@
         }
 
         // --- MOTOR DE TESTE DE CAMPO (A Lógica que você pediu) ---
-        function gerarRotaDeCampo(rotaBase, matrix) {
+        function gerarRotaDeCampo(rotaBase) {
             if (rotaBase.length <= 1) return rotaBase;
 
             // 1. AGRUPAMENTO A PÉ (Âncoras de 70m)
@@ -308,45 +307,39 @@
                 let melhorProximo = null;
                 let ruaAtual = atual.ruaPadrao;
 
-                // 2. PRIORIDADE: VARRER A RUA ATUAL (Raio de 800m)
+                // CAMADA 1: VARREDURA ABSOLUTA DA RUA (Pelo sentido da Shopee)
                 if (ruaAtual !== "DESCONHECIDO") {
+                    // Pega vizinhos da mesma rua num raio de segurança de 1.2km (para não pular para o final da avenida)
                     let vizinhosRua = pendentes.filter(p => 
-                        p.ruaPadrao === ruaAtual && dist(atual.lat, atual.lon, p.lat, p.lon) < 800
+                        p.ruaPadrao === ruaAtual && dist(atual.lat, atual.lon, p.lat, p.lon) < 1200
                     );
 
                     if (vizinhosRua.length > 0) {
-                        let menorDRua = Infinity;
-                        for(let v of vizinhosRua) {
-                            let dD = dist(atual.lat, atual.lon, v.lat, v.lon) * 1.5;
-                            if (matrix && matrix[atual.idOriginal] && matrix[atual.idOriginal][v.idOriginal] != null) {
-                                dD = matrix[atual.idOriginal][v.idOriginal];
-                            }
-                            if (dD < menorDRua) {
-                                menorDRua = dD;
-                                melhorProximo = v;
-                            }
-                        }
+                        // O SEGREDO: Ordena pela proximidade do número original da Shopee! 
+                        // Isso força o carro a seguir a mão da rua perfeitamente, sem precisar consultar o GPS e criar loops.
+                        vizinhosRua.sort((a, b) => Math.abs(a.idOriginal - atual.idOriginal) - Math.abs(b.idOriginal - atual.idOriginal));
+                        melhorProximo = vizinhosRua[0];
+                    }
+                }
 
-                        // 3. FILTRO DE CONTRAMÃO: Abandona a rua se o asfalto for longe demais (voltas)
-                        if (menorDRua > 600) {
-                            melhorProximo = null; 
+                // CAMADA 2: RADAR DE VIZINHANÇA (O que tem colado nas esquinas?)
+                if (!melhorProximo) {
+                    let menorDRadial = Infinity;
+                    for (let cand of pendentes) {
+                        let dReta = dist(atual.lat, atual.lon, cand.lat, cand.lon);
+                        // Raio de 250 metros: se tiver algo bem perto, vai direto
+                        if (dReta < 250 && dReta < menorDRadial) {
+                            menorDRadial = dReta;
+                            melhorProximo = cand;
                         }
                     }
                 }
 
-                // 4. MUDANÇA DE RUA: Pega o mais perto absoluto
+                // CAMADA 3: RESGATE DA SEQUÊNCIA ORIGINAL (O Parceiro Equivalente)
+                // Se a rua acabou e não tem nada na esquina, ele acha o número equivalente (Ex: terminou no 15, acha o 14 ou 16)
                 if (!melhorProximo) {
-                    let menorDistGeral = Infinity;
-                    for (let cand of pendentes) {
-                        let dD = dist(atual.lat, atual.lon, cand.lat, cand.lon) * 1.5;
-                        if (matrix && matrix[atual.idOriginal] && matrix[atual.idOriginal][cand.idOriginal] != null) {
-                            dD = matrix[atual.idOriginal][cand.idOriginal];
-                        }
-                        if (dD < menorDistGeral) {
-                            menorDistGeral = dD;
-                            melhorProximo = cand;
-                        }
-                    }
+                    pendentes.sort((a, b) => Math.abs(a.idOriginal - atual.idOriginal) - Math.abs(b.idOriginal - atual.idOriginal));
+                    melhorProximo = pendentes[0];
                 }
 
                 rotaOtimizada.push(melhorProximo);
@@ -423,25 +416,14 @@
 
                     if (rotaOriginalData.length === 0) throw new Error("Sem coordenadas válidas.");
 
-                    // Baixa Tabela de Trânsito
-                    let matrizOSRM = null;
-                    if (rotaOriginalData.length <= 100) { 
-                        try {
-                            let coords = rotaOriginalData.map(p => `${p.lon},${p.lat}`).join(';');
-                            let res = await fetch(`https://router.project-osrm.org/table/v1/driving/${coords}?annotations=distance`);
-                            let data = await res.json();
-                            if(data.code === 'Ok') matrizOSRM = data.distances;
-                        } catch(e) { console.warn("Aviso: Trânsito OSRM offline, usando distâncias retas."); }
-                    }
-
-                    // Roda Lógica de Campo Final
-                    rotaOtimizadaData = gerarRotaDeCampo(rotaOriginalData, matrizOSRM);
+                    // Roda a Otimização Final em Camadas (Sem dependência de API externa para a ordem!)
+                    rotaOtimizadaData = gerarRotaDeCampo(rotaOriginalData);
 
                     document.getElementById('controles-iniciais').style.display = 'none';
                     document.getElementById('modal-auditoria').style.display = 'flex';
                     iniciarMapasAuditoria();
                     
-                    // Desenha só por referência
+                    // Desenha só por referência visual
                     setTimeout(async () => {
                         mapPadrao.invalidateSize();
                         mapOtimizado.invalidateSize();
@@ -658,7 +640,8 @@
             
             document.getElementById('rodape-dist').innerText = dFinal > 1000 ? (dFinal/1000).toFixed(1) + " km" : Math.round(dFinal) + " m";
 
-            if (dFinal < 60) {
+            // A MUDANÇA SOLICITADA: DE 60 PARA 20 METROS PARA ACIONAR A CHEGADA
+            if (dFinal < 20) {
                 aguardandoConfirmacao = true;
                 releaseWakeLock();
                 document.getElementById('painel-rodape').style.display = 'none';
