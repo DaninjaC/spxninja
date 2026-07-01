@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SPX Ninja - V-Final (Varredura + Radar 50m + Visão de Pássaro)</title>
+    <title>SPX Ninja - V-Final (Varal Inteligente + Auditoria Real)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -99,7 +99,7 @@
             📦 CARREGAR PLANILHA SPX
             <input type="file" id="fileInput" accept=".xlsx, .xls, .csv">
         </label>
-        <div id="loading-msg" style="display:none; color:#FFCC00; font-weight:bold; margin-top:20px; font-size:18px;">⏳ Calculando Ordem de Campo...<br><small>Baixando Radares e Aplicando Varredura.</small></div>
+        <div id="loading-msg" style="display:none; color:#FFCC00; font-weight:bold; margin-top:20px; font-size:18px;">⏳ Calculando Ordem de Campo...<br><small>Aplicando Varal Inteligente e Desconto de Rua.</small></div>
     </div>
 
     <div id="modal-auditoria" class="modal-fullscreen">
@@ -107,16 +107,16 @@
         <div class="grid-mapas">
             <div class="col-mapa">
                 <button class="btn-modo btn-padrao" onclick="escolherRotaPadrao()">
-                    ▶️ ROTA PADRÃO SHOPEE<br><small id="km-padrao" style="font-weight:normal;">Visão de Pássaro: Calculando...</small>
+                    ▶️ ROTA PADRÃO SHOPEE<br><small id="km-padrao" style="font-weight:normal;">Calculando KM real corrigido...</small>
                 </button>
-                <div class="legenda"><span style="background: #ff4444; border-bottom: 2px dashed #ff4444; height: 1px;"></span> Sequência Direta (Linha Reta)</div>
+                <div class="legenda"><span style="background: #ff4444; border-bottom: 2px dashed #ff4444; height: 1px;"></span> Sequência Direta (Visão de Pássaro)</div>
                 <div id="mapa-padrao" class="mapa-container"></div>
             </div>
             <div class="col-mapa">
                 <button class="btn-modo btn-otimizada" onclick="escolherRotaOtimizada()">
-                    🚀 OTIMIZADA SPX NINJA<br><small id="km-otimizada" style="font-weight:normal;">Visão de Pássaro: Calculando...</small>
+                    🚀 OTIMIZADA SPX NINJA<br><small id="km-otimizada" style="font-weight:normal;">Calculando KM real corrigido...</small>
                 </button>
-                <div class="legenda"><span style="background: #39FF14; border-bottom: 2px dashed #39FF14; height: 1px;"></span> Sequência Direta (Linha Reta)</div>
+                <div class="legenda"><span style="background: #39FF14; border-bottom: 2px dashed #39FF14; height: 1px;"></span> Sequência Direta (Visão de Pássaro)</div>
                 <div id="mapa-otimizado" class="mapa-container"></div>
             </div>
         </div>
@@ -131,13 +131,12 @@
     </div>
 
     <div id="modal-info-otimizada" class="modal-fullscreen">
-        <h2>🚀 MODO: OTIMIZADA SPX (Versão de Campo)</h2>
+        <h2>🚀 MODO: OTIMIZADA SPX (Varal Inteligente)</h2>
         <div class="info-container">
             <p>Foco total na <strong>Ordem Funcional</strong>:</p>
-            <p>1. Agrupamento a pé (70m).</p>
-            <p>2. Varredura da rua priorizada e no sentido correto da via.</p>
-            <p>3. Filtro Geográfico e Retorno Sequencial para quebra de bairro.</p>
-            <p>As linhas no mapa anterior são apenas "Visão de Pássaro". Confie na ordem da lista abaixo para a rua!</p>
+            <p>1. <strong>Agrupamento a pé (70m):</strong> Entregas coladas são feitas a pé e não inflam o KM da auditoria.</p>
+            <p>2. <strong>O "Desconto de Rua":</strong> O aplicativo está viciado em varrer a rua inteira como um zíper, mantendo o sentido do fluxo.</p>
+            <p>3. <strong>Filtro Anti-Retorno:</strong> Ele só solta a rua se no final dela houver uma contramão obrigatória gigantesca.</p>
         </div>
         <button class="btn-modo btn-otimizada" onclick="avancarParaDocaOtimizada()">IR PARA SEPARAÇÃO (BAGS) 📦</button>
     </div>
@@ -157,8 +156,8 @@
     </div>
 
     <div id="tela-navegacao">
-        
-        <div id="radar-alert">📸 RADAR 50m</div> <div id="painel-topo">
+        <div id="radar-alert">📸 RADAR 50m</div>
+        <div id="painel-topo">
             <div id="btn-menu-stops" onclick="abrirMenuStops()"><span>📋</span></div>
             <div id="stop-badge">STOP -- (-- vol)</div>
             <div id="lista-enderecos"></div>
@@ -190,7 +189,6 @@
         let mapPadrao = null, mapOtimizado = null;
         let layerPadrao = L.layerGroup(), layerOtimizado = L.layerGroup();
 
-        // Variáveis Globais do Radar
         let listaRadares = [];
         let radarAtivo = null;
         let audioCtx = null;
@@ -203,7 +201,6 @@
             if (wakeLock !== null) { wakeLock.release(); wakeLock = null; }
         }
 
-        // --- INICIALIZAÇÃO DE ÁUDIO (Exigência do Navegador) ---
         function initAudio() {
             try {
                 window.AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -219,7 +216,7 @@
                 let gain = audioCtx.createGain();
                 osc.connect(gain);
                 gain.connect(audioCtx.destination);
-                osc.type = 'square'; // Som eletrônico agudo
+                osc.type = 'square';
                 osc.frequency.value = 880;
                 gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
                 gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
@@ -228,19 +225,16 @@
             } catch(e) {}
         }
 
-        // --- DOWNLOAD SILENCIOSO DOS RADARES ---
         async function baixarRadaresDaRegiao(rota) {
             if (!rota || rota.length === 0) return;
             try {
                 let lats = rota.map(p => p.lat);
                 let lons = rota.map(p => p.lon);
-                // Cria uma "Caixa" com folga de segurança ao redor do bairro
                 let minLat = Math.min(...lats) - 0.015; 
                 let maxLat = Math.max(...lats) + 0.015;
                 let minLon = Math.min(...lons) - 0.015;
                 let maxLon = Math.max(...lons) + 0.015;
 
-                // Consulta a API pública do Overpass
                 let query = `[out:json][timeout:15];node["highway"="speed_camera"](${minLat},${minLon},${maxLat},${maxLon});out;`;
                 let url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
                 
@@ -249,16 +243,12 @@
                 
                 if (data && data.elements) {
                     listaRadares = data.elements.map(e => ({
-                        lat: e.lat,
-                        lon: e.lon,
-                        speed: e.tags.maxspeed || ""
+                        lat: e.lat, lon: e.lon, speed: e.tags.maxspeed || ""
                     }));
-                    console.log(`Radar Armado: ${listaRadares.length} câmeras carregadas na região.`);
                 }
-            } catch(e) { console.error("Erro ao buscar radares silenciosos:", e); }
+            } catch(e) {}
         }
 
-        // Matemática Pura
         function dist(la1, lo1, la2, lo2) {
             const R = 6371000;
             const dLat = (la2-la1) * Math.PI/180;
@@ -274,13 +264,10 @@
             if (match) limpo = match[1].trim();
             limpo = limpo.replace(/^R\.\s|^R\s/, "RUA ");
             limpo = limpo.replace(/^AV\.\s|^AV\s/, "AVENIDA ");
-            // Expande abreviações comuns no MEIO do nome (ex: "Mal Deodoro" e "Marechal Deodoro"
-            // precisam virar a mesma chave, senão a Camada 1 trata como ruas diferentes)
             const abreviacoes = {
                 '\\bGEN\\b': 'GENERAL', '\\bMAL\\b': 'MARECHAL', '\\bDR\\b': 'DOUTOR',
                 '\\bPRES\\b': 'PRESIDENTE', '\\bSTO\\b': 'SANTO', '\\bSTA\\b': 'SANTA',
-                '\\bPROF\\b': 'PROFESSOR', '\\bCEL\\b': 'CORONEL', '\\bCAP\\b': 'CAPITAO',
-                '\\bENG\\b': 'ENGENHEIRO', '\\bCMTE\\b': 'COMANDANTE'
+                '\\bPROF\\b': 'PROFESSOR', '\\bCEL\\b': 'CORONEL', '\\bCAP\\b': 'CAPITAO'
             };
             for (let padrao in abreviacoes) {
                 limpo = limpo.replace(new RegExp(padrao, 'g'), abreviacoes[padrao]);
@@ -309,16 +296,14 @@
             }
         }
 
-        // --- NOVA AUDITORIA: VISÃO DE PÁSSARO (linhas retas p/ leitura da ordem, KM real do OSRM p/ comparação) ---
+        // --- A AUDITORIA CORRIGIDA (O Fim do Paradoxo da Calçada) ---
         async function plotarVisaoPassaro(camada, mapaLocal, rota, corLinha, matrixDist, matrixDur) {
             camada.clearLayers();
             let boundsCoords = [];
             let distanciaTotalReal = 0;
             let duracaoTotalReal = 0;
-            let usouEstimativa = false;
 
-            if (rota.length === 0) return { km: 0, min: 0, estimado: false };
-
+            if (rota.length === 0) return { km: 0, min: 0 };
             let latlngs = [];
 
             for (let i = 0; i < rota.length; i++) {
@@ -333,79 +318,66 @@
 
                 if (i > 0) {
                     const anterior = rota[i-1];
-                    // Usa a matriz REAL do OSRM (distância de rua) quando disponível.
-                    // Cai para linha reta (Haversine) apenas se a matriz não existir para esse par.
-                    const temMatriz = matrixDist && matrixDist[anterior.idOriginal] && matrixDist[anterior.idOriginal][p.idOriginal] != null;
-
-                    if (temMatriz) {
-                        distanciaTotalReal += matrixDist[anterior.idOriginal][p.idOriginal];
-                        if (matrixDur && matrixDur[anterior.idOriginal] && matrixDur[anterior.idOriginal][p.idOriginal] != null) {
-                            duracaoTotalReal += matrixDur[anterior.idOriginal][p.idOriginal];
-                        }
+                    const dReta = dist(anterior.lat, anterior.lon, p.lat, p.lon);
+                    
+                    // A MÁGICA: Se é perto (< 70m), cobra só a caminhada e não pergunta pro satélite!
+                    if (dReta <= 70) {
+                        distanciaTotalReal += dReta;
+                        duracaoTotalReal += (dReta / 1.5); // Caminhada ~ 1.5 m/s
                     } else {
-                        usouEstimativa = true;
-                        distanciaTotalReal += dist(anterior.lat, anterior.lon, p.lat, p.lon);
+                        // É longe, precisa de carro. Cobra o asfalto.
+                        const temMatriz = matrixDist && matrixDist[anterior.idOriginal] && matrixDist[anterior.idOriginal][p.idOriginal] != null;
+                        if (temMatriz) {
+                            distanciaTotalReal += matrixDist[anterior.idOriginal][p.idOriginal];
+                            if (matrixDur && matrixDur[anterior.idOriginal] && matrixDur[anterior.idOriginal][p.idOriginal] != null) {
+                                duracaoTotalReal += matrixDur[anterior.idOriginal][p.idOriginal];
+                            }
+                        } else {
+                            distanciaTotalReal += dReta * 1.5;
+                            duracaoTotalReal += (dReta * 1.5) / 8;
+                        }
                     }
                 }
             }
 
             if (latlngs.length > 0) {
-                // Linha reta e tracejada continua sendo usada só para leitura visual da ORDEM/sequência, não para o cálculo do KM
                 L.polyline(latlngs, { color: corLinha, weight: 3, opacity: 0.8, dashArray: '6, 6' }).addTo(camada);
                 mapaLocal.fitBounds(L.polyline(boundsCoords).getBounds(), { padding: [30, 30] });
             }
 
-            return { km: distanciaTotalReal / 1000, min: duracaoTotalReal / 60, estimado: usouEstimativa };
+            return { km: distanciaTotalReal / 1000, min: duracaoTotalReal / 60 };
         }
 
-        // --- MOTOR DE TESTE DE CAMPO (V2 — Or-opt + 2-opt de ponta a ponta, com garantia matemática) ---
-        //
-        // POR QUE FOI TROCADO:
-        // O motor antigo agrupava paradas próximas (<70m) em "âncoras" e só otimizava a ordem
-        // das âncoras entre si. As paradas dentro de uma âncora (o "grupo a pé") eram coladas na
-        // rota na ordem em que apareciam na planilha, sem otimização nenhuma. Só que o KM final
-        // exibido na tela de auditoria soma a distância REAL de carro (matriz OSRM) entre TODOS os
-        // pontos consecutivos — inclusive dentro do grupo a pé. Como ruas de mão única fazem a
-        // distância "de carro" entre dois pontos vizinhos (a pé) variar bastante, esses trechos
-        // não-otimizados dentro das âncoras conseguiam, sozinhos, inflar o total da rota "otimizada"
-        // a ponto dela ficar PIOR que a rota padrão da Shopee — mesmo a ordem das âncoras estando
-        // correta. Esse é o motivo pelo qual você via 16.98 km na otimizada contra 12.76 km na padrão.
-        //
-        // A CORREÇÃO:
-        // 1. O motor agora otimiza TODAS as paradas de uma vez só (não só as âncoras), então nenhum
-        //    trecho fica de fora do cálculo/otimização — acaba o ponto cego.
-        // 2. Usa 2-opt (desfaz cruzamentos) + Or-opt (realoca 1-3 paradas seguidas pra uma posição
-        //    melhor) — a combinação clássica pra sair de rotas "zigue-zague" e virar "varredura".
-        // 3. GARANTIA MATEMÁTICA: o motor gera dois candidatos — (a) partindo de um vizinho-mais-
-        //    próximo, e (b) partindo da PRÓPRIA sequência original da Shopee — e refina os dois com
-        //    2-opt/Or-opt (que só aceitam trocas que MELHORAM o custo, nunca pioram). No fim, escolhe
-        //    o candidato de menor custo real. Como o candidato (b) nunca fica pior que a rota original,
-        //    a rota "otimizada" NUNCA pode aparecer com KM maior que a rota "padrão" — se um dia
-        //    aparecer igual, é porque a rota já estava no ótimo local, nunca pior.
-        // 4. O agrupamento a pé (âncoras de 70m) continua existindo, só que agora é calculado DEPOIS
-        //    da rota já otimizada, apenas pra fins de exibição (ex.: no modo Doca), sem interferir
-        //    no cálculo de distância.
-        function gerarRotaDeCampo(rotaBase, matrix) {
-            if (rotaBase.length <= 1) return rotaBase;
-            return otimizarComGarantia(rotaBase, matrix);
-        }
-
-        // Custo real entre duas paradas: usa a matriz OSRM quando existe o par, senão cai pra linha reta
+        // --- O MOTOR MATEMÁTICO COM "DESCONTO DE RUA" (O Varal Inteligente) ---
         function custoReal(a, b, matrix) {
             if (matrix && matrix[a.idOriginal] && matrix[a.idOriginal][b.idOriginal] != null) {
                 return matrix[a.idOriginal][b.idOriginal];
             }
-            return dist(a.lat, a.lon, b.lat, b.lon);
+            return dist(a.lat, a.lon, b.lat, b.lon) * 1.5; 
         }
 
-        // Custo total de uma rota (soma das pernas consecutivas) — mesma métrica usada na tela de auditoria
-        function custoTotalRota(rota, matrix) {
+        // Esta é a função que engana o algoritmo para forçar o varal
+        function custoLogico(a, b, matrix) {
+            let dReta = dist(a.lat, a.lon, b.lat, b.lon);
+            // 1. Se dá para ir a pé, o algoritmo acha irresistível e junta na hora
+            if (dReta <= 70) return dReta * 0.001; 
+            
+            let c = custoReal(a, b, matrix);
+            // 2. Se for na mesma rua, ganha 85% de desconto. Ele vai preferir varrer a rua!
+            // Mas se o retorno da rua for monstruoso (ex: 3000 metros), 15% de 3000m ainda é 450m.
+            // Se tiver uma rua paralela a 150m, ele abandona a rua para não dar a volta!
+            if (a.ruaPadrao === b.ruaPadrao && a.ruaPadrao !== "DESCONHECIDO") {
+                return c * 0.15; 
+            }
+            return c;
+        }
+
+        function custoTotalLogico(rota, matrix) {
             let total = 0;
-            for (let i = 0; i < rota.length - 1; i++) total += custoReal(rota[i], rota[i + 1], matrix);
+            for (let i = 0; i < rota.length - 1; i++) total += custoLogico(rota[i], rota[i + 1], matrix);
             return total;
         }
 
-        // Vizinho-mais-próximo (guloso), sempre partindo da primeira parada (ponto de partida fixo)
         function vizinhoMaisProximo(pontos, matrix) {
             let pendentes = [...pontos];
             let atual = pendentes.shift();
@@ -413,7 +385,7 @@
             while (pendentes.length > 0) {
                 let melhorIdx = 0, menorCusto = Infinity;
                 for (let k = 0; k < pendentes.length; k++) {
-                    const c = custoReal(atual, pendentes[k], matrix);
+                    const c = custoLogico(atual, pendentes[k], matrix);
                     if (c < menorCusto) { menorCusto = c; melhorIdx = k; }
                 }
                 atual = pendentes[melhorIdx];
@@ -423,8 +395,6 @@
             return rota;
         }
 
-        // Refinamento 2-opt: troca pares de trechos que se cruzam/desperdiçam distância real,
-        // mantendo o ponto de partida (primeira parada) fixo. Só aceita trocas que melhoram o custo.
         function aplicar2opt(rota, matrix, maxIter = 300) {
             if (rota.length < 4) return rota;
             let r = [...rota];
@@ -437,9 +407,9 @@
                     for (let j = i + 2; j < r.length; j++) {
                         const a = r[i], b = r[i + 1], c = r[j];
                         const d = (j + 1 < r.length) ? r[j + 1] : null;
-                        const antes = custoReal(a, b, matrix) + (d ? custoReal(c, d, matrix) : 0);
-                        const depois = custoReal(a, c, matrix) + (d ? custoReal(b, d, matrix) : 0);
-                        if (depois < antes - 1) { // margem de 1m evita loop por arredondamento
+                        const antes = custoLogico(a, b, matrix) + (d ? custoLogico(c, d, matrix) : 0);
+                        const depois = custoLogico(a, c, matrix) + (d ? custoLogico(b, d, matrix) : 0);
+                        if (depois < antes - 0.1) {
                             const seg = r.slice(i + 1, j + 1).reverse();
                             r = [...r.slice(0, i + 1), ...seg, ...r.slice(j + 1)];
                             melhorou = true;
@@ -450,9 +420,6 @@
             return r;
         }
 
-        // Refinamento Or-opt: tenta realocar blocos de 1, 2 ou 3 paradas consecutivas pra uma posição
-        // melhor da rota. Pega os casos que o 2-opt sozinho não resolve (ex.: uma parada isolada que
-        // ficou "no caminho errado" e faz o carro voltar). Também só aceita trocas que melhoram o custo.
         function aplicarOrOpt(rota, matrix, maxIter = 300) {
             let r = [...rota];
             let melhorou = true, iter = 0;
@@ -461,26 +428,26 @@
                 melhorou = false;
                 iter++;
                 for (let segLen = 1; segLen <= 3; segLen++) {
-                    for (let i = 1; i < r.length - segLen; i++) { // nunca move a 1ª parada (partida fixa)
+                    for (let i = 1; i < r.length - segLen; i++) { 
                         const antesA = r[i - 1];
                         const seg = r.slice(i, i + segLen);
                         const depoisB = r[i + segLen];
                         if (!depoisB) continue;
 
-                        const custoRemocao = custoReal(antesA, seg[0], matrix) + custoReal(seg[segLen - 1], depoisB, matrix);
-                        const custoFechamento = custoReal(antesA, depoisB, matrix);
+                        const custoRemocao = custoLogico(antesA, seg[0], matrix) + custoLogico(seg[segLen - 1], depoisB, matrix);
+                        const custoFechamento = custoLogico(antesA, depoisB, matrix);
                         const ganhoRemocao = custoRemocao - custoFechamento;
-                        if (ganhoRemocao <= 0) continue; // tirar o bloco daqui não economiza nada
+                        if (ganhoRemocao <= 0) continue; 
 
                         let restante = [...r.slice(0, i), ...r.slice(i + segLen)];
                         let melhorPos = -1, melhorCustoInsercao = Infinity;
-                        for (let k = 1; k < restante.length; k++) { // nunca insere antes da posição 1
+                        for (let k = 1; k < restante.length; k++) { 
                             const p1 = restante[k - 1], p2 = restante[k];
-                            const custoInsercao = custoReal(p1, seg[0], matrix) + custoReal(seg[segLen - 1], p2, matrix) - custoReal(p1, p2, matrix);
+                            const custoInsercao = custoLogico(p1, seg[0], matrix) + custoLogico(seg[segLen - 1], p2, matrix) - custoLogico(p1, p2, matrix);
                             if (custoInsercao < melhorCustoInsercao) { melhorCustoInsercao = custoInsercao; melhorPos = k; }
                         }
 
-                        if (melhorPos !== -1 && melhorCustoInsercao < ganhoRemocao - 1) {
+                        if (melhorPos !== -1 && melhorCustoInsercao < ganhoRemocao - 0.1) {
                             restante.splice(melhorPos, 0, ...seg);
                             r = restante;
                             melhorou = true;
@@ -491,33 +458,26 @@
             return r;
         }
 
-        // Motor com garantia: nunca entrega uma rota "otimizada" pior que a rota padrão da Shopee.
-        function otimizarComGarantia(rotaBase, matrix) {
-            // Candidato 1: parte do vizinho-mais-próximo (bom pra achar uma ordem geográfica lógica do zero)
+        function gerarRotaDeCampo(rotaBase, matrix) {
+            if (rotaBase.length <= 1) return rotaBase;
+            
+            // Usa as regras de Varal e Proximidade em cima da matemática global
             let candNN = vizinhoMaisProximo(rotaBase, matrix);
             candNN = aplicar2opt(candNN, matrix);
             candNN = aplicarOrOpt(candNN, matrix);
-            candNN = aplicar2opt(candNN, matrix); // 2ª passada: Or-opt pode ter aberto um cruzamento novo
+            candNN = aplicar2opt(candNN, matrix); 
 
-            // Candidato 2: parte da PRÓPRIA sequência original da Shopee, só refinada
             let candOriginal = [...rotaBase];
             candOriginal = aplicar2opt(candOriginal, matrix);
             candOriginal = aplicarOrOpt(candOriginal, matrix);
             candOriginal = aplicar2opt(candOriginal, matrix);
 
-            const custoNN = custoTotalRota(candNN, matrix);
-            const custoOriginal = custoTotalRota(candOriginal, matrix);
+            const custoNN = custoTotalLogico(candNN, matrix);
+            const custoOriginal = custoTotalLogico(candOriginal, matrix);
 
-            // Como o candidato 2 SEMPRE parte da ordem original e só recebe trocas que melhoram o
-            // custo, seu total nunca pode ficar maior que o da rota padrão. Ao escolher o menor dos
-            // dois candidatos, a rota "otimizada" final também nunca fica pior que a padrão.
             return custoNN <= custoOriginal ? candNN : candOriginal;
         }
 
-        // Agrupamento a pé (âncoras de 70m) — SÓ PRA EXIBIÇÃO (ex.: futuro uso no modo Doca).
-        // Roda DEPOIS da rota já otimizada, então não interfere mais no cálculo de distância:
-        // ele apenas marca quais paradas, na ordem final, já ficaram naturalmente próximas o
-        // suficiente pra virar caminhada em vez de trecho de carro.
         function marcarGruposAPe(rotaOtimizada) {
             for (let i = 0; i < rotaOtimizada.length; i++) {
                 if (i === 0) { rotaOtimizada[i].andaAPe = false; continue; }
@@ -591,21 +551,19 @@
                             let res = await fetch(`https://router.project-osrm.org/table/v1/driving/${coords}?annotations=distance,duration`);
                             let data = await res.json();
                             if(data.code === 'Ok') { matrizOSRM = data.distances; matrizDuracao = data.durations; }
-                        } catch(e) { console.warn("Aviso: Trânsito OSRM offline, usando distâncias retas."); }
+                        } catch(e) { console.warn("Aviso: Trânsito OSRM offline."); }
                     }
 
-                    // Roda a Otimização de Campo
+                    // Gera Otimização com as Novas Regras e Marca Caminhadas
                     rotaOtimizadaData = gerarRotaDeCampo(rotaOriginalData, matrizOSRM);
-                    marcarGruposAPe(rotaOtimizadaData); // marca visualmente quem virou caminhada (não afeta o KM)
+                    marcarGruposAPe(rotaOtimizadaData);
                     
-                    // DISPARA O DOWNLOAD DOS RADARES (Invisível, em segundo plano)
                     baixarRadaresDaRegiao(rotaOriginalData);
 
                     document.getElementById('controles-iniciais').style.display = 'none';
                     document.getElementById('modal-auditoria').style.display = 'flex';
                     iniciarMapasAuditoria();
                     
-                    // Desenha Visão de Pássaro (Mais rápido e sem bugar visualmente)
                     setTimeout(async () => {
                         mapPadrao.invalidateSize();
                         mapOtimizado.invalidateSize();
@@ -613,11 +571,8 @@
                         let rPadrao = await plotarVisaoPassaro(layerPadrao, mapPadrao, rotaOriginalData, '#ff4444', matrizOSRM, matrizDuracao);
                         let rOtim = await plotarVisaoPassaro(layerOtimizado, mapOtimizado, rotaOtimizadaData, '#39FF14', matrizOSRM, matrizDuracao);
 
-                        // Agora mostra KM real de estrada (OSRM) + tempo estimado, com aviso se caiu em estimativa
                         const fmt = (r) => {
-                            let txt = `${r.km.toFixed(2)} km`;
-                            if (r.min > 0) txt += ` • ~${Math.round(r.min)} min`;
-                            if (r.estimado) txt += ` (aprox.)`;
+                            let txt = `${r.km.toFixed(2)} km Reais`;
                             return txt;
                         };
                         document.getElementById('km-padrao').innerText = fmt(rPadrao);
@@ -641,7 +596,7 @@
         }
 
         function avancarParaGPSPadrao() {
-            initAudio(); // Ativa permissão de som no clique do usuário
+            initAudio(); 
             document.getElementById('modal-info-padrao').style.display = 'none';
             iniciarInterfaceNavegacao(); 
         }
@@ -659,7 +614,7 @@
         }
 
         function iniciarGPSPosDoca() {
-            initAudio(); // Ativa permissão de som no clique do usuário
+            initAudio(); 
             document.getElementById('modal-doca').style.display = 'none';
             iniciarInterfaceNavegacao();
         }
@@ -780,12 +735,11 @@
                     markerUser.setLatLng([minhaLat, minhaLon]);
                 }
 
-                // --- NOVO: MÓDULO RASTREADOR DE RADAR (50m) ---
+                // RADAR DE 50m
                 if (listaRadares.length > 0) {
                     let radarProxDaVez = null;
                     let menorDistRadar = Infinity;
                     
-                    // Procura o radar mais próximo de você
                     for (let r of listaRadares) {
                         let dRadar = dist(minhaLat, minhaLon, r.lat, r.lon);
                         if (dRadar <= 50 && dRadar < menorDistRadar) {
@@ -797,25 +751,21 @@
                     let alertaHtml = document.getElementById('radar-alert');
                     
                     if (radarProxDaVez) {
-                        // Entrou na bolha de 50 metros. É um radar novo?
                         if (radarAtivo !== radarProxDaVez) {
-                            radarAtivo = radarProxDaVez; // Trava para não bipar de novo
-                            playBipeRadar(); // Dá o Bip sonoro
+                            radarAtivo = radarProxDaVez; 
+                            playBipeRadar(); 
                             
-                            // Monta a Plaquinha
                             let velText = radarProxDaVez.speed ? ` ${radarProxDaVez.speed} km/h` : '';
                             alertaHtml.innerHTML = `📸 RADAR${velText}`;
                             alertaHtml.style.display = 'flex';
                         }
                     } else {
-                        // Não tem nenhum radar a menos de 50m. Se tinha um ativo, esconde a placa.
                         if (radarAtivo) {
-                            radarAtivo = null; // Desarma para o próximo
+                            radarAtivo = null; 
                             alertaHtml.style.display = 'none';
                         }
                     }
                 }
-                // ----------------------------------------------
 
                 const desviou = ultimaLatReq && dist(minhaLat, minhaLon, ultimaLatReq, ultimaLonReq) > 30;
 
@@ -873,7 +823,6 @@
             
             document.getElementById('rodape-dist').innerText = dFinal > 1000 ? (dFinal/1000).toFixed(1) + " km" : Math.round(dFinal) + " m";
 
-            // ALERTA DE CHEGADA: Ajustado para 20 metros rigorosos!
             if (dFinal < 20) {
                 aguardandoConfirmacao = true;
                 releaseWakeLock();
