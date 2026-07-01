@@ -358,50 +358,36 @@
             return { km: distanciaTotalReal / 1000, min: duracaoTotalReal / 60, estimado: usouEstimativa };
         }
 
-        // --- MOTOR DE TESTE DE CAMPO ---
+        // --- MOTOR DE TESTE DE CAMPO (V2 — Or-opt + 2-opt de ponta a ponta, com garantia matemática) ---
+        //
+        // POR QUE FOI TROCADO:
+        // O motor antigo agrupava paradas próximas (<70m) em "âncoras" e só otimizava a ordem
+        // das âncoras entre si. As paradas dentro de uma âncora (o "grupo a pé") eram coladas na
+        // rota na ordem em que apareciam na planilha, sem otimização nenhuma. Só que o KM final
+        // exibido na tela de auditoria soma a distância REAL de carro (matriz OSRM) entre TODOS os
+        // pontos consecutivos — inclusive dentro do grupo a pé. Como ruas de mão única fazem a
+        // distância "de carro" entre dois pontos vizinhos (a pé) variar bastante, esses trechos
+        // não-otimizados dentro das âncoras conseguiam, sozinhos, inflar o total da rota "otimizada"
+        // a ponto dela ficar PIOR que a rota padrão da Shopee — mesmo a ordem das âncoras estando
+        // correta. Esse é o motivo pelo qual você via 16.98 km na otimizada contra 12.76 km na padrão.
+        //
+        // A CORREÇÃO:
+        // 1. O motor agora otimiza TODAS as paradas de uma vez só (não só as âncoras), então nenhum
+        //    trecho fica de fora do cálculo/otimização — acaba o ponto cego.
+        // 2. Usa 2-opt (desfaz cruzamentos) + Or-opt (realoca 1-3 paradas seguidas pra uma posição
+        //    melhor) — a combinação clássica pra sair de rotas "zigue-zague" e virar "varredura".
+        // 3. GARANTIA MATEMÁTICA: o motor gera dois candidatos — (a) partindo de um vizinho-mais-
+        //    próximo, e (b) partindo da PRÓPRIA sequência original da Shopee — e refina os dois com
+        //    2-opt/Or-opt (que só aceitam trocas que MELHORAM o custo, nunca pioram). No fim, escolhe
+        //    o candidato de menor custo real. Como o candidato (b) nunca fica pior que a rota original,
+        //    a rota "otimizada" NUNCA pode aparecer com KM maior que a rota "padrão" — se um dia
+        //    aparecer igual, é porque a rota já estava no ótimo local, nunca pior.
+        // 4. O agrupamento a pé (âncoras de 70m) continua existindo, só que agora é calculado DEPOIS
+        //    da rota já otimizada, apenas pra fins de exibição (ex.: no modo Doca), sem interferir
+        //    no cálculo de distância.
         function gerarRotaDeCampo(rotaBase, matrix) {
             if (rotaBase.length <= 1) return rotaBase;
-
-            // 1. AGRUPAMENTO A PÉ (Âncoras de 70m) — igual antes
-            let anchors = [];
-            for (let i = 0; i < rotaBase.length; i++) {
-                let p = rotaBase[i];
-                let found = false;
-                for (let a of anchors) {
-                    if (dist(a.lat, a.lon, p.lat, p.lon) <= 70) {
-                        a.walking.push(p);
-                        found = true;
-                        break;
-                    }
-                }
-                if (!found) {
-                    anchors.push({ ...p, walking: [] });
-                }
-            }
-
-            let rotaOtimizada;
-            if (matrix) {
-                // MOTOR REAL: vizinho-mais-próximo + 2-opt usando distância REAL de estrada (OSRM),
-                // não linha reta e não nome de rua. Como a matriz do OSRM já respeita mão de direção,
-                // o resultado tende a ser naturalmente dirigível sem contramão, sem precisar adivinhar por regras.
-                rotaOtimizada = otimizarComMatrizReal(anchors, matrix);
-            } else {
-                // FALLBACK: sem matriz real (planilha > 100 paradas ou OSRM indisponível),
-                // usa a heurística antiga por rua/raio/sequência.
-                rotaOtimizada = otimizarPorCamadas(anchors);
-            }
-
-            let rotaFinal = [];
-            for (let a of rotaOtimizada) {
-                let anchorStop = { ...a };
-                delete anchorStop.walking;
-                rotaFinal.push(anchorStop);
-                for (let w of a.walking) {
-                    rotaFinal.push(w);
-                }
-            }
-
-            return rotaFinal;
+            return otimizarComGarantia(rotaBase, matrix);
         }
 
         // Custo real entre duas paradas: usa a matriz OSRM quando existe o par, senão cai pra linha reta
@@ -412,12 +398,18 @@
             return dist(a.lat, a.lon, b.lat, b.lon);
         }
 
-        // Vizinho-mais-próximo (guloso) usando distância real, depois refinado com 2-opt
-        function otimizarComMatrizReal(anchors, matrix) {
-            let pendentes = [...anchors];
+        // Custo total de uma rota (soma das pernas consecutivas) — mesma métrica usada na tela de auditoria
+        function custoTotalRota(rota, matrix) {
+            let total = 0;
+            for (let i = 0; i < rota.length - 1; i++) total += custoReal(rota[i], rota[i + 1], matrix);
+            return total;
+        }
+
+        // Vizinho-mais-próximo (guloso), sempre partindo da primeira parada (ponto de partida fixo)
+        function vizinhoMaisProximo(pontos, matrix) {
+            let pendentes = [...pontos];
             let atual = pendentes.shift();
             let rota = [atual];
-
             while (pendentes.length > 0) {
                 let melhorIdx = 0, menorCusto = Infinity;
                 for (let k = 0; k < pendentes.length; k++) {
@@ -428,12 +420,11 @@
                 rota.push(atual);
                 pendentes.splice(melhorIdx, 1);
             }
-
-            return aplicar2opt(rota, matrix);
+            return rota;
         }
 
         // Refinamento 2-opt: troca pares de trechos que se cruzam/desperdiçam distância real,
-        // mantendo o ponto de partida (primeira parada) fixo.
+        // mantendo o ponto de partida (primeira parada) fixo. Só aceita trocas que melhoram o custo.
         function aplicar2opt(rota, matrix, maxIter = 300) {
             if (rota.length < 4) return rota;
             let r = [...rota];
@@ -459,58 +450,81 @@
             return r;
         }
 
-        // FALLBACK (sem matriz real do OSRM): heurística por rua/raio/sequência original
-        function otimizarPorCamadas(anchors) {
-            let rotaOtimizada = [];
-            let pendentes = [...anchors];
-            let atual = pendentes.shift();
-            rotaOtimizada.push(atual);
+        // Refinamento Or-opt: tenta realocar blocos de 1, 2 ou 3 paradas consecutivas pra uma posição
+        // melhor da rota. Pega os casos que o 2-opt sozinho não resolve (ex.: uma parada isolada que
+        // ficou "no caminho errado" e faz o carro voltar). Também só aceita trocas que melhoram o custo.
+        function aplicarOrOpt(rota, matrix, maxIter = 300) {
+            let r = [...rota];
+            let melhorou = true, iter = 0;
 
-            while (pendentes.length > 0) {
-                let melhorProximo = null;
-                let ruaAtual = atual.ruaPadrao;
+            while (melhorou && iter < maxIter) {
+                melhorou = false;
+                iter++;
+                for (let segLen = 1; segLen <= 3; segLen++) {
+                    for (let i = 1; i < r.length - segLen; i++) { // nunca move a 1ª parada (partida fixa)
+                        const antesA = r[i - 1];
+                        const seg = r.slice(i, i + segLen);
+                        const depoisB = r[i + segLen];
+                        if (!depoisB) continue;
 
-                // CAMADA 1: VARREDURA ABSOLUTA DA RUA
-                if (ruaAtual !== "DESCONHECIDO") {
-                    let vizinhosRua = pendentes.filter(p => 
-                        p.ruaPadrao === ruaAtual && dist(atual.lat, atual.lon, p.lat, p.lon) < 1200
-                    );
+                        const custoRemocao = custoReal(antesA, seg[0], matrix) + custoReal(seg[segLen - 1], depoisB, matrix);
+                        const custoFechamento = custoReal(antesA, depoisB, matrix);
+                        const ganhoRemocao = custoRemocao - custoFechamento;
+                        if (ganhoRemocao <= 0) continue; // tirar o bloco daqui não economiza nada
 
-                    if (vizinhosRua.length > 0) {
-                        vizinhosRua.sort((a, b) => Math.abs(a.idOriginal - atual.idOriginal) - Math.abs(b.idOriginal - atual.idOriginal));
-                        melhorProximo = vizinhosRua[0];
-                    }
-                }
+                        let restante = [...r.slice(0, i), ...r.slice(i + segLen)];
+                        let melhorPos = -1, melhorCustoInsercao = Infinity;
+                        for (let k = 1; k < restante.length; k++) { // nunca insere antes da posição 1
+                            const p1 = restante[k - 1], p2 = restante[k];
+                            const custoInsercao = custoReal(p1, seg[0], matrix) + custoReal(seg[segLen - 1], p2, matrix) - custoReal(p1, p2, matrix);
+                            if (custoInsercao < melhorCustoInsercao) { melhorCustoInsercao = custoInsercao; melhorPos = k; }
+                        }
 
-                // CAMADA 2: RADAR DE VIZINHANÇA
-                if (!melhorProximo) {
-                    let menorDRadial = Infinity;
-                    for (let cand of pendentes) {
-                        let dReta = dist(atual.lat, atual.lon, cand.lat, cand.lon);
-                        if (dReta < 250 && dReta < menorDRadial) {
-                            menorDRadial = dReta;
-                            melhorProximo = cand;
+                        if (melhorPos !== -1 && melhorCustoInsercao < ganhoRemocao - 1) {
+                            restante.splice(melhorPos, 0, ...seg);
+                            r = restante;
+                            melhorou = true;
                         }
                     }
                 }
-
-                // CAMADA 3: RESGATE POR PROXIMIDADE GEOGRÁFICA REAL
-                if (!melhorProximo) {
-                    let menorDResgate = Infinity;
-                    for (let cand of pendentes) {
-                        let dReta = dist(atual.lat, atual.lon, cand.lat, cand.lon);
-                        if (dReta < menorDResgate) {
-                            menorDResgate = dReta;
-                            melhorProximo = cand;
-                        }
-                    }
-                }
-
-                rotaOtimizada.push(melhorProximo);
-                pendentes = pendentes.filter(p => p.idOriginal !== melhorProximo.idOriginal);
-                atual = melhorProximo;
             }
+            return r;
+        }
 
+        // Motor com garantia: nunca entrega uma rota "otimizada" pior que a rota padrão da Shopee.
+        function otimizarComGarantia(rotaBase, matrix) {
+            // Candidato 1: parte do vizinho-mais-próximo (bom pra achar uma ordem geográfica lógica do zero)
+            let candNN = vizinhoMaisProximo(rotaBase, matrix);
+            candNN = aplicar2opt(candNN, matrix);
+            candNN = aplicarOrOpt(candNN, matrix);
+            candNN = aplicar2opt(candNN, matrix); // 2ª passada: Or-opt pode ter aberto um cruzamento novo
+
+            // Candidato 2: parte da PRÓPRIA sequência original da Shopee, só refinada
+            let candOriginal = [...rotaBase];
+            candOriginal = aplicar2opt(candOriginal, matrix);
+            candOriginal = aplicarOrOpt(candOriginal, matrix);
+            candOriginal = aplicar2opt(candOriginal, matrix);
+
+            const custoNN = custoTotalRota(candNN, matrix);
+            const custoOriginal = custoTotalRota(candOriginal, matrix);
+
+            // Como o candidato 2 SEMPRE parte da ordem original e só recebe trocas que melhoram o
+            // custo, seu total nunca pode ficar maior que o da rota padrão. Ao escolher o menor dos
+            // dois candidatos, a rota "otimizada" final também nunca fica pior que a padrão.
+            return custoNN <= custoOriginal ? candNN : candOriginal;
+        }
+
+        // Agrupamento a pé (âncoras de 70m) — SÓ PRA EXIBIÇÃO (ex.: futuro uso no modo Doca).
+        // Roda DEPOIS da rota já otimizada, então não interfere mais no cálculo de distância:
+        // ele apenas marca quais paradas, na ordem final, já ficaram naturalmente próximas o
+        // suficiente pra virar caminhada em vez de trecho de carro.
+        function marcarGruposAPe(rotaOtimizada) {
+            for (let i = 0; i < rotaOtimizada.length; i++) {
+                if (i === 0) { rotaOtimizada[i].andaAPe = false; continue; }
+                const anterior = rotaOtimizada[i - 1];
+                const atual = rotaOtimizada[i];
+                rotaOtimizada[i].andaAPe = dist(anterior.lat, anterior.lon, atual.lat, atual.lon) <= 70;
+            }
             return rotaOtimizada;
         }
 
@@ -582,6 +596,7 @@
 
                     // Roda a Otimização de Campo
                     rotaOtimizadaData = gerarRotaDeCampo(rotaOriginalData, matrizOSRM);
+                    marcarGruposAPe(rotaOtimizadaData); // marca visualmente quem virou caminhada (não afeta o KM)
                     
                     // DISPARA O DOWNLOAD DOS RADARES (Invisível, em segundo plano)
                     baixarRadaresDaRegiao(rotaOriginalData);
@@ -660,11 +675,12 @@
                 let lote = rotaSpx.slice(i, i + 10);
                 bagsHtml += `<div class="bag-container"><h3>BAG ${bagNum} (Pacotes ${i+1} a ${i+lote.length})</h3>`;
                 lote.forEach(p => {
+                    let seloAPe = p.andaAPe ? `<small style="color:#39FF14;">🚶 a pé (perto da anterior)</small><br>` : '';
                     bagsHtml += `
                     <div class="bag-item">
                         <div>
                             <strong><span style="color:#FFCC00;">#${globalIndex}</span> ➔ [Stop ${p.stop}]</strong>
-                            <small>${p.ruaPadrao}</small>
+                            <small>${p.ruaPadrao}</small><br>${seloAPe}
                         </div>
                         <div class="bag-vol">${p.pacotes} vol</div>
                     </div>`;
