@@ -274,6 +274,17 @@
             if (match) limpo = match[1].trim();
             limpo = limpo.replace(/^R\.\s|^R\s/, "RUA ");
             limpo = limpo.replace(/^AV\.\s|^AV\s/, "AVENIDA ");
+            // Expande abreviações comuns no MEIO do nome (ex: "Mal Deodoro" e "Marechal Deodoro"
+            // precisam virar a mesma chave, senão a Camada 1 trata como ruas diferentes)
+            const abreviacoes = {
+                '\\bGEN\\b': 'GENERAL', '\\bMAL\\b': 'MARECHAL', '\\bDR\\b': 'DOUTOR',
+                '\\bPRES\\b': 'PRESIDENTE', '\\bSTO\\b': 'SANTO', '\\bSTA\\b': 'SANTA',
+                '\\bPROF\\b': 'PROFESSOR', '\\bCEL\\b': 'CORONEL', '\\bCAP\\b': 'CAPITAO',
+                '\\bENG\\b': 'ENGENHEIRO', '\\bCMTE\\b': 'COMANDANTE'
+            };
+            for (let padrao in abreviacoes) {
+                limpo = limpo.replace(new RegExp(padrao, 'g'), abreviacoes[padrao]);
+            }
             return limpo.trim();
         }
 
@@ -298,13 +309,15 @@
             }
         }
 
-        // --- NOVA AUDITORIA: VISÃO DE PÁSSARO (Linha Reta Sequencial) ---
-        async function plotarVisaoPassaro(camada, mapaLocal, rota, corLinha) {
+        // --- NOVA AUDITORIA: VISÃO DE PÁSSARO (linhas retas p/ leitura da ordem, KM real do OSRM p/ comparação) ---
+        async function plotarVisaoPassaro(camada, mapaLocal, rota, corLinha, matrixDist, matrixDur) {
             camada.clearLayers();
             let boundsCoords = [];
-            let distanciaTotalLinear = 0;
+            let distanciaTotalReal = 0;
+            let duracaoTotalReal = 0;
+            let usouEstimativa = false;
 
-            if (rota.length === 0) return 0;
+            if (rota.length === 0) return { km: 0, min: 0, estimado: false };
 
             let latlngs = [];
 
@@ -319,17 +332,30 @@
                     .addTo(camada);
 
                 if (i > 0) {
-                    distanciaTotalLinear += dist(rota[i-1].lat, rota[i-1].lon, p.lat, p.lon);
+                    const anterior = rota[i-1];
+                    // Usa a matriz REAL do OSRM (distância de rua) quando disponível.
+                    // Cai para linha reta (Haversine) apenas se a matriz não existir para esse par.
+                    const temMatriz = matrixDist && matrixDist[anterior.idOriginal] && matrixDist[anterior.idOriginal][p.idOriginal] != null;
+
+                    if (temMatriz) {
+                        distanciaTotalReal += matrixDist[anterior.idOriginal][p.idOriginal];
+                        if (matrixDur && matrixDur[anterior.idOriginal] && matrixDur[anterior.idOriginal][p.idOriginal] != null) {
+                            duracaoTotalReal += matrixDur[anterior.idOriginal][p.idOriginal];
+                        }
+                    } else {
+                        usouEstimativa = true;
+                        distanciaTotalReal += dist(anterior.lat, anterior.lon, p.lat, p.lon);
+                    }
                 }
             }
 
             if (latlngs.length > 0) {
-                // Linha reta e tracejada para evidenciar que é apenas a ordem de direção, não o asfalto real
+                // Linha reta e tracejada continua sendo usada só para leitura visual da ORDEM/sequência, não para o cálculo do KM
                 L.polyline(latlngs, { color: corLinha, weight: 3, opacity: 0.8, dashArray: '6, 6' }).addTo(camada);
                 mapaLocal.fitBounds(L.polyline(boundsCoords).getBounds(), { padding: [30, 30] });
             }
 
-            return distanciaTotalLinear;
+            return { km: distanciaTotalReal / 1000, min: duracaoTotalReal / 60, estimado: usouEstimativa };
         }
 
         // --- MOTOR DE TESTE DE CAMPO (A Lógica Intacta e Blindada) ---
@@ -386,10 +412,18 @@
                     }
                 }
 
-                // CAMADA 3: RESGATE DA SEQUÊNCIA ORIGINAL
+                // CAMADA 3: RESGATE POR PROXIMIDADE GEOGRÁFICA REAL
+                // (antes usava proximidade de número de sequência, o que causava saltos longos
+                //  em linha reta quando o próximo número da sequência estava geograficamente longe)
                 if (!melhorProximo) {
-                    pendentes.sort((a, b) => Math.abs(a.idOriginal - atual.idOriginal) - Math.abs(b.idOriginal - atual.idOriginal));
-                    melhorProximo = pendentes[0];
+                    let menorDResgate = Infinity;
+                    for (let cand of pendentes) {
+                        let dReta = dist(atual.lat, atual.lon, cand.lat, cand.lon);
+                        if (dReta < menorDResgate) {
+                            menorDResgate = dReta;
+                            melhorProximo = cand;
+                        }
+                    }
                 }
 
                 rotaOtimizada.push(melhorProximo);
@@ -466,12 +500,13 @@
                     if (rotaOriginalData.length === 0) throw new Error("Sem coordenadas válidas.");
 
                     let matrizOSRM = null;
+                    let matrizDuracao = null;
                     if (rotaOriginalData.length <= 100) { 
                         try {
                             let coords = rotaOriginalData.map(p => `${p.lon},${p.lat}`).join(';');
-                            let res = await fetch(`https://router.project-osrm.org/table/v1/driving/${coords}?annotations=distance`);
+                            let res = await fetch(`https://router.project-osrm.org/table/v1/driving/${coords}?annotations=distance,duration`);
                             let data = await res.json();
-                            if(data.code === 'Ok') matrizOSRM = data.distances;
+                            if(data.code === 'Ok') { matrizOSRM = data.distances; matrizDuracao = data.durations; }
                         } catch(e) { console.warn("Aviso: Trânsito OSRM offline, usando distâncias retas."); }
                     }
 
@@ -490,12 +525,18 @@
                         mapPadrao.invalidateSize();
                         mapOtimizado.invalidateSize();
                         
-                        let distPadrao = await plotarVisaoPassaro(layerPadrao, mapPadrao, rotaOriginalData, '#ff4444');
-                        let distOtim = await plotarVisaoPassaro(layerOtimizado, mapOtimizado, rotaOtimizadaData, '#39FF14');
+                        let rPadrao = await plotarVisaoPassaro(layerPadrao, mapPadrao, rotaOriginalData, '#ff4444', matrizOSRM, matrizDuracao);
+                        let rOtim = await plotarVisaoPassaro(layerOtimizado, mapOtimizado, rotaOtimizadaData, '#39FF14', matrizOSRM, matrizDuracao);
 
-                        // Aqui transformamos a distância bruta de linha reta em KM para o texto
-                        document.getElementById('km-padrao').innerText = `Visão de Pássaro: ${(distPadrao / 1000).toFixed(2)} km`;
-                        document.getElementById('km-otimizada').innerText = `Visão de Pássaro: ${(distOtim / 1000).toFixed(2)} km`;
+                        // Agora mostra KM real de estrada (OSRM) + tempo estimado, com aviso se caiu em estimativa
+                        const fmt = (r) => {
+                            let txt = `${r.km.toFixed(2)} km`;
+                            if (r.min > 0) txt += ` • ~${Math.round(r.min)} min`;
+                            if (r.estimado) txt += ` (aprox.)`;
+                            return txt;
+                        };
+                        document.getElementById('km-padrao').innerText = fmt(rPadrao);
+                        document.getElementById('km-otimizada').innerText = fmt(rOtim);
                     }, 200);
 
                 } catch (err) {
