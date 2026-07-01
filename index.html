@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SPX Ninja - V-Final (Varredura + Radar 50m)</title>
+    <title>SPX Ninja - V-Final (Varredura + Radar 50m + Visão de Pássaro)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -107,16 +107,16 @@
         <div class="grid-mapas">
             <div class="col-mapa">
                 <button class="btn-modo btn-padrao" onclick="escolherRotaPadrao()">
-                    ▶️ ROTA PADRÃO SHOPEE
+                    ▶️ ROTA PADRÃO SHOPEE<br><small id="km-padrao" style="font-weight:normal;">Visão de Pássaro: Calculando...</small>
                 </button>
-                <div class="legenda"><span style="background: #ff4444;"></span> Carro &nbsp;&nbsp; | &nbsp;&nbsp; <span style="background: #FFCC00; border-bottom: 3px dashed #000; height: 1px;"></span> A Pé</div>
+                <div class="legenda"><span style="background: #ff4444; border-bottom: 2px dashed #ff4444; height: 1px;"></span> Sequência Direta (Linha Reta)</div>
                 <div id="mapa-padrao" class="mapa-container"></div>
             </div>
             <div class="col-mapa">
                 <button class="btn-modo btn-otimizada" onclick="escolherRotaOtimizada()">
-                    🚀 OTIMIZADA SPX NINJA
+                    🚀 OTIMIZADA SPX NINJA<br><small id="km-otimizada" style="font-weight:normal;">Visão de Pássaro: Calculando...</small>
                 </button>
-                <div class="legenda"><span style="background: #39FF14;"></span> Carro &nbsp;&nbsp; | &nbsp;&nbsp; <span style="background: #FFCC00; border-bottom: 3px dashed #000; height: 1px;"></span> A Pé</div>
+                <div class="legenda"><span style="background: #39FF14; border-bottom: 2px dashed #39FF14; height: 1px;"></span> Sequência Direta (Linha Reta)</div>
                 <div id="mapa-otimizado" class="mapa-container"></div>
             </div>
         </div>
@@ -137,7 +137,7 @@
             <p>1. Agrupamento a pé (70m).</p>
             <p>2. Varredura da rua priorizada e no sentido correto da via.</p>
             <p>3. Filtro Geográfico e Retorno Sequencial para quebra de bairro.</p>
-            <p>Ignore desenhos falsos no mapa. Confie na ordem da lista abaixo!</p>
+            <p>As linhas no mapa anterior são apenas "Visão de Pássaro". Confie na ordem da lista abaixo para a rua!</p>
         </div>
         <button class="btn-modo btn-otimizada" onclick="avancarParaDocaOtimizada()">IR PARA SEPARAÇÃO (BAGS) 📦</button>
     </div>
@@ -298,65 +298,38 @@
             }
         }
 
-        async function plotarDesenho(camada, mapaLocal, rota, corLinha) {
+        // --- NOVA AUDITORIA: VISÃO DE PÁSSARO (Linha Reta Sequencial) ---
+        async function plotarVisaoPassaro(camada, mapaLocal, rota, corLinha) {
             camada.clearLayers();
             let boundsCoords = [];
-            if (rota.length === 0) return;
+            let distanciaTotalLinear = 0;
+
+            if (rota.length === 0) return 0;
+
+            let latlngs = [];
 
             for (let i = 0; i < rota.length; i++) {
                 let p = rota[i];
                 boundsCoords.push([p.lat, p.lon]);
+                latlngs.push([p.lat, p.lon]);
+
                 let corPino = (i === 0) ? '#007AFF' : '#555'; 
                 L.circleMarker([p.lat, p.lon], { radius: 5, color: '#fff', fillColor: corPino, fillOpacity: 1, weight: 1 })
-                    .bindTooltip(i === 0 ? "INÍCIO" : "Stop " + p.stop, { permanent: true, direction: 'right', className: 'stop-label', offset: [5, 0] })
+                    .bindTooltip(i === 0 ? "INÍCIO (Stop " + p.stop + ")" : "Stop " + p.stop, { permanent: true, direction: 'right', className: 'stop-label', offset: [5, 0] })
                     .addTo(camada);
-            }
 
-            let anchors = [rota[0]];
-            let mapWalkToAnchor = new Map(); 
-            let currentAnchor = rota[0];
-
-            for (let i = 1; i < rota.length; i++) {
-                let p = rota[i];
-                let dLinear = dist(currentAnchor.lat, currentAnchor.lon, p.lat, p.lon);
-                if (dLinear <= 70) {
-                    mapWalkToAnchor.set(p, currentAnchor);
-                } else {
-                    anchors.push(p);
-                    currentAnchor = p;
+                if (i > 0) {
+                    distanciaTotalLinear += dist(rota[i-1].lat, rota[i-1].lon, p.lat, p.lon);
                 }
             }
 
-            mapWalkToAnchor.forEach((anchor, p) => {
-                L.polyline([[anchor.lat, anchor.lon], [p.lat, p.lon]], { color: '#FFCC00', weight: 3, dashArray: '5, 8', opacity: 1 }).addTo(camada);
-            });
-
-            let coordAsfalto = [];
-            const TAMANHO_LOTE = 40; 
-            for (let i = 0; i < anchors.length - 1; i += (TAMANHO_LOTE - 1)) {
-                let lote = anchors.slice(i, i + TAMANHO_LOTE);
-                let stringCoords = lote.map(p => `${p.lon},${p.lat}`).join(';');
-                try {
-                    let url = `https://router.project-osrm.org/route/v1/driving/${stringCoords}?overview=full&geometries=geojson`;
-                    let res = await fetch(url);
-                    let data = await res.json();
-                    if (data.routes && data.routes[0]) {
-                        let coordsMapeadas = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
-                        coordAsfalto.push(...coordsMapeadas);
-                    } else {
-                        coordAsfalto.push(...lote.map(p => [p.lat, p.lon]));
-                    }
-                } catch (e) {
-                    coordAsfalto.push(...lote.map(p => [p.lat, p.lon]));
-                }
-            }
-
-            if (coordAsfalto.length > 0) {
-                L.polyline(coordAsfalto, { color: corLinha, weight: 4, opacity: 0.9 }).addTo(camada);
-            }
-            if (boundsCoords.length > 0) {
+            if (latlngs.length > 0) {
+                // Linha reta e tracejada para evidenciar que é apenas a ordem de direção, não o asfalto real
+                L.polyline(latlngs, { color: corLinha, weight: 3, opacity: 0.8, dashArray: '6, 6' }).addTo(camada);
                 mapaLocal.fitBounds(L.polyline(boundsCoords).getBounds(), { padding: [30, 30] });
             }
+
+            return distanciaTotalLinear;
         }
 
         // --- MOTOR DE TESTE DE CAMPO (A Lógica Intacta e Blindada) ---
@@ -512,11 +485,17 @@
                     document.getElementById('modal-auditoria').style.display = 'flex';
                     iniciarMapasAuditoria();
                     
+                    // Desenha Visão de Pássaro (Mais rápido e sem bugar visualmente)
                     setTimeout(async () => {
                         mapPadrao.invalidateSize();
                         mapOtimizado.invalidateSize();
-                        await plotarDesenho(layerPadrao, mapPadrao, rotaOriginalData, '#ff4444');
-                        await plotarDesenho(layerOtimizado, mapOtimizado, rotaOtimizadaData, '#39FF14');
+                        
+                        let distPadrao = await plotarVisaoPassaro(layerPadrao, mapPadrao, rotaOriginalData, '#ff4444');
+                        let distOtim = await plotarVisaoPassaro(layerOtimizado, mapOtimizado, rotaOtimizadaData, '#39FF14');
+
+                        // Aqui transformamos a distância bruta de linha reta em KM para o texto
+                        document.getElementById('km-padrao').innerText = `Visão de Pássaro: ${(distPadrao / 1000).toFixed(2)} km`;
+                        document.getElementById('km-otimizada').innerText = `Visão de Pássaro: ${(distOtim / 1000).toFixed(2)} km`;
                     }, 200);
 
                 } catch (err) {
@@ -767,7 +746,7 @@
             
             document.getElementById('rodape-dist').innerText = dFinal > 1000 ? (dFinal/1000).toFixed(1) + " km" : Math.round(dFinal) + " m";
 
-            // ALERTA DE CHEGADA: Ajustado de 60m para rigorosos 20 metros
+            // ALERTA DE CHEGADA: Ajustado para 20 metros rigorosos!
             if (dFinal < 20) {
                 aguardandoConfirmacao = true;
                 releaseWakeLock();
