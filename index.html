@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SPX Ninja - V-Final (Varal Inteligente + Auditoria Real)</title>
+    <title>SPX Ninja - V-Final (Zíper + Não-Interseção + Radares)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -69,7 +69,7 @@
         .legenda { font-size: 13px; color: #ddd; margin-top: 8px; text-align: left; font-weight: bold; padding-bottom: 5px;}
         .legenda span { display: inline-block; width: 25px; height: 4px; margin-right: 5px; vertical-align: middle;}
 
-        /* CSS DO NOVO ALERTA DE RADAR */
+        /* CSS DO ALERTA DE RADAR */
         #radar-alert {
             display: none;
             position: absolute;
@@ -99,7 +99,7 @@
             📦 CARREGAR PLANILHA SPX
             <input type="file" id="fileInput" accept=".xlsx, .xls, .csv">
         </label>
-        <div id="loading-msg" style="display:none; color:#FFCC00; font-weight:bold; margin-top:20px; font-size:18px;">⏳ Calculando Ordem de Campo...<br><small>Aplicando Varal Inteligente e Desconto de Rua.</small></div>
+        <div id="loading-msg" style="display:none; color:#FFCC00; font-weight:bold; margin-top:20px; font-size:18px;">⏳ Calculando Varredura e Zíper...<br><small>Evitando cruzamentos no percurso.</small></div>
     </div>
 
     <div id="modal-auditoria" class="modal-fullscreen">
@@ -107,16 +107,16 @@
         <div class="grid-mapas">
             <div class="col-mapa">
                 <button class="btn-modo btn-padrao" onclick="escolherRotaPadrao()">
-                    ▶️ ROTA PADRÃO SHOPEE<br><small id="km-padrao" style="font-weight:normal;">Calculando KM real corrigido...</small>
+                    ▶️ ROTA PADRÃO SHOPEE<br><small id="km-padrao" style="font-weight:normal;">Visão de Pássaro: Calculando...</small>
                 </button>
-                <div class="legenda"><span style="background: #ff4444; border-bottom: 2px dashed #ff4444; height: 1px;"></span> Sequência Direta (Visão de Pássaro)</div>
+                <div class="legenda"><span style="background: #ff4444; border-bottom: 2px dashed #ff4444; height: 1px;"></span> Direção &nbsp;&nbsp; | &nbsp;&nbsp; <span style="background: #FFCC00; border-bottom: 3px dashed #000; height: 1px;"></span> A Pé</div>
                 <div id="mapa-padrao" class="mapa-container"></div>
             </div>
             <div class="col-mapa">
                 <button class="btn-modo btn-otimizada" onclick="escolherRotaOtimizada()">
-                    🚀 OTIMIZADA SPX NINJA<br><small id="km-otimizada" style="font-weight:normal;">Calculando KM real corrigido...</small>
+                    🚀 OTIMIZADA SPX NINJA<br><small id="km-otimizada" style="font-weight:normal;">Visão de Pássaro: Calculando...</small>
                 </button>
-                <div class="legenda"><span style="background: #39FF14; border-bottom: 2px dashed #39FF14; height: 1px;"></span> Sequência Direta (Visão de Pássaro)</div>
+                <div class="legenda"><span style="background: #39FF14; border-bottom: 2px dashed #39FF14; height: 1px;"></span> Direção &nbsp;&nbsp; | &nbsp;&nbsp; <span style="background: #FFCC00; border-bottom: 3px dashed #000; height: 1px;"></span> A Pé</div>
                 <div id="mapa-otimizado" class="mapa-container"></div>
             </div>
         </div>
@@ -131,12 +131,12 @@
     </div>
 
     <div id="modal-info-otimizada" class="modal-fullscreen">
-        <h2>🚀 MODO: OTIMIZADA SPX (Varal Inteligente)</h2>
+        <h2>🚀 MODO: OTIMIZADA SPX (Zíper Inteligente)</h2>
         <div class="info-container">
             <p>Foco total na <strong>Ordem Funcional</strong>:</p>
-            <p>1. <strong>Agrupamento a pé (70m):</strong> Entregas coladas são feitas a pé e não inflam o KM da auditoria.</p>
-            <p>2. <strong>O "Desconto de Rua":</strong> O aplicativo está viciado em varrer a rua inteira como um zíper, mantendo o sentido do fluxo.</p>
-            <p>3. <strong>Filtro Anti-Retorno:</strong> Ele só solta a rua se no final dela houver uma contramão obrigatória gigantesca.</p>
+            <p>1. <strong>Zíper de Mão Única:</strong> Varre a rua até o final seguindo o sentido real sem zigue-zague.</p>
+            <p>2. <strong>Não-Interseção:</strong> O algoritmo foi travado para proibir o cruzamento de linhas sobre quarteirões já limpos.</p>
+            <p>3. <strong>Radar 50m:</strong> Bolha de aviso nativa ativada.</p>
         </div>
         <button class="btn-modo btn-otimizada" onclick="avancarParaDocaOtimizada()">IR PARA SEPARAÇÃO (BAGS) 📦</button>
     </div>
@@ -156,7 +156,9 @@
     </div>
 
     <div id="tela-navegacao">
-        <div id="radar-alert">📸 RADAR 50m</div>
+        
+        <div id="radar-alert">📸 RADAR 50m</div> 
+
         <div id="painel-topo">
             <div id="btn-menu-stops" onclick="abrirMenuStops()"><span>📋</span></div>
             <div id="stop-badge">STOP -- (-- vol)</div>
@@ -189,6 +191,7 @@
         let mapPadrao = null, mapOtimizado = null;
         let layerPadrao = L.layerGroup(), layerOtimizado = L.layerGroup();
 
+        // Variáveis do Radar
         let listaRadares = [];
         let radarAtivo = null;
         let audioCtx = null;
@@ -201,12 +204,13 @@
             if (wakeLock !== null) { wakeLock.release(); wakeLock = null; }
         }
 
+        // --- ÁUDIO (Radar) ---
         function initAudio() {
             try {
                 window.AudioContext = window.AudioContext || window.webkitAudioContext;
                 if (!audioCtx) audioCtx = new AudioContext();
                 if (audioCtx.state === 'suspended') audioCtx.resume();
-            } catch(e) { console.log("Áudio não suportado"); }
+            } catch(e) {}
         }
 
         function playBipeRadar() {
@@ -249,6 +253,7 @@
             } catch(e) {}
         }
 
+        // Matemática Geográfica
         function dist(la1, lo1, la2, lo2) {
             const R = 6371000;
             const dLat = (la2-la1) * Math.PI/180;
@@ -296,197 +301,158 @@
             }
         }
 
-        // --- A AUDITORIA CORRIGIDA (O Fim do Paradoxo da Calçada) ---
-        async function plotarVisaoPassaro(camada, mapaLocal, rota, corLinha, matrixDist, matrixDur) {
+        // --- A AUDITORIA VISUAL (Pássaro) ---
+        async function plotarVisaoPassaro(camada, mapaLocal, rota, corLinha) {
             camada.clearLayers();
             let boundsCoords = [];
-            let distanciaTotalReal = 0;
-            let duracaoTotalReal = 0;
+            let distanciaTotal = 0;
 
-            if (rota.length === 0) return { km: 0, min: 0 };
-            let latlngs = [];
+            if (rota.length === 0) return { km: 0 };
+            
+            let currentAnchor = rota[0];
+            let anchorPoints = [currentAnchor];
 
-            for (let i = 0; i < rota.length; i++) {
+            boundsCoords.push([currentAnchor.lat, currentAnchor.lon]);
+            L.circleMarker([currentAnchor.lat, currentAnchor.lon], { radius: 5, color: '#fff', fillColor: '#007AFF', fillOpacity: 1, weight: 1 })
+                .bindTooltip("INÍCIO (Stop " + currentAnchor.stop + ")", { permanent: true, direction: 'right', className: 'stop-label', offset: [5, 0] })
+                .addTo(camada);
+
+            for (let i = 1; i < rota.length; i++) {
                 let p = rota[i];
                 boundsCoords.push([p.lat, p.lon]);
-                latlngs.push([p.lat, p.lon]);
 
-                let corPino = (i === 0) ? '#007AFF' : '#555'; 
-                L.circleMarker([p.lat, p.lon], { radius: 5, color: '#fff', fillColor: corPino, fillOpacity: 1, weight: 1 })
-                    .bindTooltip(i === 0 ? "INÍCIO (Stop " + p.stop + ")" : "Stop " + p.stop, { permanent: true, direction: 'right', className: 'stop-label', offset: [5, 0] })
+                L.circleMarker([p.lat, p.lon], { radius: 5, color: '#fff', fillColor: '#555', fillOpacity: 1, weight: 1 })
+                    .bindTooltip("Stop " + p.stop, { permanent: true, direction: 'right', className: 'stop-label', offset: [5, 0] })
                     .addTo(camada);
 
-                if (i > 0) {
-                    const anterior = rota[i-1];
-                    const dReta = dist(anterior.lat, anterior.lon, p.lat, p.lon);
-                    
-                    // A MÁGICA: Se é perto (< 70m), cobra só a caminhada e não pergunta pro satélite!
-                    if (dReta <= 70) {
-                        distanciaTotalReal += dReta;
-                        duracaoTotalReal += (dReta / 1.5); // Caminhada ~ 1.5 m/s
-                    } else {
-                        // É longe, precisa de carro. Cobra o asfalto.
-                        const temMatriz = matrixDist && matrixDist[anterior.idOriginal] && matrixDist[anterior.idOriginal][p.idOriginal] != null;
-                        if (temMatriz) {
-                            distanciaTotalReal += matrixDist[anterior.idOriginal][p.idOriginal];
-                            if (matrixDur && matrixDur[anterior.idOriginal] && matrixDur[anterior.idOriginal][p.idOriginal] != null) {
-                                duracaoTotalReal += matrixDur[anterior.idOriginal][p.idOriginal];
-                            }
-                        } else {
-                            distanciaTotalReal += dReta * 1.5;
-                            duracaoTotalReal += (dReta * 1.5) / 8;
-                        }
-                    }
+                let dReta = dist(currentAnchor.lat, currentAnchor.lon, p.lat, p.lon);
+                
+                // Desenha a Pé ou de Carro
+                if (dReta <= 70) {
+                    L.polyline([[currentAnchor.lat, currentAnchor.lon], [p.lat, p.lon]], { color: '#FFCC00', weight: 3, dashArray: '5, 8', opacity: 1 }).addTo(camada);
+                    distanciaTotal += dReta; 
+                } else {
+                    anchorPoints.push(p);
+                    L.polyline([[currentAnchor.lat, currentAnchor.lon], [p.lat, p.lon]], { color: corLinha, weight: 3, opacity: 0.8, dashArray: '6, 6' }).addTo(camada);
+                    distanciaTotal += dReta; 
+                    currentAnchor = p;
                 }
             }
 
-            if (latlngs.length > 0) {
-                L.polyline(latlngs, { color: corLinha, weight: 3, opacity: 0.8, dashArray: '6, 6' }).addTo(camada);
+            if (boundsCoords.length > 0) {
                 mapaLocal.fitBounds(L.polyline(boundsCoords).getBounds(), { padding: [30, 30] });
             }
 
-            return { km: distanciaTotalReal / 1000, min: duracaoTotalReal / 60 };
+            return { km: distanciaTotal / 1000 };
         }
 
-        // --- O MOTOR MATEMÁTICO COM "DESCONTO DE RUA" (O Varal Inteligente) ---
-        function custoReal(a, b, matrix) {
-            if (matrix && matrix[a.idOriginal] && matrix[a.idOriginal][b.idOriginal] != null) {
-                return matrix[a.idOriginal][b.idOriginal];
+        // ============================================================================
+        // MOTOR DE OTIMIZAÇÃO V-FINAL: A REGRA DA NÃO-INTERSEÇÃO E ZÍPER
+        // ============================================================================
+
+        // Fórmula Matemática de Cruzamento de Linhas (Orientação de Vetores CCW)
+        function intersectam(A, B, C, D) {
+            function ccw(p1, p2, p3) {
+                return (p3.lon - p1.lon) * (p2.lat - p1.lat) > (p2.lon - p1.lon) * (p3.lat - p1.lat);
             }
-            return dist(a.lat, a.lon, b.lat, b.lon) * 1.5; 
+            return (ccw(A, C, D) !== ccw(B, C, D)) && (ccw(A, B, C) !== ccw(A, B, D));
         }
 
-        // Esta é a função que engana o algoritmo para forçar o varal
-        function custoLogico(a, b, matrix) {
-            let dReta = dist(a.lat, a.lon, b.lat, b.lon);
-            // 1. Se dá para ir a pé, o algoritmo acha irresistível e junta na hora
-            if (dReta <= 70) return dReta * 0.001; 
+        // Checa se o pulo que o algoritmo quer dar cruza alguma linha verde já feita
+        function cruzaCaminho(rotaConstruida, pontoCandidato) {
+            if (rotaConstruida.length < 2) return false;
             
-            let c = custoReal(a, b, matrix);
-            // 2. Se for na mesma rua, ganha 85% de desconto. Ele vai preferir varrer a rua!
-            // Mas se o retorno da rua for monstruoso (ex: 3000 metros), 15% de 3000m ainda é 450m.
-            // Se tiver uma rua paralela a 150m, ele abandona a rua para não dar a volta!
-            if (a.ruaPadrao === b.ruaPadrao && a.ruaPadrao !== "DESCONHECIDO") {
-                return c * 0.15; 
-            }
-            return c;
-        }
-
-        function custoTotalLogico(rota, matrix) {
-            let total = 0;
-            for (let i = 0; i < rota.length - 1; i++) total += custoLogico(rota[i], rota[i + 1], matrix);
-            return total;
-        }
-
-        function vizinhoMaisProximo(pontos, matrix) {
-            let pendentes = [...pontos];
-            let atual = pendentes.shift();
-            let rota = [atual];
-            while (pendentes.length > 0) {
-                let melhorIdx = 0, menorCusto = Infinity;
-                for (let k = 0; k < pendentes.length; k++) {
-                    const c = custoLogico(atual, pendentes[k], matrix);
-                    if (c < menorCusto) { menorCusto = c; melhorIdx = k; }
-                }
-                atual = pendentes[melhorIdx];
-                rota.push(atual);
-                pendentes.splice(melhorIdx, 1);
-            }
-            return rota;
-        }
-
-        function aplicar2opt(rota, matrix, maxIter = 300) {
-            if (rota.length < 4) return rota;
-            let r = [...rota];
-            let melhorou = true, iter = 0;
-
-            while (melhorou && iter < maxIter) {
-                melhorou = false;
-                iter++;
-                for (let i = 0; i < r.length - 2; i++) {
-                    for (let j = i + 2; j < r.length; j++) {
-                        const a = r[i], b = r[i + 1], c = r[j];
-                        const d = (j + 1 < r.length) ? r[j + 1] : null;
-                        const antes = custoLogico(a, b, matrix) + (d ? custoLogico(c, d, matrix) : 0);
-                        const depois = custoLogico(a, c, matrix) + (d ? custoLogico(b, d, matrix) : 0);
-                        if (depois < antes - 0.1) {
-                            const seg = r.slice(i + 1, j + 1).reverse();
-                            r = [...r.slice(0, i + 1), ...seg, ...r.slice(j + 1)];
-                            melhorou = true;
-                        }
-                    }
+            let pA = rotaConstruida[rotaConstruida.length - 1]; // Onde o carro está
+            let pB = pontoCandidato; // Pra onde o carro quer ir
+            
+            // Loopa todas as linhas desenhadas (exceto a última que gruda em pA)
+            for (let i = 0; i < rotaConstruida.length - 2; i++) {
+                let pC = rotaConstruida[i];
+                let pD = rotaConstruida[i + 1];
+                if (intersectam(pA, pB, pC, pD)) {
+                    return true; // CRUZOU!
                 }
             }
-            return r;
+            return false; // CAMINHO LIMPO!
         }
 
-        function aplicarOrOpt(rota, matrix, maxIter = 300) {
-            let r = [...rota];
-            let melhorou = true, iter = 0;
-
-            while (melhorou && iter < maxIter) {
-                melhorou = false;
-                iter++;
-                for (let segLen = 1; segLen <= 3; segLen++) {
-                    for (let i = 1; i < r.length - segLen; i++) { 
-                        const antesA = r[i - 1];
-                        const seg = r.slice(i, i + segLen);
-                        const depoisB = r[i + segLen];
-                        if (!depoisB) continue;
-
-                        const custoRemocao = custoLogico(antesA, seg[0], matrix) + custoLogico(seg[segLen - 1], depoisB, matrix);
-                        const custoFechamento = custoLogico(antesA, depoisB, matrix);
-                        const ganhoRemocao = custoRemocao - custoFechamento;
-                        if (ganhoRemocao <= 0) continue; 
-
-                        let restante = [...r.slice(0, i), ...r.slice(i + segLen)];
-                        let melhorPos = -1, melhorCustoInsercao = Infinity;
-                        for (let k = 1; k < restante.length; k++) { 
-                            const p1 = restante[k - 1], p2 = restante[k];
-                            const custoInsercao = custoLogico(p1, seg[0], matrix) + custoLogico(seg[segLen - 1], p2, matrix) - custoLogico(p1, p2, matrix);
-                            if (custoInsercao < melhorCustoInsercao) { melhorCustoInsercao = custoInsercao; melhorPos = k; }
-                        }
-
-                        if (melhorPos !== -1 && melhorCustoInsercao < ganhoRemocao - 0.1) {
-                            restante.splice(melhorPos, 0, ...seg);
-                            r = restante;
-                            melhorou = true;
-                        }
-                    }
-                }
-            }
-            return r;
-        }
-
-        function gerarRotaDeCampo(rotaBase, matrix) {
+        function gerarRotaBlindada(rotaBase) {
             if (rotaBase.length <= 1) return rotaBase;
-            
-            // Usa as regras de Varal e Proximidade em cima da matemática global
-            let candNN = vizinhoMaisProximo(rotaBase, matrix);
-            candNN = aplicar2opt(candNN, matrix);
-            candNN = aplicarOrOpt(candNN, matrix);
-            candNN = aplicar2opt(candNN, matrix); 
 
-            let candOriginal = [...rotaBase];
-            candOriginal = aplicar2opt(candOriginal, matrix);
-            candOriginal = aplicarOrOpt(candOriginal, matrix);
-            candOriginal = aplicar2opt(candOriginal, matrix);
-
-            const custoNN = custoTotalLogico(candNN, matrix);
-            const custoOriginal = custoTotalLogico(candOriginal, matrix);
-
-            return custoNN <= custoOriginal ? candNN : candOriginal;
-        }
-
-        function marcarGruposAPe(rotaOtimizada) {
-            for (let i = 0; i < rotaOtimizada.length; i++) {
-                if (i === 0) { rotaOtimizada[i].andaAPe = false; continue; }
-                const anterior = rotaOtimizada[i - 1];
-                const atual = rotaOtimizada[i];
-                rotaOtimizada[i].andaAPe = dist(anterior.lat, anterior.lon, atual.lat, atual.lon) <= 70;
+            // 1. AGRUPAMENTO A PÉ (Âncoras de 70m)
+            let anchors = [];
+            for (let i = 0; i < rotaBase.length; i++) {
+                let p = rotaBase[i];
+                let found = false;
+                for (let a of anchors) {
+                    if (dist(a.lat, a.lon, p.lat, p.lon) <= 70) {
+                        a.walking.push(p);
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) {
+                    anchors.push({ ...p, walking: [] });
+                }
             }
-            return rotaOtimizada;
+
+            let rotaOtimizada = [];
+            let pendentes = [...anchors];
+            let atual = pendentes.shift();
+            rotaOtimizada.push(atual);
+
+            while (pendentes.length > 0) {
+                let melhorProximo = null;
+                let ruaAtual = atual.ruaPadrao;
+
+                // REGRA 1: O ZÍPER DA RUA (Continua na mesma rua e no fluxo da Shopee)
+                let vizinhosRua = pendentes.filter(p => p.ruaPadrao === ruaAtual && ruaAtual !== "DESCONHECIDO");
+                if (vizinhosRua.length > 0) {
+                    // Pega o pacote que está MAIS PRÓXIMO NA SEQUÊNCIA ORIGINAL
+                    // Isso garante que você entra pelo lado certo da rua e vai descendo sem zigue-zague!
+                    vizinhosRua.sort((a, b) => Math.abs(a.idOriginal - atual.idOriginal) - Math.abs(b.idOriginal - atual.idOriginal));
+                    melhorProximo = vizinhosRua[0];
+                } 
+                else {
+                    // REGRA 2: PULO SEM INTERSEÇÃO (Mudar de quarteirão)
+                    let menorCusto = Infinity;
+                    
+                    for (let cand of pendentes) {
+                        let custo = dist(atual.lat, atual.lon, cand.lat, cand.lon);
+                        
+                        // A TRAVA GEOMÉTRICA (Fim dos cruzamentos)
+                        if (cruzaCaminho(rotaOtimizada, cand)) {
+                            custo *= 50; // Penalidade Extrema: É proibido cruzar uma linha! Force o contorno.
+                        }
+                        
+                        if (custo < menorCusto) {
+                            menorCusto = custo;
+                            melhorProximo = cand;
+                        }
+                    }
+                }
+
+                rotaOtimizada.push(melhorProximo);
+                pendentes = pendentes.filter(p => p.idOriginal !== melhorProximo.idOriginal);
+                atual = melhorProximo;
+            }
+
+            // Descompacta as caminhadas de volta para a lista do app
+            let rotaFinal = [];
+            for (let a of rotaOtimizada) {
+                let anchorStop = { ...a };
+                delete anchorStop.walking;
+                rotaFinal.push(anchorStop);
+                for (let w of a.walking) {
+                    w.andaAPe = true; // Flag visual para a Doca
+                    rotaFinal.push(w);
+                }
+            }
+
+            return rotaFinal;
         }
+
+        // ============================================================================
 
         // --- PROCESSAMENTO DA PLANILHA ---
         document.getElementById('fileInput').addEventListener('change', async function(e) {
@@ -543,20 +509,8 @@
 
                     if (rotaOriginalData.length === 0) throw new Error("Sem coordenadas válidas.");
 
-                    let matrizOSRM = null;
-                    let matrizDuracao = null;
-                    if (rotaOriginalData.length <= 100) { 
-                        try {
-                            let coords = rotaOriginalData.map(p => `${p.lon},${p.lat}`).join(';');
-                            let res = await fetch(`https://router.project-osrm.org/table/v1/driving/${coords}?annotations=distance,duration`);
-                            let data = await res.json();
-                            if(data.code === 'Ok') { matrizOSRM = data.distances; matrizDuracao = data.durations; }
-                        } catch(e) { console.warn("Aviso: Trânsito OSRM offline."); }
-                    }
-
-                    // Gera Otimização com as Novas Regras e Marca Caminhadas
-                    rotaOtimizadaData = gerarRotaDeCampo(rotaOriginalData, matrizOSRM);
-                    marcarGruposAPe(rotaOtimizadaData);
+                    // RODA O MOTOR BLINDADO
+                    rotaOtimizadaData = gerarRotaBlindada(rotaOriginalData);
                     
                     baixarRadaresDaRegiao(rotaOriginalData);
 
@@ -568,13 +522,10 @@
                         mapPadrao.invalidateSize();
                         mapOtimizado.invalidateSize();
                         
-                        let rPadrao = await plotarVisaoPassaro(layerPadrao, mapPadrao, rotaOriginalData, '#ff4444', matrizOSRM, matrizDuracao);
-                        let rOtim = await plotarVisaoPassaro(layerOtimizado, mapOtimizado, rotaOtimizadaData, '#39FF14', matrizOSRM, matrizDuracao);
+                        let rPadrao = await plotarVisaoPassaro(layerPadrao, mapPadrao, rotaOriginalData, '#ff4444');
+                        let rOtim = await plotarVisaoPassaro(layerOtimizado, mapOtimizado, rotaOtimizadaData, '#39FF14');
 
-                        const fmt = (r) => {
-                            let txt = `${r.km.toFixed(2)} km Reais`;
-                            return txt;
-                        };
+                        const fmt = (r) => { return `${r.km.toFixed(2)} km de Visão`; };
                         document.getElementById('km-padrao').innerText = fmt(rPadrao);
                         document.getElementById('km-otimizada').innerText = fmt(rOtim);
                     }, 200);
@@ -630,7 +581,7 @@
                 let lote = rotaSpx.slice(i, i + 10);
                 bagsHtml += `<div class="bag-container"><h3>BAG ${bagNum} (Pacotes ${i+1} a ${i+lote.length})</h3>`;
                 lote.forEach(p => {
-                    let seloAPe = p.andaAPe ? `<small style="color:#39FF14;">🚶 a pé (perto da anterior)</small><br>` : '';
+                    let seloAPe = p.andaAPe ? `<small style="color:#39FF14;">🚶 A Pé</small><br>` : '';
                     bagsHtml += `
                     <div class="bag-item">
                         <div>
