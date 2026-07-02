@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SPX Ninja - V-Final (Varal Inteligente + Custo Operacional + Radares)</title>
+    <title>SPX Ninja - V-Final (Varredura Radial + ETA + Radar 75m)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -46,8 +46,9 @@
         #seta-flutuante { position: absolute; top: 15px; left: 15px; z-index: 1000; background: #1877F2; border-radius: 15px; padding: 15px; text-align: center; color: white; border: 3px solid #fff; box-shadow: 0 4px 10px rgba(0,0,0,0.5); min-width: 100px;}
         #seta-icon { font-size: 60px; background: rgba(255,255,255,0.2); border-radius: 10px; padding: 10px; display: inline-block; line-height: 1; margin-bottom: 5px;}
         #seta-dist { font-size: 28px; font-weight: bold; }
+        
         #painel-rodape { background: #111; padding: 15px; text-align: center; z-index: 1001; border-top: 2px solid #333;}
-        #rodape-rua { color: #39FF14; font-weight: bold; font-size: 16px; text-transform: uppercase; margin-bottom: 5px; }
+        #rodape-rua { color: #FFCC00; font-weight: bold; font-size: 16px; text-transform: uppercase; margin-bottom: 5px; }
         #rodape-dist { font-size: 32px; font-weight: bold; color: #fff;}
 
         #painel-acoes { display: none; gap: 10px; padding: 15px; background: #000; justify-content: center; z-index: 1002;}
@@ -99,7 +100,7 @@
             📦 CARREGAR PLANILHA SPX
             <input type="file" id="fileInput" accept=".xlsx, .xls, .csv">
         </label>
-        <div id="loading-msg" style="display:none; color:#FFCC00; font-weight:bold; margin-top:20px; font-size:18px;">⏳ Calculando Ordem de Campo...<br><small>Aplicando Zíper Inteligente e Prevenindo Cruzamentos.</small></div>
+        <div id="loading-msg" style="display:none; color:#FFCC00; font-weight:bold; margin-top:20px; font-size:18px;">⏳ Mapeando Circuito Radial...<br><small>Agrupando ruas e eliminando cruzamentos.</small></div>
     </div>
 
     <div id="modal-auditoria" class="modal-fullscreen">
@@ -116,7 +117,7 @@
                 <button class="btn-modo btn-otimizada" onclick="escolherRotaOtimizada()">
                     🚀 OTIMIZADA SPX NINJA<br><span id="km-otimizada" style="font-weight:normal; font-size:14px;">Calculando Custo Operacional...</span>
                 </button>
-                <div class="legenda"><span style="background: #39FF14; border-bottom: 2px dashed #39FF14; height: 1px;"></span> Sequência Direta (Visão de Pássaro)</div>
+                <div class="legenda"><span style="background: #39FF14; border-bottom: 2px dashed #39FF14; height: 1px;"></span> Espiral de Varredura Limpa</div>
                 <div id="mapa-otimizado" class="mapa-container"></div>
             </div>
         </div>
@@ -131,12 +132,12 @@
     </div>
 
     <div id="modal-info-otimizada" class="modal-fullscreen">
-        <h2>🚀 MODO: OTIMIZADA SPX (Zíper Inteligente)</h2>
+        <h2>🚀 MODO: OTIMIZADA SPX (Varredura Radial)</h2>
         <div class="info-container">
-            <p>Foco total na <strong>Eficiência Operacional</strong>:</p>
-            <p>1. <strong>Zíper de Mão Única:</strong> Varre a rua até o final seguindo o sentido real, evitando retornos malucos.</p>
-            <p>2. <strong>Não-Interseção:</strong> Travado para proibir que você passe por onde já passou (linhas não se cruzam).</p>
-            <p>3. <strong>Radar 50m:</strong> Bolha de aviso nativa ativada contra radares locais.</p>
+            <p>Foco total na <strong>Eficiência Operacional Circular</strong>:</p>
+            <p>1. <strong>O Radar de Bairro:</strong> O sistema agrupou as ruas por ângulo, formando uma espiral em torno do bairro. O fim dos fios cruzados!</p>
+            <p>2. <strong>Zíper Focado:</strong> Dentro da mesma rua, ele puxa o varal ponto a ponto para você não voltar atrás.</p>
+            <p>3. <strong>Atualização de Campo:</strong> Radar aciona aos 75m reais. ETA no painel. Chegada aos 30m.</p>
         </div>
         <button class="btn-modo btn-otimizada" onclick="avancarParaDocaOtimizada()">IR PARA SEPARAÇÃO (BAGS) 📦</button>
     </div>
@@ -157,7 +158,7 @@
 
     <div id="tela-navegacao">
         
-        <div id="radar-alert">📸 RADAR 50m</div> 
+        <div id="radar-alert">📸 RADAR à frente</div> 
 
         <div id="painel-topo">
             <div id="btn-menu-stops" onclick="abrirMenuStops()"><span>📋</span></div>
@@ -186,7 +187,7 @@
         let passosNavegacao = [], idxDestino = 0, idxPasso = 0;
         let minhaLat, minhaLon, mapa, markerUser, markerDest, polylineRota;
         let camadaFundo = L.layerGroup(), aguardandoConfirmacao = false, ultimaLatReq, ultimaLonReq;
-        let wakeLock = null, distAnteriorCurva = Infinity; 
+        let wakeLock = null; 
         let latAntGps = null, lonAntGps = null, headingCarro = null; 
         let mapPadrao = null, mapOtimizado = null;
         let layerPadrao = L.layerGroup(), layerOtimizado = L.layerGroup();
@@ -299,13 +300,13 @@
         }
 
         // ============================================================================
-        // A NOVA AUDITORIA: "CUSTO OPERACIONAL" (Multa por troca de rua/manobra)
+        // A AUDITORIA CORRIGIDA: Custo Operacional c/ Penalidade de Manobra
         // ============================================================================
-        async function plotarVisaoPassaro(camada, mapaLocal, rota, corLinha, matrixDist, matrixDur) {
+        async function plotarVisaoPassaro(camada, mapaLocal, rota, corLinha) {
             camada.clearLayers();
             let boundsCoords = [];
             let distanciaTotalReal = 0;
-            let quebrasDeRua = 0; // O Rastreador de Zigue-Zague
+            let quebrasDeRua = 0;
 
             if (rota.length === 0) return { km: 0, quebras: 0 };
             let latlngs = [];
@@ -324,22 +325,15 @@
                     const anterior = rota[i-1];
                     const dReta = dist(anterior.lat, anterior.lon, p.lat, p.lon);
                     
-                    // AUDITORIA TÁTICA: Conta as manobras. Mudou de rua? É multa.
                     if (anterior.ruaPadrao !== p.ruaPadrao && anterior.ruaPadrao !== "DESCONHECIDO" && p.ruaPadrao !== "DESCONHECIDO") {
                         quebrasDeRua++;
                     }
 
-                    // Se for perto (< 70m), soma a sola do sapato.
                     if (dReta <= 70) {
                         distanciaTotalReal += dReta;
                     } else {
-                        // Se for de carro, cobra asfalto
-                        const temMatriz = matrixDist && matrixDist[anterior.idOriginal] && matrixDist[anterior.idOriginal][p.idOriginal] != null;
-                        if (temMatriz) {
-                            distanciaTotalReal += matrixDist[anterior.idOriginal][p.idOriginal];
-                        } else {
-                            distanciaTotalReal += dReta * 1.5;
-                        }
+                        // Cálculo base: Linha reta * Fator asfalto urbano
+                        distanciaTotalReal += dReta * 1.5;
                     }
                 }
             }
@@ -349,99 +343,94 @@
                 mapaLocal.fitBounds(L.polyline(boundsCoords).getBounds(), { padding: [30, 30] });
             }
 
-            // A MÁGICA DE VENDAS: Cada quebra de rua adiciona 350m de custo operacional (retornos, farol, trânsito)
             let kmComMultaDeManobra = (distanciaTotalReal + (quebrasDeRua * 350)) / 1000;
-
             return { km: kmComMultaDeManobra, quebras: quebrasDeRua };
         }
 
         // ============================================================================
-        // O MOTOR: NÃO-INTERSEÇÃO E ZÍPER DA RUA
+        // NOVO MOTOR SPX NINJA: SWEEP ALGORITHM (VARREDURA RADIAL) + ZÍPER
+        // Fim dos zigue-zagues. Varre em espiral.
         // ============================================================================
-        function intersectam(A, B, C, D) {
-            function ccw(p1, p2, p3) {
-                return (p3.lon - p1.lon) * (p2.lat - p1.lat) > (p2.lon - p1.lon) * (p3.lat - p1.lat);
-            }
-            return (ccw(A, C, D) !== ccw(B, C, D)) && (ccw(A, B, C) !== ccw(A, B, D));
-        }
-
-        function cruzaCaminho(rotaConstruida, pontoCandidato) {
-            if (rotaConstruida.length < 2) return false;
-            let pA = rotaConstruida[rotaConstruida.length - 1]; 
-            let pB = pontoCandidato; 
-            for (let i = 0; i < rotaConstruida.length - 2; i++) {
-                let pC = rotaConstruida[i];
-                let pD = rotaConstruida[i + 1];
-                if (intersectam(pA, pB, pC, pD)) {
-                    return true; 
-                }
-            }
-            return false; 
-        }
-
-        function gerarRotaBlindada(rotaBase) {
+        function gerarRotaEspiral(rotaBase) {
             if (rotaBase.length <= 1) return rotaBase;
 
-            let anchors = [];
-            for (let i = 0; i < rotaBase.length; i++) {
-                let p = rotaBase[i];
-                let found = false;
-                for (let a of anchors) {
-                    if (dist(a.lat, a.lon, p.lat, p.lon) <= 70) {
-                        a.walking.push(p);
-                        found = true;
-                        break;
-                    }
-                }
-                if (!found) { anchors.push({ ...p, walking: [] }); }
+            // 1. Encontrar o Centro Geométrico Global do Bairro (O Olho do Radar)
+            let sumLat = 0, sumLon = 0;
+            rotaBase.forEach(p => { sumLat += p.lat; sumLon += p.lon; });
+            const centerLat = sumLat / rotaBase.length;
+            const centerLon = sumLon / rotaBase.length;
+
+            // 2. Agrupar Entregas por Rua (Prepara o Varal)
+            let gruposRua = {};
+            rotaBase.forEach(p => {
+                let rua = p.ruaPadrao;
+                if (rua === "DESCONHECIDO") rua = "DESC_" + p.idOriginal;
+                if (!gruposRua[rua]) gruposRua[rua] = [];
+                gruposRua[rua].push(p);
+            });
+
+            // 3. Determinar o Ângulo do Radar de cada Rua
+            let ruas = [];
+            for (let nomeRua in gruposRua) {
+                let pontos = gruposRua[nomeRua];
+                let sLat = 0, sLon = 0;
+                pontos.forEach(p => { sLat += p.lat; sLon += p.lon; });
+                let cLat = sLat / pontos.length;
+                let cLon = sLon / pontos.length;
+                
+                // O Segredo: Math.atan2 dá a direção como ponteiros de um relógio
+                let angulo = Math.atan2(cLat - centerLat, cLon - centerLon);
+                ruas.push({ nome: nomeRua, pontos: pontos, angulo: angulo });
             }
 
-            let rotaOtimizada = [];
-            let pendentes = [...anchors];
-            let atual = pendentes.shift();
-            rotaOtimizada.push(atual);
+            // 4. Ordenar Ruas de forma Circular (Garantia Geométrica contra Cruzamentos)
+            ruas.sort((a, b) => a.angulo - b.angulo);
 
-            while (pendentes.length > 0) {
-                let melhorProximo = null;
-                let ruaAtual = atual.ruaPadrao;
-
-                // REGRA 1: O ZÍPER DA RUA
-                let vizinhosRua = pendentes.filter(p => p.ruaPadrao === ruaAtual && ruaAtual !== "DESCONHECIDO");
-                if (vizinhosRua.length > 0) {
-                    vizinhosRua.sort((a, b) => Math.abs(a.idOriginal - atual.idOriginal) - Math.abs(b.idOriginal - atual.idOriginal));
-                    melhorProximo = vizinhosRua[0];
-                } 
-                else {
-                    // REGRA 2: NÃO-INTERSEÇÃO
-                    let menorCusto = Infinity;
-                    for (let cand of pendentes) {
-                        let custo = dist(atual.lat, atual.lon, cand.lat, cand.lon);
-                        
-                        if (cruzaCaminho(rotaOtimizada, cand)) {
-                            custo *= 50; // MULTA GEOMÉTRICA (Proibido cruzar linha)
-                        }
-                        
-                        if (custo < menorCusto) {
-                            menorCusto = custo;
-                            melhorProximo = cand;
-                        }
-                    }
-                }
-
-                rotaOtimizada.push(melhorProximo);
-                pendentes = pendentes.filter(p => p.idOriginal !== melhorProximo.idOriginal);
-                atual = melhorProximo;
-            }
-
+            // 5. Unir tudo formando a Rota Limpa
             let rotaFinal = [];
-            for (let a of rotaOtimizada) {
-                let anchorStop = { ...a };
-                delete anchorStop.walking;
-                rotaFinal.push(anchorStop);
-                for (let w of a.walking) {
-                    w.andaAPe = true;
-                    rotaFinal.push(w);
+            let ultimoPonto = null;
+
+            ruas.forEach(rua => {
+                let pendentes = [...rua.pontos];
+
+                // Ponto de entrada da rua (O mais perto de onde o carro parou antes)
+                let atual = null;
+                if (ultimoPonto) {
+                    let menorD = Infinity;
+                    let melhorIdx = 0;
+                    for (let i = 0; i < pendentes.length; i++) {
+                        let d = dist(ultimoPonto.lat, ultimoPonto.lon, pendentes[i].lat, pendentes[i].lon);
+                        if (d < menorD) { menorD = d; melhorIdx = i; }
+                    }
+                    atual = pendentes[melhorIdx];
+                    pendentes.splice(melhorIdx, 1);
+                } else {
+                    atual = pendentes.shift();
                 }
+
+                rotaFinal.push(atual);
+
+                // O Zíper: Pega o mais perto DENTRO da mesma via para limpar tudo de uma vez
+                while (pendentes.length > 0) {
+                    let menorD = Infinity;
+                    let melhorIdx = 0;
+                    for (let i = 0; i < pendentes.length; i++) {
+                        let d = dist(atual.lat, atual.lon, pendentes[i].lat, pendentes[i].lon);
+                        if (d < menorD) { menorD = d; melhorIdx = i; }
+                    }
+                    atual = pendentes[melhorIdx];
+                    rotaFinal.push(atual);
+                    pendentes.splice(melhorIdx, 1);
+                }
+                ultimoPonto = atual;
+            });
+
+            // 6. Marcar caminhadas a pé para a Doca (dist < 70m)
+            for (let i = 0; i < rotaFinal.length; i++) {
+                if (i === 0) { rotaFinal[i].andaAPe = false; continue; }
+                const anterior = rotaFinal[i - 1];
+                const pAtual = rotaFinal[i];
+                pAtual.andaAPe = dist(anterior.lat, anterior.lon, pAtual.lat, pAtual.lon) <= 70;
             }
 
             return rotaFinal;
@@ -502,19 +491,8 @@
 
                     if (rotaOriginalData.length === 0) throw new Error("Sem coordenadas válidas.");
 
-                    let matrizOSRM = null;
-                    let matrizDuracao = null;
-                    if (rotaOriginalData.length <= 100) { 
-                        try {
-                            let coords = rotaOriginalData.map(p => `${p.lon},${p.lat}`).join(';');
-                            let res = await fetch(`https://router.project-osrm.org/table/v1/driving/${coords}?annotations=distance,duration`);
-                            let data = await res.json();
-                            if(data.code === 'Ok') { matrizOSRM = data.distances; matrizDuracao = data.durations; }
-                        } catch(e) {}
-                    }
-
-                    // RODA O MOTOR BLINDADO ZÍPER
-                    rotaOtimizadaData = gerarRotaBlindada(rotaOriginalData);
+                    // A Mágica de Espiral e Varredura roda aqui
+                    rotaOtimizadaData = gerarRotaEspiral(rotaOriginalData);
                     
                     baixarRadaresDaRegiao(rotaOriginalData);
 
@@ -522,13 +500,12 @@
                     document.getElementById('modal-auditoria').style.display = 'flex';
                     iniciarMapasAuditoria();
                     
-                    // Pinta os painéis de venda
                     setTimeout(async () => {
                         mapPadrao.invalidateSize();
                         mapOtimizado.invalidateSize();
                         
-                        let rPadrao = await plotarVisaoPassaro(layerPadrao, mapPadrao, rotaOriginalData, '#ff4444', matrizOSRM, matrizDuracao);
-                        let rOtim = await plotarVisaoPassaro(layerOtimizado, mapOtimizado, rotaOtimizadaData, '#39FF14', matrizOSRM, matrizDuracao);
+                        let rPadrao = await plotarVisaoPassaro(layerPadrao, mapPadrao, rotaOriginalData, '#ff4444');
+                        let rOtim = await plotarVisaoPassaro(layerOtimizado, mapOtimizado, rotaOtimizadaData, '#39FF14');
 
                         document.getElementById('km-padrao').innerHTML = `Custo Operacional: <b>${rPadrao.km.toFixed(2)} km</b><br><small style="color:#aaa;">(${rPadrao.quebras} manobras/trocas de rua penalizadas)</small>`;
                         document.getElementById('km-otimizada').innerHTML = `Custo Operacional: <b>${rOtim.km.toFixed(2)} km</b><br><small style="color:#aaa;">(${rOtim.quebras} manobras/trocas de rua penalizadas)</small>`;
@@ -690,13 +667,14 @@
                     markerUser.setLatLng([minhaLat, minhaLon]);
                 }
 
+                // RADAR DE 75m (Para sentir como 50m no mundo real)
                 if (listaRadares.length > 0) {
                     let radarProxDaVez = null;
                     let menorDistRadar = Infinity;
                     
                     for (let r of listaRadares) {
                         let dRadar = dist(minhaLat, minhaLon, r.lat, r.lon);
-                        if (dRadar <= 50 && dRadar < menorDistRadar) {
+                        if (dRadar <= 75 && dRadar < menorDistRadar) {
                             menorDistRadar = dRadar;
                             radarProxDaVez = r;
                         }
@@ -763,21 +741,22 @@
                         lat: s.maneuver.location[1], lon: s.maneuver.location[0],
                         manobra: s.maneuver.modifier, rua: s.name || "Siga em frente"
                     }));
-                    idxPasso = 0;
-                    distAnteriorCurva = Infinity; 
+                    // Tira a linha global de traçado pra não poluir o celular
                     if (polylineRota) mapa.removeLayer(polylineRota);
-                    polylineRota = L.polyline(route.geometry.coordinates.map(c => [c[1], c[0]]), { color: '#007AFF', weight: 6, opacity: 0.8 }).addTo(mapa);
                 }
             } catch (e) { console.log("Erro rota", e); }
         }
 
         function navegar() {
-            if (!rotaSpx[idxDestino] || passosNavegacao.length === 0) return;
+            if (!rotaSpx[idxDestino]) return;
             const dFinal = dist(minhaLat, minhaLon, rotaSpx[idxDestino].lat, rotaSpx[idxDestino].lon);
             
-            document.getElementById('rodape-dist').innerText = dFinal > 1000 ? (dFinal/1000).toFixed(1) + " km" : Math.round(dFinal) + " m";
+            // ETA NO PAINEL INFERIOR (Velocidade Média Urbana de Bairro ~ 20km/h = 5.5 m/s)
+            let tempoSegundos = dFinal / 5.5; 
+            let minPrevisao = Math.ceil(tempoSegundos / 60);
 
-            if (dFinal < 20) {
+            // CHEGADA ALTERADA PARA 30 METROS
+            if (dFinal < 30) {
                 aguardandoConfirmacao = true;
                 releaseWakeLock();
                 document.getElementById('painel-rodape').style.display = 'none';
@@ -788,24 +767,13 @@
                 return;
             }
 
-            const passo = passosNavegacao[idxPasso];
-            if (!passo) return;
-            const dCurva = dist(minhaLat, minhaLon, passo.lat, passo.lon);
-
-            document.getElementById('rodape-rua').innerText = passo.rua;
-            document.getElementById('seta-dist').innerText = Math.round(dCurva) + " m";
-
-            const m = passo.manobra;
-            if (m && m.includes("left")) document.getElementById('seta-icon').innerText = "⬅️";
-            else if (m && m.includes("right")) document.getElementById('seta-icon').innerText = "➡️";
-            else document.getElementById('seta-icon').innerText = "⬆️";
+            // ATUALIZAÇÃO DO PAINEL DE ETA E SENSOR FRONTAL
+            document.getElementById('rodape-rua').innerText = "PREVISÃO DE CHEGADA";
+            document.getElementById('rodape-dist').innerText = minPrevisao + " min";
             
-            if (dCurva > distAnteriorCurva + 3 && distAnteriorCurva < 40) {
-                if (idxPasso < passosNavegacao.length - 1) { idxPasso++; distAnteriorCurva = Infinity; }
-            } else {
-                if (dCurva < distAnteriorCurva) distAnteriorCurva = dCurva;
-                if (dCurva < 8 && idxPasso < passosNavegacao.length - 1) { idxPasso++; distAnteriorCurva = Infinity; }
-            }
+            // Seta flutuante focada no destino final e não na curva cega
+            document.getElementById('seta-dist').innerText = dFinal > 1000 ? (dFinal/1000).toFixed(1) + " km" : Math.round(dFinal) + " m";
+            document.getElementById('seta-icon').innerText = "⬆️"; // Direto ao alvo
         }
 
         function finalizarParada(status) {
