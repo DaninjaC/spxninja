@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SPX Ninja - V-Final (Varredura Radial + ETA + Radar 75m)</title>
+    <title>SPX Ninja - V-Final (Varredura Limpa + Linha Azul)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -70,7 +70,6 @@
         .legenda { font-size: 13px; color: #ddd; margin-top: 8px; text-align: left; font-weight: bold; padding-bottom: 5px;}
         .legenda span { display: inline-block; width: 25px; height: 4px; margin-right: 5px; vertical-align: middle;}
 
-        /* CSS DO ALERTA DE RADAR */
         #radar-alert {
             display: none;
             position: absolute;
@@ -100,7 +99,7 @@
             📦 CARREGAR PLANILHA SPX
             <input type="file" id="fileInput" accept=".xlsx, .xls, .csv">
         </label>
-        <div id="loading-msg" style="display:none; color:#FFCC00; font-weight:bold; margin-top:20px; font-size:18px;">⏳ Mapeando Circuito Radial...<br><small>Agrupando ruas e eliminando cruzamentos.</small></div>
+        <div id="loading-msg" style="display:none; color:#FFCC00; font-weight:bold; margin-top:20px; font-size:18px;">⏳ Desembaraçando a Rota...<br><small>Eliminando linhas cruzadas e zigue-zagues.</small></div>
     </div>
 
     <div id="modal-auditoria" class="modal-fullscreen">
@@ -110,14 +109,14 @@
                 <button class="btn-modo btn-padrao" onclick="escolherRotaPadrao()">
                     ▶️ ROTA PADRÃO SHOPEE<br><span id="km-padrao" style="font-weight:normal; font-size:14px;">Calculando Custo Operacional...</span>
                 </button>
-                <div class="legenda"><span style="background: #ff4444; border-bottom: 2px dashed #ff4444; height: 1px;"></span> Sequência Direta (Visão de Pássaro)</div>
+                <div class="legenda"><span style="background: #ff4444; border-bottom: 2px dashed #ff4444; height: 1px;"></span> Sequência Padrão</div>
                 <div id="mapa-padrao" class="mapa-container"></div>
             </div>
             <div class="col-mapa">
                 <button class="btn-modo btn-otimizada" onclick="escolherRotaOtimizada()">
                     🚀 OTIMIZADA SPX NINJA<br><span id="km-otimizada" style="font-weight:normal; font-size:14px;">Calculando Custo Operacional...</span>
                 </button>
-                <div class="legenda"><span style="background: #39FF14; border-bottom: 2px dashed #39FF14; height: 1px;"></span> Espiral de Varredura Limpa</div>
+                <div class="legenda"><span style="background: #39FF14; border-bottom: 2px dashed #39FF14; height: 1px;"></span> Varredura Limpa (Sem Cruzamentos)</div>
                 <div id="mapa-otimizado" class="mapa-container"></div>
             </div>
         </div>
@@ -132,12 +131,12 @@
     </div>
 
     <div id="modal-info-otimizada" class="modal-fullscreen">
-        <h2>🚀 MODO: OTIMIZADA SPX (Varredura Radial)</h2>
+        <h2>🚀 MODO: OTIMIZADA SPX (Varredura Limpa)</h2>
         <div class="info-container">
-            <p>Foco total na <strong>Eficiência Operacional Circular</strong>:</p>
-            <p>1. <strong>O Radar de Bairro:</strong> O sistema agrupou as ruas por ângulo, formando uma espiral em torno do bairro. O fim dos fios cruzados!</p>
-            <p>2. <strong>Zíper Focado:</strong> Dentro da mesma rua, ele puxa o varal ponto a ponto para você não voltar atrás.</p>
-            <p>3. <strong>Atualização de Campo:</strong> Radar aciona aos 75m reais. ETA no painel. Chegada aos 30m.</p>
+            <p>Foco total na <strong>Eficiência Operacional Limpa</strong>:</p>
+            <p>1. <strong>Fim das Linhas Cruzadas:</strong> O algoritmo de destorção garantiu que a rota limpe os blocos sem passar por cima do que já foi feito.</p>
+            <p>2. <strong>Caminho Contínuo:</strong> A rota agora flui ligando A ao B e ao C numa sequência geográfica clara.</p>
+            <p>3. <strong>Tracejado Azul Voltou:</strong> Corrigido o bug visual do mapa GPS.</p>
         </div>
         <button class="btn-modo btn-otimizada" onclick="avancarParaDocaOtimizada()">IR PARA SEPARAÇÃO (BAGS) 📦</button>
     </div>
@@ -300,7 +299,7 @@
         }
 
         // ============================================================================
-        // A AUDITORIA CORRIGIDA: Custo Operacional c/ Penalidade de Manobra
+        // A AUDITORIA: Custo Operacional c/ Penalidade de Manobra
         // ============================================================================
         async function plotarVisaoPassaro(camada, mapaLocal, rota, corLinha) {
             camada.clearLayers();
@@ -330,10 +329,9 @@
                     }
 
                     if (dReta <= 70) {
-                        distanciaTotalReal += dReta;
+                        distanciaTotalReal += dReta; // a pé não usa multiplicador
                     } else {
-                        // Cálculo base: Linha reta * Fator asfalto urbano
-                        distanciaTotalReal += dReta * 1.5;
+                        distanciaTotalReal += dReta * 1.5; // multiplicador asfalto urbano
                     }
                 }
             }
@@ -348,89 +346,96 @@
         }
 
         // ============================================================================
-        // NOVO MOTOR SPX NINJA: SWEEP ALGORITHM (VARREDURA RADIAL) + ZÍPER
-        // Fim dos zigue-zagues. Varre em espiral.
+        // O MOTOR DE VARREDURA LIMPA: OTIMIZAÇÃO GEOMÉTRICA (SEM CRUZAMENTOS)
+        // Usa Algoritmo de Vizinhança + 2-Opt Geométrico Puro
         // ============================================================================
-        function gerarRotaEspiral(rotaBase) {
+        function gerarRotaLimpa(rotaBase) {
             if (rotaBase.length <= 1) return rotaBase;
 
-            // 1. Encontrar o Centro Geométrico Global do Bairro (O Olho do Radar)
-            let sumLat = 0, sumLon = 0;
-            rotaBase.forEach(p => { sumLat += p.lat; sumLon += p.lon; });
-            const centerLat = sumLat / rotaBase.length;
-            const centerLon = sumLon / rotaBase.length;
-
-            // 2. Agrupar Entregas por Rua (Prepara o Varal)
-            let gruposRua = {};
-            rotaBase.forEach(p => {
-                let rua = p.ruaPadrao;
-                if (rua === "DESCONHECIDO") rua = "DESC_" + p.idOriginal;
-                if (!gruposRua[rua]) gruposRua[rua] = [];
-                gruposRua[rua].push(p);
-            });
-
-            // 3. Determinar o Ângulo do Radar de cada Rua
-            let ruas = [];
-            for (let nomeRua in gruposRua) {
-                let pontos = gruposRua[nomeRua];
-                let sLat = 0, sLon = 0;
-                pontos.forEach(p => { sLat += p.lat; sLon += p.lon; });
-                let cLat = sLat / pontos.length;
-                let cLon = sLon / pontos.length;
-                
-                // O Segredo: Math.atan2 dá a direção como ponteiros de um relógio
-                let angulo = Math.atan2(cLat - centerLat, cLon - centerLon);
-                ruas.push({ nome: nomeRua, pontos: pontos, angulo: angulo });
+            // 1. Agrupar vizinhos a pé (Até 70m)
+            let anchors = [];
+            for (let i = 0; i < rotaBase.length; i++) {
+                let p = rotaBase[i];
+                let found = false;
+                for (let a of anchors) {
+                    if (dist(a.lat, a.lon, p.lat, p.lon) <= 70) {
+                        a.walking.push(p);
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) { anchors.push({ ...p, walking: [] }); }
             }
 
-            // 4. Ordenar Ruas de forma Circular (Garantia Geométrica contra Cruzamentos)
-            ruas.sort((a, b) => a.angulo - b.angulo);
+            // 2. Traçar Caminho Guloso (Nearest Neighbor) com pequeno incentivo para mesma rua
+            let naoVisitados = [...anchors];
+            let rotaGeometrica = [naoVisitados.shift()];
 
-            // 5. Unir tudo formando a Rota Limpa
+            while(naoVisitados.length > 0) {
+                let ultimo = rotaGeometrica[rotaGeometrica.length - 1];
+                let melhorIdx = 0;
+                let minCusto = Infinity;
+
+                for(let i=0; i < naoVisitados.length; i++) {
+                    let cand = naoVisitados[i];
+                    let d = dist(ultimo.lat, ultimo.lon, cand.lat, cand.lon);
+                    
+                    // Empurrãozinho sutil para continuar na mesma rua (10% de desconto)
+                    // Ajuda o algoritmo a não ficar trocando de calçada desnecessariamente.
+                    if(ultimo.ruaPadrao === cand.ruaPadrao && ultimo.ruaPadrao !== "DESCONHECIDO") {
+                        d *= 0.9;
+                    }
+
+                    if(d < minCusto) {
+                        minCusto = d;
+                        melhorIdx = i;
+                    }
+                }
+                rotaGeometrica.push(naoVisitados[melhorIdx]);
+                naoVisitados.splice(melhorIdx, 1);
+            }
+
+            // 3. A DESTORÇÃO (ALGORITMO 2-OPT PURO)
+            // Se duas linhas formam um X (cruzamento), destorcer elas diminui a distância matemática.
+            // Executar isso garante um traçado de polígono limpo sem nenhum zigue-zague sobreposto.
+            let melhorou = true;
+            let iteracoes = 0;
+            
+            while(melhorou && iteracoes < 500) {
+                melhorou = false;
+                iteracoes++;
+                for(let i=0; i < rotaGeometrica.length - 2; i++) {
+                    for(let j=i+2; j < rotaGeometrica.length; j++) {
+                        let a = rotaGeometrica[i];
+                        let b = rotaGeometrica[i+1];
+                        let c = rotaGeometrica[j];
+                        let d = (j+1 < rotaGeometrica.length) ? rotaGeometrica[j+1] : null;
+
+                        // Distância de cruzar (atual)
+                        let d_atual = dist(a.lat, a.lon, b.lat, b.lon) + (d ? dist(c.lat, c.lon, d.lat, d.lon) : 0);
+                        // Distância sem cruzar (novo)
+                        let d_novo = dist(a.lat, a.lon, c.lat, c.lon) + (d ? dist(b.lat, b.lon, d.lat, d.lon) : 0);
+
+                        if(d_novo < d_atual - 0.5) { // 0.5m de margem previne loops infinitos
+                            // Inverte o pedaço do caminho e destorce o X
+                            let pedaco = rotaGeometrica.slice(i+1, j+1).reverse();
+                            rotaGeometrica.splice(i+1, pedaco.length, ...pedaco);
+                            melhorou = true;
+                        }
+                    }
+                }
+            }
+
+            // 4. Descompactar as caminhadas de volta para a lista do app
             let rotaFinal = [];
-            let ultimoPonto = null;
-
-            ruas.forEach(rua => {
-                let pendentes = [...rua.pontos];
-
-                // Ponto de entrada da rua (O mais perto de onde o carro parou antes)
-                let atual = null;
-                if (ultimoPonto) {
-                    let menorD = Infinity;
-                    let melhorIdx = 0;
-                    for (let i = 0; i < pendentes.length; i++) {
-                        let d = dist(ultimoPonto.lat, ultimoPonto.lon, pendentes[i].lat, pendentes[i].lon);
-                        if (d < menorD) { menorD = d; melhorIdx = i; }
-                    }
-                    atual = pendentes[melhorIdx];
-                    pendentes.splice(melhorIdx, 1);
-                } else {
-                    atual = pendentes.shift();
+            for (let a of rotaGeometrica) {
+                let anchorStop = { ...a };
+                delete anchorStop.walking;
+                rotaFinal.push(anchorStop);
+                for (let w of a.walking) {
+                    w.andaAPe = true;
+                    rotaFinal.push(w);
                 }
-
-                rotaFinal.push(atual);
-
-                // O Zíper: Pega o mais perto DENTRO da mesma via para limpar tudo de uma vez
-                while (pendentes.length > 0) {
-                    let menorD = Infinity;
-                    let melhorIdx = 0;
-                    for (let i = 0; i < pendentes.length; i++) {
-                        let d = dist(atual.lat, atual.lon, pendentes[i].lat, pendentes[i].lon);
-                        if (d < menorD) { menorD = d; melhorIdx = i; }
-                    }
-                    atual = pendentes[melhorIdx];
-                    rotaFinal.push(atual);
-                    pendentes.splice(melhorIdx, 1);
-                }
-                ultimoPonto = atual;
-            });
-
-            // 6. Marcar caminhadas a pé para a Doca (dist < 70m)
-            for (let i = 0; i < rotaFinal.length; i++) {
-                if (i === 0) { rotaFinal[i].andaAPe = false; continue; }
-                const anterior = rotaFinal[i - 1];
-                const pAtual = rotaFinal[i];
-                pAtual.andaAPe = dist(anterior.lat, anterior.lon, pAtual.lat, pAtual.lon) <= 70;
             }
 
             return rotaFinal;
@@ -491,8 +496,8 @@
 
                     if (rotaOriginalData.length === 0) throw new Error("Sem coordenadas válidas.");
 
-                    // A Mágica de Espiral e Varredura roda aqui
-                    rotaOtimizadaData = gerarRotaEspiral(rotaOriginalData);
+                    // RODA O MOTOR GEOMÉTRICO (SEM CRUZAR)
+                    rotaOtimizadaData = gerarRotaLimpa(rotaOriginalData);
                     
                     baixarRadaresDaRegiao(rotaOriginalData);
 
@@ -667,7 +672,7 @@
                     markerUser.setLatLng([minhaLat, minhaLon]);
                 }
 
-                // RADAR DE 75m (Para sentir como 50m no mundo real)
+                // RADAR DE 75m (Parece 50m na rua devido ao delay de comunicação)
                 if (listaRadares.length > 0) {
                     let radarProxDaVez = null;
                     let menorDistRadar = Infinity;
@@ -741,8 +746,12 @@
                         lat: s.maneuver.location[1], lon: s.maneuver.location[0],
                         manobra: s.maneuver.modifier, rua: s.name || "Siga em frente"
                     }));
-                    // Tira a linha global de traçado pra não poluir o celular
+                    idxPasso = 0;
+                    distAnteriorCurva = Infinity; 
+                    
+                    // CORREÇÃO: A LINHA AZUL DE RUA VOLTOU PARA A TELA AQUI
                     if (polylineRota) mapa.removeLayer(polylineRota);
+                    polylineRota = L.polyline(route.geometry.coordinates.map(c => [c[1], c[0]]), { color: '#007AFF', weight: 6, opacity: 0.8 }).addTo(mapa);
                 }
             } catch (e) { console.log("Erro rota", e); }
         }
@@ -771,9 +780,8 @@
             document.getElementById('rodape-rua').innerText = "PREVISÃO DE CHEGADA";
             document.getElementById('rodape-dist').innerText = minPrevisao + " min";
             
-            // Seta flutuante focada no destino final e não na curva cega
             document.getElementById('seta-dist').innerText = dFinal > 1000 ? (dFinal/1000).toFixed(1) + " km" : Math.round(dFinal) + " m";
-            document.getElementById('seta-icon').innerText = "⬆️"; // Direto ao alvo
+            document.getElementById('seta-icon').innerText = "⬆️"; 
         }
 
         function finalizarParada(status) {
