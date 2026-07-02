@@ -8,6 +8,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Plugin que adiciona rotação real ao mapa (o Leaflet puro não gira o mapa sozinho) -->
+    <script src="https://unpkg.com/leaflet-rotate@0.2.8/dist/leaflet-rotate-src.js"></script>
 
     <style>
         body { background-color: #000; color: #fff; font-family: sans-serif; margin: 0; padding: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
@@ -627,7 +629,14 @@
             document.getElementById('tela-navegacao').style.display = 'flex';
             
             if (!mapa) {
-                mapa = L.map('map', { zoomControl: false, attributionControl: false }).setView([-23.61, -46.57], 16);
+                mapa = L.map('map', {
+                    zoomControl: false,
+                    attributionControl: false,
+                    rotate: true,          // habilita a rotação real do mapa (tiles, linha, marcadores)
+                    rotateControl: false,  // não mostra botão de girar manualmente
+                    touchRotate: false,    // impede o usuário de girar o mapa com o dedo (fica travado no GPS)
+                    shiftKeyRotate: false
+                }).setView([-23.61, -46.57], 16);
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(mapa);
                 camadaFundo.addTo(mapa);
             }
@@ -652,6 +661,26 @@
             const x = Math.cos(lat1 * toRad) * Math.sin(lat2 * toRad) - Math.sin(lat1 * toRad) * Math.cos(lat2 * toRad) * Math.cos(dLon);
             let brng = Math.atan2(y, x) * toDeg;
             return Math.round((brng + 360) % 360);
+        }
+
+        // Gira o mapa para que a direção que eu estou seguindo sempre aponte pra cima
+        // (igual Waze/Google Maps) e me empurra pra parte de baixo da tela, deixando
+        // mais rua visível à minha frente.
+        function atualizarCameraNavegacao() {
+            if (!mapa) return;
+
+            // Se ainda não sei pra onde estou indo (parado, sem heading), mantém norte pra cima
+            mapa.setBearing(headingCarro !== null ? -headingCarro : 0);
+
+            // Centraliza exatamente no meu ponto (sem animação, pra não "atrasar" em relação ao GPS)
+            mapa.setView([minhaLat, minhaLon], mapa.getZoom(), { animate: false });
+
+            // Empurra a câmera pra "trás", deixando meu ponto mais perto da base da tela
+            const wrapper = document.getElementById('map-wrapper');
+            if (wrapper) {
+                const deslocamento = wrapper.clientHeight * 0.32;
+                mapa.panBy([0, -deslocamento], { animate: false });
+            }
         }
 
         function iniciarGPS() {
@@ -713,7 +742,7 @@
                     }
                     navegar();
                 }
-                mapa.panTo([minhaLat, minhaLon]);
+                atualizarCameraNavegacao();
             }, (err) => {
                 document.getElementById('rodape-rua').innerText = "ERRO GPS: " + err.message;
             }, { enableHighAccuracy: true });
