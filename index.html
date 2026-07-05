@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SPX Ninja - V-Final (Varredura Limpa + Linha Azul)</title>
+    <title>SPX Ninja - V-Final (Seta Corrigida)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -672,7 +672,6 @@
                     markerUser.setLatLng([minhaLat, minhaLon]);
                 }
 
-                // RADAR DE 75m (Parece 50m na rua devido ao delay de comunicação)
                 if (listaRadares.length > 0) {
                     let radarProxDaVez = null;
                     let menorDistRadar = Infinity;
@@ -749,7 +748,6 @@
                     idxPasso = 0;
                     distAnteriorCurva = Infinity; 
                     
-                    // CORREÇÃO: A LINHA AZUL DE RUA VOLTOU PARA A TELA AQUI
                     if (polylineRota) mapa.removeLayer(polylineRota);
                     polylineRota = L.polyline(route.geometry.coordinates.map(c => [c[1], c[0]]), { color: '#007AFF', weight: 6, opacity: 0.8 }).addTo(mapa);
                 }
@@ -760,11 +758,10 @@
             if (!rotaSpx[idxDestino]) return;
             const dFinal = dist(minhaLat, minhaLon, rotaSpx[idxDestino].lat, rotaSpx[idxDestino].lon);
             
-            // ETA NO PAINEL INFERIOR (Velocidade Média Urbana de Bairro ~ 20km/h = 5.5 m/s)
+            // ETA NO PAINEL INFERIOR
             let tempoSegundos = dFinal / 5.5; 
             let minPrevisao = Math.ceil(tempoSegundos / 60);
 
-            // CHEGADA ALTERADA PARA 30 METROS
             if (dFinal < 30) {
                 aguardandoConfirmacao = true;
                 releaseWakeLock();
@@ -776,12 +773,34 @@
                 return;
             }
 
-            // ATUALIZAÇÃO DO PAINEL DE ETA E SENSOR FRONTAL
+            // MANTÉM O PAINEL INFERIOR COMO PREVISÃO (ETA)
             document.getElementById('rodape-rua').innerText = "PREVISÃO DE CHEGADA";
             document.getElementById('rodape-dist').innerText = minPrevisao + " min";
             
-            document.getElementById('seta-dist').innerText = dFinal > 1000 ? (dFinal/1000).toFixed(1) + " km" : Math.round(dFinal) + " m";
-            document.getElementById('seta-icon').innerText = "⬆️"; 
+            // RESTAURA A LÓGICA DA SETA FLUTUANTE (TURN-BY-TURN)
+            if (passosNavegacao.length === 0) {
+                document.getElementById('seta-dist').innerText = dFinal > 1000 ? (dFinal/1000).toFixed(1) + " km" : Math.round(dFinal) + " m";
+                document.getElementById('seta-icon').innerText = "⬆️"; 
+            } else {
+                const passo = passosNavegacao[idxPasso];
+                if (!passo) return;
+                const dCurva = dist(minhaLat, minhaLon, passo.lat, passo.lon);
+
+                document.getElementById('seta-dist').innerText = Math.round(dCurva) + " m";
+
+                const m = passo.manobra;
+                if (m && m.includes("left")) document.getElementById('seta-icon').innerText = "⬅️";
+                else if (m && m.includes("right")) document.getElementById('seta-icon').innerText = "➡️";
+                else document.getElementById('seta-icon').innerText = "⬆️";
+                
+                // Lógica de atraso: só avisa a próxima curva DEPOIS de entrar na rua
+                if (dCurva > distAnteriorCurva + 3 && distAnteriorCurva < 40) {
+                    if (idxPasso < passosNavegacao.length - 1) { idxPasso++; distAnteriorCurva = Infinity; }
+                } else {
+                    if (dCurva < distAnteriorCurva) distAnteriorCurva = dCurva;
+                    if (dCurva < 8 && idxPasso < passosNavegacao.length - 1) { idxPasso++; distAnteriorCurva = Infinity; }
+                }
+            }
         }
 
         function finalizarParada(status) {
