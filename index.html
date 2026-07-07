@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SPX Ninja - V-Final (Seta Corrigida)</title>
+    <title>SPX Ninja - V-Final (Mão da Via + Comercial + Relatório)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -30,6 +30,7 @@
         .bag-item strong { font-size: 18px; color: #fff; }
         .bag-item small { color: #aaa; display: block; margin-top: 3px; font-size: 12px;}
         .bag-vol { background: #39FF14; color: #000; padding: 3px 8px; border-radius: 12px; font-weight: bold; font-size: 14px; }
+        .tag-comercial { background: #9d00ff; color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; margin-right: 5px; display: inline-block; margin-bottom: 3px;}
 
         #tela-navegacao { display: none; flex-direction: column; height: 100vh; width: 100%; position: relative;}
         #painel-topo { background: #003399; padding: 15px; text-align: center; z-index: 1001; max-height: 35vh; overflow-y: auto; border-bottom: 2px solid #000; position: relative;}
@@ -71,24 +72,18 @@
         .legenda span { display: inline-block; width: 25px; height: 4px; margin-right: 5px; vertical-align: middle;}
 
         #radar-alert {
-            display: none;
-            position: absolute;
-            top: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 2005;
-            background: #dc3545;
-            color: #fff;
-            padding: 12px 25px;
-            border-radius: 30px;
-            font-weight: bold;
-            font-size: 22px;
-            border: 3px solid #fff;
-            box-shadow: 0 6px 15px rgba(0,0,0,0.6);
-            align-items: center;
-            gap: 10px;
-            text-transform: uppercase;
+            display: none; position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
+            z-index: 2005; background: #dc3545; color: #fff; padding: 12px 25px; border-radius: 30px;
+            font-weight: bold; font-size: 22px; border: 3px solid #fff; box-shadow: 0 6px 15px rgba(0,0,0,0.6);
+            align-items: center; gap: 10px; text-transform: uppercase;
         }
+
+        /* TELA DE RELATÓRIO FINAL */
+        .relatorio-card { background: #111; border: 2px solid #39FF14; border-radius: 12px; padding: 20px; text-align: center; margin-top: 20px; }
+        .rel-dado { margin-bottom: 15px; }
+        .rel-dado span { display: block; font-size: 14px; color: #aaa; text-transform: uppercase; }
+        .rel-dado strong { font-size: 28px; color: #fff; }
+        .rel-destaque { color: #FFCC00 !important; }
     </style>
 </head>
 <body>
@@ -99,7 +94,7 @@
             📦 CARREGAR PLANILHA SPX
             <input type="file" id="fileInput" accept=".xlsx, .xls, .csv">
         </label>
-        <div id="loading-msg" style="display:none; color:#FFCC00; font-weight:bold; margin-top:20px; font-size:18px;">⏳ Desembaraçando a Rota...<br><small>Eliminando linhas cruzadas e zigue-zagues.</small></div>
+        <div id="loading-msg" style="display:none; color:#FFCC00; font-weight:bold; margin-top:20px; font-size:18px;">⏳ Calculando Mão da Via...<br><small>Identificando comércios e otimizando fluxo.</small></div>
     </div>
 
     <div id="modal-auditoria" class="modal-fullscreen">
@@ -116,7 +111,7 @@
                 <button class="btn-modo btn-otimizada" onclick="escolherRotaOtimizada()">
                     🚀 OTIMIZADA SPX NINJA<br><span id="km-otimizada" style="font-weight:normal; font-size:14px;">Calculando Custo Operacional...</span>
                 </button>
-                <div class="legenda"><span style="background: #39FF14; border-bottom: 2px dashed #39FF14; height: 1px;"></span> Varredura Limpa (Sem Cruzamentos)</div>
+                <div class="legenda"><span style="background: #39FF14; border-bottom: 2px dashed #39FF14; height: 1px;"></span> Zíper Contínuo de Fluxo</div>
                 <div id="mapa-otimizado" class="mapa-container"></div>
             </div>
         </div>
@@ -131,12 +126,12 @@
     </div>
 
     <div id="modal-info-otimizada" class="modal-fullscreen">
-        <h2>🚀 MODO: OTIMIZADA SPX (Varredura Limpa)</h2>
+        <h2>🚀 MODO: OTIMIZADA SPX (Fluxo e Comercial)</h2>
         <div class="info-container">
-            <p>Foco total na <strong>Eficiência Operacional Limpa</strong>:</p>
-            <p>1. <strong>Fim das Linhas Cruzadas:</strong> O algoritmo de destorção garantiu que a rota limpe os blocos sem passar por cima do que já foi feito.</p>
-            <p>2. <strong>Caminho Contínuo:</strong> A rota agora flui ligando A ao B e ao C numa sequência geográfica clara.</p>
-            <p>3. <strong>Tracejado Azul Voltou:</strong> Corrigido o bug visual do mapa GPS.</p>
+            <p>Foco na <strong>Eficiência de Campo</strong>:</p>
+            <p>1. <strong>Mão da Via Respeitada:</strong> O algoritmo amarra as ruas seguindo a mesma direção da Shopee para evitar contramão e zigue-zague.</p>
+            <p>2. <strong>Radar de Comércios:</strong> Lojas, Galpões e Prédios estão sinalizados em roxo para você priorizar.</p>
+            <p>3. <strong>Relatório Final:</strong> Ao finalizar a última entrega, você receberá suas métricas do dia.</p>
         </div>
         <button class="btn-modo btn-otimizada" onclick="avancarParaDocaOtimizada()">IR PARA SEPARAÇÃO (BAGS) 📦</button>
     </div>
@@ -181,6 +176,18 @@
         </div>
     </div>
 
+    <div id="modal-relatorio" class="modal-fullscreen" style="z-index: 5000;">
+        <h2>🏆 EXPEDIENTE FINALIZADO!</h2>
+        <p>Excelente trabalho, Ninja! Aqui estão as suas métricas de hoje:</p>
+        <div class="relatorio-card">
+            <div class="rel-dado"><span>Tempo Total na Rua</span><strong id="rel-total">--:--</strong></div>
+            <div class="rel-dado"><span>Média por Entrega</span><strong id="rel-media">--:--</strong></div>
+            <div class="rel-dado"><span>Parada Mais Rápida ⚡</span><strong id="rel-rapida" class="rel-destaque">--:--</strong></div>
+            <div class="rel-dado"><span>Parada Mais Lenta 🐢</span><strong id="rel-lenta">--:--</strong></div>
+        </div>
+        <button class="btn-modo btn-otimizada" style="margin-top: 30px;" onclick="location.reload()">NOVA PLANILHA</button>
+    </div>
+
     <script>
         let rotaSpx = [], rotaOriginalData = [], rotaOtimizadaData = []; 
         let passosNavegacao = [], idxDestino = 0, idxPasso = 0;
@@ -190,6 +197,10 @@
         let latAntGps = null, lonAntGps = null, headingCarro = null; 
         let mapPadrao = null, mapOtimizado = null;
         let layerPadrao = L.layerGroup(), layerOtimizado = L.layerGroup();
+
+        // Dados de Relatório
+        let horaInicioExpediente = null;
+        let historicoParadas = [];
 
         let listaRadares = [];
         let radarAtivo = null;
@@ -298,9 +309,6 @@
             }
         }
 
-        // ============================================================================
-        // A AUDITORIA: Custo Operacional c/ Penalidade de Manobra
-        // ============================================================================
         async function plotarVisaoPassaro(camada, mapaLocal, rota, corLinha) {
             camada.clearLayers();
             let boundsCoords = [];
@@ -329,9 +337,9 @@
                     }
 
                     if (dReta <= 70) {
-                        distanciaTotalReal += dReta; // a pé não usa multiplicador
+                        distanciaTotalReal += dReta;
                     } else {
-                        distanciaTotalReal += dReta * 1.5; // multiplicador asfalto urbano
+                        distanciaTotalReal += dReta * 1.5;
                     }
                 }
             }
@@ -346,96 +354,80 @@
         }
 
         // ============================================================================
-        // O MOTOR DE VARREDURA LIMPA: OTIMIZAÇÃO GEOMÉTRICA (SEM CRUZAMENTOS)
-        // Usa Algoritmo de Vizinhança + 2-Opt Geométrico Puro
+        // NOVO MOTOR SPX NINJA: ZÍPER DE FLUXO DA VIA
+        // Agrupa por Rua e FORÇA a sequência crescente do ID Original para respeitar a Mão.
         // ============================================================================
-        function gerarRotaLimpa(rotaBase) {
+        function gerarRotaPorFluxo(rotaBase) {
             if (rotaBase.length <= 1) return rotaBase;
 
-            // 1. Agrupar vizinhos a pé (Até 70m)
-            let anchors = [];
-            for (let i = 0; i < rotaBase.length; i++) {
+            // 1. Criar "Blocos de Rua" amarrados pela sequência da Shopee
+            let grupos = [];
+            let grupoAtual = [rotaBase[0]];
+
+            for (let i = 1; i < rotaBase.length; i++) {
                 let p = rotaBase[i];
-                let found = false;
-                for (let a of anchors) {
-                    if (dist(a.lat, a.lon, p.lat, p.lon) <= 70) {
-                        a.walking.push(p);
-                        found = true;
-                        break;
+                let ant = grupoAtual[grupoAtual.length - 1];
+
+                // Se for a mesma rua e não for um salto absurdo, fica no mesmo bloco
+                if (p.ruaPadrao === ant.ruaPadrao && p.ruaPadrao !== "DESCONHECIDO" && dist(p.lat, p.lon, ant.lat, ant.lon) < 800) {
+                    grupoAtual.push(p);
+                } else {
+                    // Tenta ver se cola no fim de um bloco existente da mesma rua
+                    let adicionou = false;
+                    for (let g of grupos) {
+                        if (g[0].ruaPadrao === p.ruaPadrao && g[0].ruaPadrao !== "DESCONHECIDO") {
+                            let lastG = g[g.length - 1];
+                            if (dist(p.lat, p.lon, lastG.lat, lastG.lon) < 800) {
+                                g.push(p);
+                                adicionou = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (!adicionou) {
+                        grupos.push(grupoAtual);
+                        grupoAtual = [p];
                     }
                 }
-                if (!found) { anchors.push({ ...p, walking: [] }); }
             }
+            if (grupoAtual.length > 0) grupos.push(grupoAtual);
 
-            // 2. Traçar Caminho Guloso (Nearest Neighbor) com pequeno incentivo para mesma rua
-            let naoVisitados = [...anchors];
-            let rotaGeometrica = [naoVisitados.shift()];
+            // A MÁGICA DA MÃO DA RUA: Ordenar cada bloco internamente pela ID Original
+            // A Shopee já mapeou a mão única, então crescente (A -> B) é sempre legal!
+            grupos.forEach(g => g.sort((a, b) => a.idOriginal - b.idOriginal));
 
-            while(naoVisitados.length > 0) {
-                let ultimo = rotaGeometrica[rotaGeometrica.length - 1];
+            // 2. Conectar os Blocos (Pulando de Rua em Rua pela menor distância)
+            let blocosPendentes = [...grupos];
+            // O primeiro bloco é o que tem a entrega #1
+            blocosPendentes.sort((a, b) => a[0].idOriginal - b[0].idOriginal);
+            let blocoAtual = blocosPendentes.shift();
+
+            let rotaFinal = [...blocoAtual];
+
+            while (blocosPendentes.length > 0) {
+                let ultimoPonto = rotaFinal[rotaFinal.length - 1];
                 let melhorIdx = 0;
                 let minCusto = Infinity;
 
-                for(let i=0; i < naoVisitados.length; i++) {
-                    let cand = naoVisitados[i];
-                    let d = dist(ultimo.lat, ultimo.lon, cand.lat, cand.lon);
+                for (let i = 0; i < blocosPendentes.length; i++) {
+                    let candStart = blocosPendentes[i][0];
+                    let d = dist(ultimoPonto.lat, ultimoPonto.lon, candStart.lat, candStart.lon);
                     
-                    // Empurrãozinho sutil para continuar na mesma rua (10% de desconto)
-                    // Ajuda o algoritmo a não ficar trocando de calçada desnecessariamente.
-                    if(ultimo.ruaPadrao === cand.ruaPadrao && ultimo.ruaPadrao !== "DESCONHECIDO") {
-                        d *= 0.9;
-                    }
-
-                    if(d < minCusto) {
+                    if (d < minCusto) {
                         minCusto = d;
                         melhorIdx = i;
                     }
                 }
-                rotaGeometrica.push(naoVisitados[melhorIdx]);
-                naoVisitados.splice(melhorIdx, 1);
+
+                let proxBloco = blocosPendentes[melhorIdx];
+                rotaFinal.push(...proxBloco);
+                blocosPendentes.splice(melhorIdx, 1);
             }
 
-            // 3. A DESTORÇÃO (ALGORITMO 2-OPT PURO)
-            // Se duas linhas formam um X (cruzamento), destorcer elas diminui a distância matemática.
-            // Executar isso garante um traçado de polígono limpo sem nenhum zigue-zague sobreposto.
-            let melhorou = true;
-            let iteracoes = 0;
-            
-            while(melhorou && iteracoes < 500) {
-                melhorou = false;
-                iteracoes++;
-                for(let i=0; i < rotaGeometrica.length - 2; i++) {
-                    for(let j=i+2; j < rotaGeometrica.length; j++) {
-                        let a = rotaGeometrica[i];
-                        let b = rotaGeometrica[i+1];
-                        let c = rotaGeometrica[j];
-                        let d = (j+1 < rotaGeometrica.length) ? rotaGeometrica[j+1] : null;
-
-                        // Distância de cruzar (atual)
-                        let d_atual = dist(a.lat, a.lon, b.lat, b.lon) + (d ? dist(c.lat, c.lon, d.lat, d.lon) : 0);
-                        // Distância sem cruzar (novo)
-                        let d_novo = dist(a.lat, a.lon, c.lat, c.lon) + (d ? dist(b.lat, b.lon, d.lat, d.lon) : 0);
-
-                        if(d_novo < d_atual - 0.5) { // 0.5m de margem previne loops infinitos
-                            // Inverte o pedaço do caminho e destorce o X
-                            let pedaco = rotaGeometrica.slice(i+1, j+1).reverse();
-                            rotaGeometrica.splice(i+1, pedaco.length, ...pedaco);
-                            melhorou = true;
-                        }
-                    }
-                }
-            }
-
-            // 4. Descompactar as caminhadas de volta para a lista do app
-            let rotaFinal = [];
-            for (let a of rotaGeometrica) {
-                let anchorStop = { ...a };
-                delete anchorStop.walking;
-                rotaFinal.push(anchorStop);
-                for (let w of a.walking) {
-                    w.andaAPe = true;
-                    rotaFinal.push(w);
-                }
+            // 3. Marcações de Sola de Sapato
+            for (let i = 0; i < rotaFinal.length; i++) {
+                if (i === 0) { rotaFinal[i].andaAPe = false; continue; }
+                rotaFinal[i].andaAPe = dist(rotaFinal[i-1].lat, rotaFinal[i-1].lon, rotaFinal[i].lat, rotaFinal[i].lon) <= 70;
             }
 
             return rotaFinal;
@@ -462,14 +454,25 @@
 
                     const contagemVolumes = {};
                     const listaEnderecosPorStop = {};
+                    const dadosComerciais = {};
+
+                    // REGEX PARA IDENTIFICAR COMÉRCIO/PRÉDIO
+                    const regexComercial = /galp[aã]o|loja|sala|comercial|empresa|cl[íi]nica|consult[oó]rio|escola|pr[eé]dio|shopping|igreja|oficina|galeria/i;
 
                     json.forEach(i => { 
                         let s = i.stop || i.parada || i.sequence;
                         let end = i["destination address"] || i.endereco || "S/N";
+                        let compl = i.complemento || "";
+                        
                         if(s && !isNaN(s)) {
                             contagemVolumes[s] = (contagemVolumes[s] || 0) + 1; 
                             if (!listaEnderecosPorStop[s]) listaEnderecosPorStop[s] = [];
                             listaEnderecosPorStop[s].push(end);
+                            
+                            // Se bater a regex de comércio, salva
+                            if (regexComercial.test(end) || regexComercial.test(compl)) {
+                                dadosComerciais[s] = true;
+                            }
                         }
                     });
 
@@ -488,7 +491,10 @@
                                 lat: parseFloat(String(i.latitude || i.lat).replace(',', '.')),
                                 lon: parseFloat(String(i.longitude || i.lon || i.lng).replace(',', '.')),
                                 ruaPadrao: extrairRuaPadrao(i["destination address"] || i.endereco),
-                                stop: s, pacotes: contagemVolumes[s], enderecos: listaEnderecosPorStop[s], 
+                                stop: s, 
+                                pacotes: contagemVolumes[s], 
+                                enderecos: listaEnderecosPorStop[s], 
+                                comercial: dadosComerciais[s] || false,
                                 status: 'neutro', marker: null
                             };
                         })
@@ -496,8 +502,8 @@
 
                     if (rotaOriginalData.length === 0) throw new Error("Sem coordenadas válidas.");
 
-                    // RODA O MOTOR GEOMÉTRICO (SEM CRUZAR)
-                    rotaOtimizadaData = gerarRotaLimpa(rotaOriginalData);
+                    // RODA O MOTOR QUE RESPEITA O FLUXO DA RUA
+                    rotaOtimizadaData = gerarRotaPorFluxo(rotaOriginalData);
                     
                     baixarRadaresDaRegiao(rotaOriginalData);
 
@@ -525,7 +531,7 @@
             reader.readAsBinaryString(e.target.files[0]);
         });
 
-        // --- AÇÕES DA INTERFACE ---
+        // --- AÇÕES DA INTERFACE E INÍCIO DE EXPEDIENTE ---
         function escolherRotaPadrao() {
             rotaSpx = [...rotaOriginalData];
             document.getElementById('modal-auditoria').style.display = 'none';
@@ -536,6 +542,7 @@
             initAudio(); 
             document.getElementById('modal-info-padrao').style.display = 'none';
             iniciarInterfaceNavegacao(); 
+            horaInicioExpediente = new Date(); // Inicia cronômetro do Relatório
         }
 
         function escolherRotaOtimizada() {
@@ -554,6 +561,7 @@
             initAudio(); 
             document.getElementById('modal-doca').style.display = 'none';
             iniciarInterfaceNavegacao();
+            horaInicioExpediente = new Date(); // Inicia cronômetro do Relatório
         }
 
         function renderizarModoDoca() {
@@ -567,12 +575,16 @@
                 let lote = rotaSpx.slice(i, i + 10);
                 bagsHtml += `<div class="bag-container"><h3>BAG ${bagNum} (Pacotes ${i+1} a ${i+lote.length})</h3>`;
                 lote.forEach(p => {
-                    let seloAPe = p.andaAPe ? `<small style="color:#39FF14;">🚶 A Pé</small><br>` : '';
+                    let tags = "";
+                    if (p.comercial) tags += `<span class="tag-comercial">🏢 COMERCIAL</span> `;
+                    if (p.andaAPe) tags += `<span style="color:#39FF14; font-size:11px;">🚶 A Pé</span>`;
+                    if (tags !== "") tags = `<br>${tags}`;
+
                     bagsHtml += `
                     <div class="bag-item">
                         <div>
                             <strong><span style="color:#FFCC00;">#${globalIndex}</span> ➔ [Stop ${p.stop}]</strong>
-                            <small>${p.ruaPadrao}</small><br>${seloAPe}
+                            <small>${p.ruaPadrao}</small>${tags}
                         </div>
                         <div class="bag-vol">${p.pacotes} vol</div>
                     </div>`;
@@ -593,12 +605,14 @@
                 let borda = index === idxDestino ? 'border: 2px solid #39FF14;' : 'border: 1px solid #333;';
                 let iconeStatus = p.status === 'concluido' ? '✅' : (p.status === 'pendente' ? '❌' : (index === idxDestino ? '📍' : '📦'));
 
+                let tagComercial = p.comercial ? `<span class="tag-comercial" style="float:none;">🏢</span>` : '';
+
                 html += `<div style="background:${corFundo}; ${borda} border-radius:10px; padding:15px; margin-bottom:10px; text-align:left; color:${corTexto}; cursor:pointer;" onclick="pularParaStop(${index})">
                     <div style="font-size: 18px; font-weight: bold; margin-bottom: 5px;">
                         ${iconeStatus} <span style="color:#FFCC00;">#${index + 1}</span> ➔ STOP ${p.stop} 
                         <span style="float:right; font-size:14px; background:#333; padding:2px 8px; border-radius:10px;">${p.pacotes} vol</span>
                     </div>
-                    <div style="font-size: 13px; opacity: 0.8;">${p.ruaPadrao}</div>
+                    <div style="font-size: 13px; opacity: 0.8;">${tagComercial} ${p.ruaPadrao}</div>
                 </div>`;
             });
             document.getElementById('conteudo-lista-stops').innerHTML = html;
@@ -672,6 +686,7 @@
                     markerUser.setLatLng([minhaLat, minhaLon]);
                 }
 
+                // RADAR DE 75m (Parece 50m na rua devido ao delay de comunicação)
                 if (listaRadares.length > 0) {
                     let radarProxDaVez = null;
                     let menorDistRadar = Infinity;
@@ -722,7 +737,8 @@
             try {
                 const d = rotaSpx[idxDestino];
                 
-                document.getElementById('stop-badge').innerHTML = `<span style="color:#fff;">#${idxDestino + 1}</span> ➔ STOP ${d.stop} <small>(${d.pacotes} vol)</small>`;
+                let tagComercial = d.comercial ? `<span class="tag-comercial" style="margin-left:10px;">🏢 COMERCIAL</span>` : '';
+                document.getElementById('stop-badge').innerHTML = `<span style="color:#fff;">#${idxDestino + 1}</span> ➔ STOP ${d.stop} <small>(${d.pacotes} vol)</small> ${tagComercial}`;
                 document.getElementById('lista-enderecos').innerHTML = formatarEnderecos(d.enderecos);
                 
                 if (markerDest) mapa.removeLayer(markerDest);
@@ -758,7 +774,6 @@
             if (!rotaSpx[idxDestino]) return;
             const dFinal = dist(minhaLat, minhaLon, rotaSpx[idxDestino].lat, rotaSpx[idxDestino].lon);
             
-            // ETA NO PAINEL INFERIOR
             let tempoSegundos = dFinal / 5.5; 
             let minPrevisao = Math.ceil(tempoSegundos / 60);
 
@@ -773,11 +788,9 @@
                 return;
             }
 
-            // MANTÉM O PAINEL INFERIOR COMO PREVISÃO (ETA)
             document.getElementById('rodape-rua').innerText = "PREVISÃO DE CHEGADA";
             document.getElementById('rodape-dist').innerText = minPrevisao + " min";
             
-            // RESTAURA A LÓGICA DA SETA FLUTUANTE (TURN-BY-TURN)
             if (passosNavegacao.length === 0) {
                 document.getElementById('seta-dist').innerText = dFinal > 1000 ? (dFinal/1000).toFixed(1) + " km" : Math.round(dFinal) + " m";
                 document.getElementById('seta-icon').innerText = "⬆️"; 
@@ -793,7 +806,6 @@
                 else if (m && m.includes("right")) document.getElementById('seta-icon').innerText = "➡️";
                 else document.getElementById('seta-icon').innerText = "⬆️";
                 
-                // Lógica de atraso: só avisa a próxima curva DEPOIS de entrar na rua
                 if (dCurva > distAnteriorCurva + 3 && distAnteriorCurva < 40) {
                     if (idxPasso < passosNavegacao.length - 1) { idxPasso++; distAnteriorCurva = Infinity; }
                 } else {
@@ -803,10 +815,30 @@
             }
         }
 
+        // FUNÇÃO FORMATAR TEMPO PARA O RELATÓRIO
+        function msParaTempo(ms) {
+            let minutos = Math.floor(ms / 60000);
+            let segundos = Math.floor((ms % 60000) / 1000);
+            return `${minutos}m ${segundos}s`;
+        }
+        function msParaHoras(ms) {
+            let horas = Math.floor(ms / 3600000);
+            let minutos = Math.floor((ms % 3600000) / 60000);
+            return `${horas}h ${minutos}m`;
+        }
+
         function finalizarParada(status) {
             const p = rotaSpx[idxDestino];
             p.status = status;
             p.marker.setStyle({ fillColor: status === 'concluido' ? '#888' : '#ff0000', color: '#fff', weight: 2 });
+
+            // REGISTRO DE DADOS PARA O RELATÓRIO
+            let agora = new Date();
+            let tempoGasto = historicoParadas.length === 0 ? 
+                             (agora - horaInicioExpediente) : 
+                             (agora - historicoParadas[historicoParadas.length - 1].hora);
+            
+            historicoParadas.push({ stop: p.stop, hora: agora, ms: tempoGasto });
 
             aguardandoConfirmacao = false;
             requestWakeLock();
@@ -819,8 +851,32 @@
             document.getElementById('painel-acoes').style.display = 'none';
             document.getElementById('painel-topo').classList.remove('modo-confirmacao');
             
-            if (idxDestino < rotaSpx.length) calcularRota();
-            else { releaseWakeLock(); document.getElementById('rodape-rua').innerText = "ROTA FINALIZADA"; }
+            if (idxDestino < rotaSpx.length) {
+                calcularRota();
+            } else { 
+                releaseWakeLock(); 
+                document.getElementById('rodape-rua').innerText = "ROTA FINALIZADA"; 
+                
+                // GERA E EXIBE O RELATÓRIO FINAL
+                let totalMs = agora - horaInicioExpediente;
+                let mediaMs = totalMs / historicoParadas.length;
+                
+                let rapida = historicoParadas[0];
+                let lenta = historicoParadas[0];
+                
+                historicoParadas.forEach(hist => {
+                    if(hist.ms < rapida.ms) rapida = hist;
+                    if(hist.ms > lenta.ms) lenta = hist;
+                });
+
+                document.getElementById('rel-total').innerText = msParaHoras(totalMs);
+                document.getElementById('rel-media').innerText = msParaTempo(mediaMs);
+                document.getElementById('rel-rapida').innerText = msParaTempo(rapida.ms) + " (Stop " + rapida.stop + ")";
+                document.getElementById('rel-lenta').innerText = msParaTempo(lenta.ms) + " (Stop " + lenta.stop + ")";
+
+                document.getElementById('tela-navegacao').style.display = 'none';
+                document.getElementById('modal-relatorio').style.display = 'flex';
+            }
         }
     </script>
 </body>
