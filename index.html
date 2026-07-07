@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SPX Ninja - V-Final (Seta Oculta + Autosave)</title>
+    <title>SPX Ninja - V-Final (Olho de Águia + Autosave)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -47,7 +47,7 @@
 
         #map-wrapper { flex: 1; position: relative; width: 100%; }
         #map { width: 100%; height: 100%; background: #eee; }
-        #seta-flutuante { position: absolute; top: 15px; left: 15px; z-index: 1000; background: #1877F2; border-radius: 15px; padding: 15px; text-align: center; color: white; border: 3px solid #fff; box-shadow: 0 4px 10px rgba(0,0,0,0.5); min-width: 100px; display: none;} /* Escondida por padrão */
+        #seta-flutuante { position: absolute; top: 15px; left: 15px; z-index: 1000; background: #1877F2; border-radius: 15px; padding: 15px; text-align: center; color: white; border: 3px solid #fff; box-shadow: 0 4px 10px rgba(0,0,0,0.5); min-width: 100px;}
         #seta-icon { font-size: 60px; background: rgba(255,255,255,0.2); border-radius: 10px; padding: 10px; display: inline-block; line-height: 1; margin-bottom: 5px;}
         #seta-dist { font-size: 28px; font-weight: bold; }
         
@@ -64,7 +64,7 @@
         .logo-ninja-img { display: block; margin: 0 auto 40px auto; width: 280px; max-width: 85%; height: auto; }
         .btn-ini { background: #39FF14; color: #000; padding: 20px; border-radius: 12px; font-weight: bold; font-size: 20px; cursor: pointer; text-align: center; width: 90%; max-width: 400px;}
         
-        /* NOVO BOTÃO AUTOSAVE */
+        /* BOTÃO AUTOSAVE */
         #btn-continuar { display: none; background: #FFCC00; color: #000; padding: 20px; border-radius: 12px; font-weight: bold; font-size: 20px; cursor: pointer; text-align: center; width: 90%; max-width: 400px; margin-top: 15px; border: none; }
         
         input[type="file"] { display: none; }
@@ -144,10 +144,9 @@
         <h2>🚀 MODO: OTIMIZADA SPX (Zíper + Extras)</h2>
         <div class="info-container">
             <p>Foco na <strong>Eficiência de Campo</strong>:</p>
-            <p>1. <strong>Mão da Via:</strong> O algoritmo amarra as ruas seguindo a direção da Shopee para evitar contramão.</p>
-            <p>2. <strong>Pacotes Misteriosos:</strong> Identificados e enxertados ao lado do hospedeiro mais próximo na sua Bag.</p>
-            <p>3. <strong>Seta Limpa:</strong> A seta na tela agora só aparece para indicar curvas. Na reta, focamos no ETA.</p>
-            <p>4. <strong>Autosave:</strong> Se o app fechar por acidente, a sua rota continuará salva para hoje.</p>
+            <p>1. <strong>Seta Olho de Águia:</strong> O GPS soma as retas e só apita (Esquerda/Direita) quando realmente tem uma curva. Foco no trânsito.</p>
+            <p>2. <strong>Mão da Via:</strong> Amarra as ruas seguindo a direção da Shopee para evitar contramão.</p>
+            <p>3. <strong>Baixa Rápida & Autosave:</strong> Marcador no menu para pacotes adiantados e salvamento anti-falhas.</p>
         </div>
         <button class="btn-modo btn-otimizada" onclick="avancarParaDocaOtimizada()">IR PARA SEPARAÇÃO (BAGS) 📦</button>
     </div>
@@ -175,7 +174,7 @@
         </div>
         <div id="map-wrapper">
             <div id="seta-flutuante">
-                <div id="seta-icon">⬆️</div>
+                <div id="seta-icon">📦</div>
                 <div id="seta-dist">0 m</div>
             </div>
             <div id="map"></div>
@@ -233,7 +232,7 @@
                 if (estado.data === new Date().toDateString()) {
                     document.getElementById('btn-continuar').style.display = 'block';
                 } else {
-                    localStorage.removeItem('spx_ninja_estado'); // Se for de outro dia, limpa
+                    localStorage.removeItem('spx_ninja_estado');
                 }
             }
         };
@@ -265,7 +264,6 @@
             localStorage.setItem('spx_ninja_estado', JSON.stringify(estado));
         }
 
-        // CONTINUAR DE ONDE PAROU
         function continuarRotaSalva() {
             let estadoStr = localStorage.getItem('spx_ninja_estado');
             if (!estadoStr) return;
@@ -288,7 +286,6 @@
             document.getElementById('controles-iniciais').style.display = 'none';
             iniciarInterfaceNavegacao();
             
-            // Se já tiver finalizado mas fechou na tela de relatório
             if (rotaSpx.every(p => p.status !== 'neutro')) {
                 verificarFimDeRota();
             }
@@ -299,7 +296,6 @@
             location.reload();
         }
 
-        // MAPA DE CALOR
         function getCorVolume(vol) {
             if (vol === 1) return { bg: '#39FF14', color: '#000' };
             if (vol === 2) return { bg: '#FFCC00', color: '#000' };
@@ -458,7 +454,6 @@
             return { km: kmComMultaDeManobra, quebras: quebrasDeRua };
         }
 
-        // MOTOR: ZÍPER DE RUA E SENTIDO ÚNICO
         function gerarRotaPorFluxo(rotaBase) {
             if (rotaBase.length <= 1) return rotaBase;
 
@@ -527,7 +522,6 @@
             return rotaFinal;
         }
 
-        // --- PROCESSAMENTO DA PLANILHA ---
         document.getElementById('fileInput').addEventListener('change', async function(e) {
             document.getElementById('btnLabel').style.display = 'none';
             document.getElementById('loading-msg').style.display = 'block';
@@ -675,7 +669,6 @@
             reader.readAsBinaryString(e.target.files[0]);
         });
 
-        // --- AÇÕES DA INTERFACE E INÍCIO DE EXPEDIENTE ---
         function escolherRotaPadrao() {
             rotaSpx = [...rotaOriginalData];
             document.getElementById('modal-auditoria').style.display = 'none';
@@ -747,9 +740,6 @@
             container.innerHTML = bagsHtml;
         }
 
-        // ==========================================
-        // BAIXA MANUAL NO MENU + AUTO PULO DO GPS
-        // ==========================================
         function abrirMenuStops() {
             let html = '';
             rotaSpx.forEach((p, index) => {
@@ -764,7 +754,6 @@
                 let labelStop = p.extra ? `PACOTE EXTRA` : `STOP ${p.stop}`;
                 let volColor = getCorVolume(p.pacotes); 
 
-                // BOTÕES DE AÇÃO RÁPIDA NO MENU
                 let botoesAcao = '';
                 if (p.status === 'neutro') {
                     botoesAcao = `
@@ -840,7 +829,6 @@
 
             camadaFundo.clearLayers();
             rotaSpx.forEach((p) => {
-                // Recupera as cores certas se for restored do autosave
                 let colorPino = p.extra ? '#FF8C00' : '#333';
                 if (p.status === 'concluido') colorPino = '#888';
                 if (p.status === 'pendente') colorPino = '#ff0000';
@@ -971,7 +959,7 @@
         }
 
         // ==========================================
-        // O MOTOR DA SETA - OCULTANDO NA RETA
+        // O "OLHO DE ÁGUIA" (Raio-X de Curvas)
         // ==========================================
         function navegar() {
             if (!rotaSpx[idxDestino]) return;
@@ -995,51 +983,69 @@
             document.getElementById('rodape-dist').innerText = minPrevisao + " min";
             
             if (passosNavegacao.length === 0) {
-                // Reta final para o destino: Oculta a seta e o contador de dist.
-                document.getElementById('seta-flutuante').style.display = 'none'; 
+                document.getElementById('seta-dist').innerText = dFinal > 1000 ? (dFinal/1000).toFixed(1) + " km" : Math.round(dFinal) + " m";
+                document.getElementById('seta-icon').innerText = "📦"; 
+                document.getElementById('seta-flutuante').style.display = 'block'; 
             } else {
+                
+                // LÓGICA ORIGINAL DE ATRASO (Para o motor do GPS saber onde o carro está)
                 const passoAtual = passosNavegacao[idxPasso];
                 if (!passoAtual) return;
                 
-                const dCurva = dist(minhaLat, minhaLon, passoAtual.lat, passoAtual.lon);
+                const dCurvaAtual = dist(minhaLat, minhaLon, passoAtual.lat, passoAtual.lon);
 
-                if (dCurva < distAnteriorCurva) {
-                    distAnteriorCurva = dCurva;
+                if (dCurvaAtual < distAnteriorCurva) {
+                    distAnteriorCurva = dCurvaAtual;
                 }
 
-                if (dCurva > distAnteriorCurva + 8 && distAnteriorCurva < 40) {
+                if (dCurvaAtual > distAnteriorCurva + 8 && distAnteriorCurva < 40) {
                     if (idxPasso < passosNavegacao.length - 1) { 
                         idxPasso++; 
                         distAnteriorCurva = Infinity; 
                     }
-                } else if (idxPasso === 0 && dCurva > 15) {
+                } else if (idxPasso === 0 && dCurvaAtual > 15) {
                     if (idxPasso < passosNavegacao.length - 1) { 
                         idxPasso++; 
                         distAnteriorCurva = Infinity; 
                     }
                 }
 
-                const passoParaTela = passosNavegacao[idxPasso];
-                const distTela = dist(minhaLat, minhaLon, passoParaTela.lat, passoParaTela.lon);
-                
-                const m = passoParaTela.manobra ? String(passoParaTela.manobra).toLowerCase() : "";
-                
-                // MÁGICA: Só exibe se for uma curva ou retorno (Não exibe se for 'straight')
-                let isCurva = m.includes("left") || m.includes("right") || m.includes("uturn") || m.includes("back");
-                
-                if (isCurva) {
-                    document.getElementById('seta-dist').innerText = Math.round(distTela) + " m";
-                    let icone = "⬆️";
-                    if (m.includes("left")) icone = "⬅️";
-                    else if (m.includes("right")) icone = "➡️";
-                    else if (m.includes("uturn") || m.includes("back")) icone = "↩️";
+                // ====================================================
+                // NOVA LÓGICA VISUAL: SOMA DE DISTÂNCIAS (LOOK-AHEAD)
+                // ====================================================
+                let distSomada = 0;
+                let pLat = minhaLat;
+                let pLon = minhaLon;
+                let iconeFuturo = "📦";
+                let achouCurva = false;
+
+                for (let i = idxPasso; i < passosNavegacao.length; i++) {
+                    let pFuturo = passosNavegacao[i];
+                    distSomada += dist(pLat, pLon, pFuturo.lat, pFuturo.lon);
                     
-                    document.getElementById('seta-icon').innerText = icone;
-                    document.getElementById('seta-flutuante').style.display = 'block'; // Mostra
-                } else {
-                    // É linha reta, então esconde completamente o painel flutuante azul
-                    document.getElementById('seta-flutuante').style.display = 'none'; 
+                    let mFuturo = pFuturo.manobra ? String(pFuturo.manobra).toLowerCase() : "";
+                    let isCurva = mFuturo.includes("left") || mFuturo.includes("right") || mFuturo.includes("uturn") || mFuturo.includes("back");
+                    
+                    if (isCurva) {
+                        if (mFuturo.includes("left")) iconeFuturo = "⬅️";
+                        else if (mFuturo.includes("right")) iconeFuturo = "➡️";
+                        else if (mFuturo.includes("uturn") || mFuturo.includes("back")) iconeFuturo = "↩️";
+                        achouCurva = true;
+                        break; 
+                    }
+                    
+                    pLat = pFuturo.lat;
+                    pLon = pFuturo.lon;
                 }
+
+                if (!achouCurva) {
+                    distSomada = dFinal;
+                    iconeFuturo = "📦";
+                }
+
+                document.getElementById('seta-dist').innerText = distSomada > 1000 ? (distSomada/1000).toFixed(1) + " km" : Math.round(distSomada) + " m";
+                document.getElementById('seta-icon').innerText = iconeFuturo;
+                document.getElementById('seta-flutuante').style.display = 'block'; 
             }
         }
 
@@ -1122,7 +1128,7 @@
                 
                 let labelRapida = rapida.extra ? "PACOTE EXTRA" : rapida.stop;
                 let labelLenta = lenta.extra ? "PACOTE EXTRA" : lenta.stop;
-                
+
                 document.getElementById('rel-rapida').innerText = msParaTempo(rapida.ms) + " (Stop " + labelRapida + ")";
                 document.getElementById('rel-lenta').innerText = msParaTempo(lenta.ms) + " (Stop " + labelLenta + ")";
 
