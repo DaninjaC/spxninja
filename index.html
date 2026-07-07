@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SPX Ninja - V-Final (Painel de Alta Performance)</title>
+    <title>SPX Ninja - V-Final (Seta Oculta + Autosave)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -47,7 +47,7 @@
 
         #map-wrapper { flex: 1; position: relative; width: 100%; }
         #map { width: 100%; height: 100%; background: #eee; }
-        #seta-flutuante { position: absolute; top: 15px; left: 15px; z-index: 1000; background: #1877F2; border-radius: 15px; padding: 15px; text-align: center; color: white; border: 3px solid #fff; box-shadow: 0 4px 10px rgba(0,0,0,0.5); min-width: 100px;}
+        #seta-flutuante { position: absolute; top: 15px; left: 15px; z-index: 1000; background: #1877F2; border-radius: 15px; padding: 15px; text-align: center; color: white; border: 3px solid #fff; box-shadow: 0 4px 10px rgba(0,0,0,0.5); min-width: 100px; display: none;} /* Escondida por padrão */
         #seta-icon { font-size: 60px; background: rgba(255,255,255,0.2); border-radius: 10px; padding: 10px; display: inline-block; line-height: 1; margin-bottom: 5px;}
         #seta-dist { font-size: 28px; font-weight: bold; }
         
@@ -63,6 +63,10 @@
         #controles-iniciais { padding: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh;}
         .logo-ninja-img { display: block; margin: 0 auto 40px auto; width: 280px; max-width: 85%; height: auto; }
         .btn-ini { background: #39FF14; color: #000; padding: 20px; border-radius: 12px; font-weight: bold; font-size: 20px; cursor: pointer; text-align: center; width: 90%; max-width: 400px;}
+        
+        /* NOVO BOTÃO AUTOSAVE */
+        #btn-continuar { display: none; background: #FFCC00; color: #000; padding: 20px; border-radius: 12px; font-weight: bold; font-size: 20px; cursor: pointer; text-align: center; width: 90%; max-width: 400px; margin-top: 15px; border: none; }
+        
         input[type="file"] { display: none; }
         .stop-label { background: rgba(0,0,0,0.8); color: #fff; border: 1px solid #39FF14; font-weight: bold; padding: 2px 4px; border-radius: 3px; font-size: 10px; }
         .leaflet-tile-container { filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%); }
@@ -81,7 +85,7 @@
             align-items: center; gap: 10px; text-transform: uppercase;
         }
 
-        /* TELA DE RELATÓRIO FINAL - ESTILO GRID ATUALIZADO */
+        /* TELA DE RELATÓRIO FINAL */
         .relatorio-card { background: #111; border: 2px solid #39FF14; border-radius: 12px; padding: 20px; margin-top: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
         .rel-dado { display: flex; flex-direction: column; justify-content: center; align-items: center; background: #1a1a1a; padding: 12px; border-radius: 8px; border: 1px solid #333; }
         .rel-dado span { font-size: 11px; color: #aaa; text-transform: uppercase; text-align: center; margin-bottom: 5px; font-weight: bold;}
@@ -103,6 +107,8 @@
             📦 CARREGAR PLANILHA SPX
             <input type="file" id="fileInput" accept=".xlsx, .xls, .csv">
         </label>
+        <button id="btn-continuar" onclick="continuarRotaSalva()">🔄 CONTINUAR ROTA EM ANDAMENTO</button>
+        
         <div id="loading-msg" style="display:none; color:#FFCC00; font-weight:bold; margin-top:20px; font-size:18px;">⏳ Calculando Rotas...<br><small>Alocando Pacotes e Gerando Mapa de Calor.</small></div>
     </div>
 
@@ -140,7 +146,8 @@
             <p>Foco na <strong>Eficiência de Campo</strong>:</p>
             <p>1. <strong>Mão da Via:</strong> O algoritmo amarra as ruas seguindo a direção da Shopee para evitar contramão.</p>
             <p>2. <strong>Pacotes Misteriosos:</strong> Identificados e enxertados ao lado do hospedeiro mais próximo na sua Bag.</p>
-            <p>3. <strong>Baixa Rápida:</strong> Se você pular ou adiantar um pacote a pé, marque como concluído direto no Menu 📋.</p>
+            <p>3. <strong>Seta Limpa:</strong> A seta na tela agora só aparece para indicar curvas. Na reta, focamos no ETA.</p>
+            <p>4. <strong>Autosave:</strong> Se o app fechar por acidente, a sua rota continuará salva para hoje.</p>
         </div>
         <button class="btn-modo btn-otimizada" onclick="avancarParaDocaOtimizada()">IR PARA SEPARAÇÃO (BAGS) 📦</button>
     </div>
@@ -197,7 +204,7 @@
             <div class="rel-dado rel-full"><span>Recorde do Dia (Mais Rápida) ⚡</span><strong id="rel-rapida">--:--</strong></div>
         </div>
 
-        <button class="btn-modo btn-otimizada" style="margin-top: 30px;" onclick="location.reload()">NOVA PLANILHA</button>
+        <button class="btn-modo btn-otimizada" style="margin-top: 30px;" onclick="limparERecarregar()">NOVA PLANILHA</button>
     </div>
 
     <script>
@@ -212,14 +219,85 @@
 
         let horaInicioExpediente = null;
         let historicoParadas = [];
-        
-        // Novas variáveis globais para o relatório financeiro
         let globalKmPadrao = 0;
         let globalKmOtimizada = 0;
-
         let listaRadares = [];
         let radarAtivo = null;
         let audioCtx = null;
+
+        // INICIALIZAÇÃO E CHECAGEM DE AUTOSAVE
+        window.onload = function() {
+            let estadoStr = localStorage.getItem('spx_ninja_estado');
+            if (estadoStr) {
+                let estado = JSON.parse(estadoStr);
+                if (estado.data === new Date().toDateString()) {
+                    document.getElementById('btn-continuar').style.display = 'block';
+                } else {
+                    localStorage.removeItem('spx_ninja_estado'); // Se for de outro dia, limpa
+                }
+            }
+        };
+
+        // SISTEMA DE SALVAMENTO (AUTOSAVE)
+        function salvarEstadoRota() {
+            if (!rotaSpx || rotaSpx.length === 0) return;
+            let estado = {
+                data: new Date().toDateString(),
+                horaInicioExpediente: horaInicioExpediente,
+                idxDestino: idxDestino,
+                globalKmPadrao: globalKmPadrao,
+                globalKmOtimizada: globalKmOtimizada,
+                historicoParadas: historicoParadas.map(h => ({ stop: h.stop, hora: h.hora, ms: h.ms, extra: h.extra })),
+                rota: rotaSpx.map(p => ({
+                    idOriginal: p.idOriginal,
+                    lat: p.lat,
+                    lon: p.lon,
+                    ruaPadrao: p.ruaPadrao,
+                    stop: p.stop,
+                    pacotes: p.pacotes,
+                    enderecos: p.enderecos,
+                    comercial: p.comercial,
+                    extra: p.extra,
+                    andaAPe: p.andaAPe,
+                    status: p.status
+                }))
+            };
+            localStorage.setItem('spx_ninja_estado', JSON.stringify(estado));
+        }
+
+        // CONTINUAR DE ONDE PAROU
+        function continuarRotaSalva() {
+            let estadoStr = localStorage.getItem('spx_ninja_estado');
+            if (!estadoStr) return;
+            
+            let estado = JSON.parse(estadoStr);
+            horaInicioExpediente = new Date(estado.horaInicioExpediente);
+            idxDestino = estado.idxDestino;
+            globalKmPadrao = estado.globalKmPadrao;
+            globalKmOtimizada = estado.globalKmOtimizada;
+            
+            historicoParadas = estado.historicoParadas.map(h => ({
+                stop: h.stop, hora: new Date(h.hora), ms: h.ms, extra: h.extra
+            }));
+            
+            rotaSpx = estado.rota;
+            
+            baixarRadaresDaRegiao(rotaSpx);
+            initAudio();
+            
+            document.getElementById('controles-iniciais').style.display = 'none';
+            iniciarInterfaceNavegacao();
+            
+            // Se já tiver finalizado mas fechou na tela de relatório
+            if (rotaSpx.every(p => p.status !== 'neutro')) {
+                verificarFimDeRota();
+            }
+        }
+
+        function limparERecarregar() {
+            localStorage.removeItem('spx_ninja_estado');
+            location.reload();
+        }
 
         // MAPA DE CALOR
         function getCorVolume(vol) {
@@ -581,7 +659,6 @@
                         let rPadrao = await plotarVisaoPassaro(layerPadrao, mapPadrao, rotaOriginalData, '#ff4444');
                         let rOtim = await plotarVisaoPassaro(layerOtimizado, mapOtimizado, rotaOtimizadaData, '#39FF14');
                         
-                        // Gravando variáveis globais para o relatório final
                         globalKmPadrao = rPadrao.km;
                         globalKmOtimizada = rOtim.km;
 
@@ -610,6 +687,7 @@
             document.getElementById('modal-info-padrao').style.display = 'none';
             iniciarInterfaceNavegacao(); 
             horaInicioExpediente = new Date();
+            salvarEstadoRota();
         }
 
         function escolherRotaOtimizada() {
@@ -629,6 +707,7 @@
             document.getElementById('modal-doca').style.display = 'none';
             iniciarInterfaceNavegacao();
             horaInicioExpediente = new Date();
+            salvarEstadoRota();
         }
 
         function renderizarModoDoca() {
@@ -725,6 +804,7 @@
             historicoParadas.push({ stop: p.stop, hora: agora, ms: tempoGasto, extra: p.extra });
 
             abrirMenuStops();
+            salvarEstadoRota();
 
             if (index === idxDestino) {
                 avancarProximoDestino();
@@ -760,8 +840,12 @@
 
             camadaFundo.clearLayers();
             rotaSpx.forEach((p) => {
+                // Recupera as cores certas se for restored do autosave
                 let colorPino = p.extra ? '#FF8C00' : '#333';
-                p.marker = L.circleMarker([p.lat, p.lon], { radius: 6, color: '#666', fillColor: colorPino, fillOpacity: 1, weight: 1 })
+                if (p.status === 'concluido') colorPino = '#888';
+                if (p.status === 'pendente') colorPino = '#ff0000';
+                
+                p.marker = L.circleMarker([p.lat, p.lon], { radius: 6, color: '#666', fillColor: colorPino, fillOpacity: 1, weight: p.status==='neutro'?1:2 })
                 .bindTooltip(p.extra ? "Extra" : ("Stop " + p.stop), { permanent: true, direction: 'top', className: 'stop-label', offset: [0, -5] })
                 .addTo(camadaFundo);
             });
@@ -887,7 +971,7 @@
         }
 
         // ==========================================
-        // O MOTOR DA SETA COM ATRASO
+        // O MOTOR DA SETA - OCULTANDO NA RETA
         // ==========================================
         function navegar() {
             if (!rotaSpx[idxDestino]) return;
@@ -911,8 +995,8 @@
             document.getElementById('rodape-dist').innerText = minPrevisao + " min";
             
             if (passosNavegacao.length === 0) {
-                document.getElementById('seta-dist').innerText = dFinal > 1000 ? (dFinal/1000).toFixed(1) + " km" : Math.round(dFinal) + " m";
-                document.getElementById('seta-icon').innerText = "⬆️"; 
+                // Reta final para o destino: Oculta a seta e o contador de dist.
+                document.getElementById('seta-flutuante').style.display = 'none'; 
             } else {
                 const passoAtual = passosNavegacao[idxPasso];
                 if (!passoAtual) return;
@@ -938,16 +1022,24 @@
                 const passoParaTela = passosNavegacao[idxPasso];
                 const distTela = dist(minhaLat, minhaLon, passoParaTela.lat, passoParaTela.lon);
                 
-                document.getElementById('seta-dist').innerText = Math.round(distTela) + " m";
-
                 const m = passoParaTela.manobra ? String(passoParaTela.manobra).toLowerCase() : "";
-                let icone = "⬆️";
                 
-                if (m.includes("left")) icone = "⬅️";
-                else if (m.includes("right")) icone = "➡️";
-                else if (m.includes("uturn") || m.includes("back")) icone = "↩️";
+                // MÁGICA: Só exibe se for uma curva ou retorno (Não exibe se for 'straight')
+                let isCurva = m.includes("left") || m.includes("right") || m.includes("uturn") || m.includes("back");
                 
-                document.getElementById('seta-icon').innerText = icone;
+                if (isCurva) {
+                    document.getElementById('seta-dist').innerText = Math.round(distTela) + " m";
+                    let icone = "⬆️";
+                    if (m.includes("left")) icone = "⬅️";
+                    else if (m.includes("right")) icone = "➡️";
+                    else if (m.includes("uturn") || m.includes("back")) icone = "↩️";
+                    
+                    document.getElementById('seta-icon').innerText = icone;
+                    document.getElementById('seta-flutuante').style.display = 'block'; // Mostra
+                } else {
+                    // É linha reta, então esconde completamente o painel flutuante azul
+                    document.getElementById('seta-flutuante').style.display = 'none'; 
+                }
             }
         }
 
@@ -962,9 +1054,6 @@
             return `${horas}h ${minutos}m`;
         }
 
-        // ==========================================
-        // AUTO-AVANÇO E VERIFICAÇÃO COM O NOVO RELATÓRIO
-        // ==========================================
         function avancarProximoDestino() {
             aguardandoConfirmacao = false;
             requestWakeLock();
@@ -1002,11 +1091,10 @@
                 
                 let agora = new Date();
                 let totalMs = agora - horaInicioExpediente;
-                if (totalMs <= 0) totalMs = 1000; // Evita falha matemática
+                if (totalMs <= 0) totalMs = 1000; 
                 
                 if (historicoParadas.length === 0) return;
                 
-                // MÉT RIC AS FINANCEIRAS E DE SUCESSO
                 let volsEntregues = rotaSpx.filter(p => p.status === 'concluido').reduce((acc, p) => acc + p.pacotes, 0);
                 let volsFalha = rotaSpx.filter(p => p.status === 'pendente').reduce((acc, p) => acc + p.pacotes, 0);
                 let totalVols = volsEntregues + volsFalha;
@@ -1016,14 +1104,15 @@
                 let ritmo = horasNaRua > 0 ? Math.round(volsEntregues / horasNaRua) : 0;
 
                 let economia = (globalKmPadrao - globalKmOtimizada).toFixed(2);
-                if (economia < 0) economia = 0; // Proteção para não exibir economia negativa
+                if (economia < 0) economia = 0; 
                 
                 let rapida = historicoParadas[0];
+                let lenta = historicoParadas[0];
                 historicoParadas.forEach(hist => {
                     if(hist.ms < rapida.ms) rapida = hist;
+                    if(hist.ms > lenta.ms) lenta = hist;
                 });
 
-                // ATUALIZANDO OS CAMPOS DO RELATÓRIO
                 document.getElementById('rel-total').innerText = msParaHoras(totalMs);
                 document.getElementById('rel-ritmo').innerText = ritmo + " vol/h";
                 document.getElementById('rel-sucesso').innerText = taxaSucesso + "%";
@@ -1032,7 +1121,10 @@
                 document.getElementById('rel-km-poupado').innerText = economia + " km";
                 
                 let labelRapida = rapida.extra ? "PACOTE EXTRA" : rapida.stop;
+                let labelLenta = lenta.extra ? "PACOTE EXTRA" : lenta.stop;
+                
                 document.getElementById('rel-rapida').innerText = msParaTempo(rapida.ms) + " (Stop " + labelRapida + ")";
+                document.getElementById('rel-lenta').innerText = msParaTempo(lenta.ms) + " (Stop " + labelLenta + ")";
 
                 document.getElementById('modal-relatorio').style.display = 'flex';
             }
@@ -1048,6 +1140,7 @@
             
             historicoParadas.push({ stop: p.stop, hora: agora, ms: tempoGasto, extra: p.extra });
 
+            salvarEstadoRota();
             avancarProximoDestino();
         }
     </script>
