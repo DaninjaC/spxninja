@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SPX Ninja - V-Final (Mão da Rua + Comercial + Seta Corrigida)</title>
+    <title>SPX Ninja - V-Final (Pacotes Extras + Zíper + Seta)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -30,7 +30,10 @@
         .bag-item strong { font-size: 18px; color: #fff; }
         .bag-item small { color: #aaa; display: block; margin-top: 3px; font-size: 12px;}
         .bag-vol { background: #39FF14; color: #000; padding: 3px 8px; border-radius: 12px; font-weight: bold; font-size: 14px; }
+        
+        /* Novas Tags Visuais */
         .tag-comercial { background: #9d00ff; color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; margin-right: 5px; display: inline-block; margin-bottom: 3px;}
+        .tag-extra { background: #FF8C00; color: #000; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; margin-right: 5px; display: inline-block; margin-bottom: 3px;}
 
         #tela-navegacao { display: none; flex-direction: column; height: 100vh; width: 100%; position: relative;}
         #painel-topo { background: #003399; padding: 15px; text-align: center; z-index: 1001; max-height: 35vh; overflow-y: auto; border-bottom: 2px solid #000; position: relative;}
@@ -94,7 +97,7 @@
             📦 CARREGAR PLANILHA SPX
             <input type="file" id="fileInput" accept=".xlsx, .xls, .csv">
         </label>
-        <div id="loading-msg" style="display:none; color:#FFCC00; font-weight:bold; margin-top:20px; font-size:18px;">⏳ Calculando Mão da Via...<br><small>Identificando comércios e otimizando fluxo.</small></div>
+        <div id="loading-msg" style="display:none; color:#FFCC00; font-weight:bold; margin-top:20px; font-size:18px;">⏳ Calculando Rotas...<br><small>Alocando Pacotes Misteriosos e Comerciais.</small></div>
     </div>
 
     <div id="modal-auditoria" class="modal-fullscreen">
@@ -111,7 +114,7 @@
                 <button class="btn-modo btn-otimizada" onclick="escolherRotaOtimizada()">
                     🚀 OTIMIZADA SPX NINJA<br><span id="km-otimizada" style="font-weight:normal; font-size:14px;">Calculando Custo Operacional...</span>
                 </button>
-                <div class="legenda"><span style="background: #39FF14; border-bottom: 2px dashed #39FF14; height: 1px;"></span> Zíper Contínuo de Fluxo</div>
+                <div class="legenda"><span style="background: #39FF14; border-bottom: 2px dashed #39FF14; height: 1px;"></span> Zíper Contínuo + <span style="background: #FF8C00; border-radius: 50%; width: 10px; height: 10px; display: inline-block;"></span> Extra</div>
                 <div id="mapa-otimizado" class="mapa-container"></div>
             </div>
         </div>
@@ -126,12 +129,12 @@
     </div>
 
     <div id="modal-info-otimizada" class="modal-fullscreen">
-        <h2>🚀 MODO: OTIMIZADA SPX (Fluxo e Comercial)</h2>
+        <h2>🚀 MODO: OTIMIZADA SPX (Zíper + Extras)</h2>
         <div class="info-container">
             <p>Foco na <strong>Eficiência de Campo</strong>:</p>
-            <p>1. <strong>Mão da Via Respeitada:</strong> O algoritmo amarra as ruas seguindo a mesma direção da Shopee para evitar contramão e zigue-zague.</p>
-            <p>2. <strong>Radar de Comércios:</strong> Lojas, Galpões e Prédios estão sinalizados em roxo para você priorizar.</p>
-            <p>3. <strong>Seta Restaurada:</strong> O sistema de navegação e atraso de curva foi religado com sucesso.</p>
+            <p>1. <strong>Mão da Via:</strong> O algoritmo amarra as ruas seguindo a direção da Shopee para evitar contramão.</p>
+            <p>2. <strong>Pacotes Misteriosos:</strong> Identificados e enxertados ao lado do hospedeiro mais próximo na sua Bag.</p>
+            <p>3. <strong>Seta Restaurada:</strong> O atraso de curva foi mantido para a navegação real.</p>
         </div>
         <button class="btn-modo btn-otimizada" onclick="avancarParaDocaOtimizada()">IR PARA SEPARAÇÃO (BAGS) 📦</button>
     </div>
@@ -151,9 +154,7 @@
     </div>
 
     <div id="tela-navegacao">
-        
         <div id="radar-alert">📸 RADAR à frente</div> 
-
         <div id="painel-topo">
             <div id="btn-menu-stops" onclick="abrirMenuStops()"><span>📋</span></div>
             <div id="stop-badge">STOP -- (-- vol)</div>
@@ -198,7 +199,6 @@
         let mapPadrao = null, mapOtimizado = null;
         let layerPadrao = L.layerGroup(), layerOtimizado = L.layerGroup();
 
-        // Dados de Relatório
         let horaInicioExpediente = null;
         let historicoParadas = [];
 
@@ -323,9 +323,11 @@
                 boundsCoords.push([p.lat, p.lon]);
                 latlngs.push([p.lat, p.lon]);
 
-                let corPino = (i === 0) ? '#007AFF' : '#555'; 
+                let corPino = p.extra ? '#FF8C00' : ((i === 0) ? '#007AFF' : '#555'); 
+                let textoHover = p.extra ? "Pacote Extra" : (i === 0 ? "INÍCIO (Stop " + p.stop + ")" : "Stop " + p.stop);
+
                 L.circleMarker([p.lat, p.lon], { radius: 5, color: '#fff', fillColor: corPino, fillOpacity: 1, weight: 1 })
-                    .bindTooltip(i === 0 ? "INÍCIO (Stop " + p.stop + ")" : "Stop " + p.stop, { permanent: true, direction: 'right', className: 'stop-label', offset: [5, 0] })
+                    .bindTooltip(textoHover, { permanent: true, direction: 'right', className: 'stop-label', offset: [5, 0] })
                     .addTo(camada);
 
                 if (i > 0) {
@@ -354,8 +356,7 @@
         }
 
         // ============================================================================
-        // MOTOR DE ZÍPER DE FLUXO (O VARAL COM A MÃO CERTA)
-        // Agrupa as ruas e força a ordem da Shopee (idOriginal) para nunca pegar contramão
+        // O ZÍPER DA RUA: Agrupa blocos e ordena sequencialmente (Mão da Via)
         // ============================================================================
         function gerarRotaPorFluxo(rotaBase) {
             if (rotaBase.length <= 1) return rotaBase;
@@ -389,7 +390,7 @@
             }
             if (grupoAtual.length > 0) grupos.push(grupoAtual);
 
-            // Respeita a ordem original para garantir a mão da rua
+            // Garante a mão única da Shopee
             grupos.forEach(g => g.sort((a, b) => a.idOriginal - b.idOriginal));
 
             let blocosPendentes = [...grupos];
@@ -449,35 +450,52 @@
                     const listaEnderecosPorStop = {};
                     const dadosComerciais = {};
 
-                    // MÓDULO COMERCIAL
-                    const regexComercial = /galp[aã]o|loja|sala|comercial|empresa|cl[íi]nica|consult[oó]rio|escola|pr[eé]dio|shopping|igreja|oficina|galeria/i;
+                    // TAG COMERCIAL: Pesquisa avançada
+                    const regexComercial = /galp[aã]o|loja|sala|comercial|empresa|cl[íi]nica|consult[oó]rio|escola|pr[eé]dio|shopping|igreja|oficina|galeria|instituto|studio|centro/i;
+
+                    let pacotesMisteriososRaw = [];
+                    let paradasOficiaisRaw = [];
 
                     json.forEach(i => { 
                         let s = i.stop || i.parada || i.sequence;
                         let end = i["destination address"] || i.endereco || "S/N";
                         let compl = i.complemento || "";
                         
-                        if(s && !isNaN(s)) {
-                            contagemVolumes[s] = (contagemVolumes[s] || 0) + 1; 
-                            if (!listaEnderecosPorStop[s]) listaEnderecosPorStop[s] = [];
-                            listaEnderecosPorStop[s].push(end);
+                        let isComercial = regexComercial.test(end) || regexComercial.test(compl);
+
+                        // IDENTIFICAÇÃO DE ÓRFÃOS: Se o Stop for "-" ou vazio
+                        if (!s || String(s).trim() === '-' || isNaN(parseInt(s))) {
+                            pacotesMisteriososRaw.push({
+                                lat: parseFloat(String(i.latitude || i.lat).replace(',', '.')),
+                                lon: parseFloat(String(i.longitude || i.lon || i.lng).replace(',', '.')),
+                                ruaPadrao: extrairRuaPadrao(end),
+                                endereco: end,
+                                comercial: isComercial,
+                                pacotes: 1 // Linha única de mistério
+                            });
+                        } else {
+                            // Paradas Roteirizadas
+                            let numStop = parseInt(s);
+                            contagemVolumes[numStop] = (contagemVolumes[numStop] || 0) + 1; 
+                            if (!listaEnderecosPorStop[numStop]) listaEnderecosPorStop[numStop] = [];
+                            listaEnderecosPorStop[numStop].push(end);
                             
-                            if (regexComercial.test(end) || regexComercial.test(compl)) {
-                                dadosComerciais[s] = true;
-                            }
+                            if (isComercial) dadosComerciais[numStop] = true;
+                            paradasOficiaisRaw.push({ ...i, stopLimpo: numStop });
                         }
                     });
 
                     const stopsUnicos = new Set();
 
-                    rotaOriginalData = json.filter(i => {
-                            let s = i.stop || i.parada || i.sequence;
-                            if (!s || isNaN(s) || stopsUnicos.has(s)) return false; 
+                    // ROTA ORIGINAL (Apenas a roteirizada, para não quebrar a lógica)
+                    rotaOriginalData = paradasOficiaisRaw.filter(i => {
+                            let s = i.stopLimpo;
+                            if (stopsUnicos.has(s)) return false; 
                             stopsUnicos.add(s); return true;
                         })
-                        .sort((a, b) => (a.stop || a.parada) - (b.stop || b.parada))
+                        .sort((a, b) => a.stopLimpo - b.stopLimpo)
                         .map((i, index) => {
-                            let s = i.stop || i.parada || i.sequence;
+                            let s = i.stopLimpo;
                             return {
                                 idOriginal: index, 
                                 lat: parseFloat(String(i.latitude || i.lat).replace(',', '.')),
@@ -487,6 +505,7 @@
                                 pacotes: contagemVolumes[s], 
                                 enderecos: listaEnderecosPorStop[s], 
                                 comercial: dadosComerciais[s] || false,
+                                extra: false,
                                 status: 'neutro', marker: null
                             };
                         })
@@ -494,8 +513,49 @@
 
                     if (rotaOriginalData.length === 0) throw new Error("Sem coordenadas válidas.");
 
-                    // GERA O ZÍPER DA RUA
+                    // ==========================================
+                    // 1. GERA A OTIMIZAÇÃO (SEM MISTERIOSOS)
+                    // ==========================================
                     rotaOtimizadaData = gerarRotaPorFluxo(rotaOriginalData);
+
+                    // ==========================================
+                    // 2. INJETA OS MISTERIOSOS COMO HOSPEDEIROS
+                    // ==========================================
+                    let counterExtra = 1;
+                    pacotesMisteriososRaw.forEach(mist => {
+                        if (isNaN(mist.lat) || isNaN(mist.lon)) return;
+                        
+                        let menorDist = Infinity;
+                        let melhorIdx = -1;
+                        
+                        for (let i = 0; i < rotaOtimizadaData.length; i++) {
+                            let d = dist(mist.lat, mist.lon, rotaOtimizadaData[i].lat, rotaOtimizadaData[i].lon);
+                            if (d < menorDist) {
+                                menorDist = d;
+                                melhorIdx = i;
+                            }
+                        }
+
+                        if (melhorIdx !== -1) {
+                            let objExtra = {
+                                idOriginal: 9999 + counterExtra, // Fake ID
+                                lat: mist.lat,
+                                lon: mist.lon,
+                                ruaPadrao: mist.ruaPadrao,
+                                stop: "EXTRA", // Apenas para debug logico
+                                pacotes: mist.pacotes,
+                                enderecos: [mist.endereco],
+                                comercial: mist.comercial,
+                                extra: true, // Flag visual
+                                andaAPe: menorDist <= 70, 
+                                status: 'neutro', marker: null
+                            };
+                            
+                            // Insere o extra fisicamente APÓS o hospedeiro na lista
+                            rotaOtimizadaData.splice(melhorIdx + 1, 0, objExtra);
+                            counterExtra++;
+                        }
+                    });
                     
                     baixarRadaresDaRegiao(rotaOriginalData);
 
@@ -523,7 +583,7 @@
             reader.readAsBinaryString(e.target.files[0]);
         });
 
-        // --- AÇÕES DA INTERFACE ---
+        // --- AÇÕES DA INTERFACE E INÍCIO DE EXPEDIENTE ---
         function escolherRotaPadrao() {
             rotaSpx = [...rotaOriginalData];
             document.getElementById('modal-auditoria').style.display = 'none';
@@ -569,13 +629,17 @@
                 lote.forEach(p => {
                     let tags = "";
                     if (p.comercial) tags += `<span class="tag-comercial">🏢 COMERCIAL</span> `;
+                    if (p.extra) tags += `<span class="tag-extra">❓ PACOTE EXTRA</span> `;
                     if (p.andaAPe) tags += `<span style="color:#39FF14; font-size:11px;">🚶 A Pé</span>`;
+                    
                     if (tags !== "") tags = `<br>${tags}`;
+
+                    let labelStop = p.extra ? `[❓ EXTRA]` : `[Stop ${p.stop}]`;
 
                     bagsHtml += `
                     <div class="bag-item">
                         <div>
-                            <strong><span style="color:#FFCC00;">#${globalIndex}</span> ➔ [Stop ${p.stop}]</strong>
+                            <strong><span style="color:#FFCC00;">#${globalIndex}</span> ➔ ${labelStop}</strong>
                             <small>${p.ruaPadrao}</small>${tags}
                         </div>
                         <div class="bag-vol">${p.pacotes} vol</div>
@@ -591,17 +655,18 @@
         function abrirMenuStops() {
             let html = '';
             rotaSpx.forEach((p, index) => {
+                let iconeStatus = p.status === 'concluido' ? '✅' : (p.status === 'pendente' ? '❌' : (index === idxDestino ? '📍' : (p.extra ? '❓' : '📦')));
                 let corTexto = p.status === 'concluido' ? '#888' : (p.status === 'pendente' ? '#ff6666' : '#fff');
                 let corZebrada = Math.floor(index / 10) % 2 === 0 ? '#2a2a2a' : '#0a0a0a';
                 let corFundo = index === idxDestino ? '#003399' : corZebrada;
                 let borda = index === idxDestino ? 'border: 2px solid #39FF14;' : 'border: 1px solid #333;';
-                let iconeStatus = p.status === 'concluido' ? '✅' : (p.status === 'pendente' ? '❌' : (index === idxDestino ? '📍' : '📦'));
 
                 let tagComercial = p.comercial ? `<span class="tag-comercial" style="float:none;">🏢</span>` : '';
+                let labelStop = p.extra ? `PACOTE EXTRA` : `STOP ${p.stop}`;
 
                 html += `<div style="background:${corFundo}; ${borda} border-radius:10px; padding:15px; margin-bottom:10px; text-align:left; color:${corTexto}; cursor:pointer;" onclick="pularParaStop(${index})">
                     <div style="font-size: 18px; font-weight: bold; margin-bottom: 5px;">
-                        ${iconeStatus} <span style="color:#FFCC00;">#${index + 1}</span> ➔ STOP ${p.stop} 
+                        ${iconeStatus} <span style="color:#FFCC00;">#${index + 1}</span> ➔ ${labelStop} 
                         <span style="float:right; font-size:14px; background:#333; padding:2px 8px; border-radius:10px;">${p.pacotes} vol</span>
                     </div>
                     <div style="font-size: 13px; opacity: 0.8;">${tagComercial} ${p.ruaPadrao}</div>
@@ -642,8 +707,9 @@
 
             camadaFundo.clearLayers();
             rotaSpx.forEach((p) => {
-                p.marker = L.circleMarker([p.lat, p.lon], { radius: 6, color: '#666', fillColor: '#333', fillOpacity: 1, weight: 1 })
-                .bindTooltip("Stop " + p.stop, { permanent: true, direction: 'top', className: 'stop-label', offset: [0, -5] })
+                let colorPino = p.extra ? '#FF8C00' : '#333';
+                p.marker = L.circleMarker([p.lat, p.lon], { radius: 6, color: '#666', fillColor: colorPino, fillOpacity: 1, weight: 1 })
+                .bindTooltip(p.extra ? "Extra" : ("Stop " + p.stop), { permanent: true, direction: 'top', className: 'stop-label', offset: [0, -5] })
                 .addTo(camadaFundo);
             });
 
@@ -729,7 +795,9 @@
                 const d = rotaSpx[idxDestino];
                 
                 let tagComercial = d.comercial ? `<span class="tag-comercial" style="margin-left:10px;">🏢 COMERCIAL</span>` : '';
-                document.getElementById('stop-badge').innerHTML = `<span style="color:#fff;">#${idxDestino + 1}</span> ➔ STOP ${d.stop} <small>(${d.pacotes} vol)</small> ${tagComercial}`;
+                let labelStop = d.extra ? `❓ PACOTE EXTRA` : `STOP ${d.stop}`;
+                
+                document.getElementById('stop-badge').innerHTML = `<span style="color:#fff;">#${idxDestino + 1}</span> ➔ ${labelStop} <small>(${d.pacotes} vol)</small> ${tagComercial}`;
                 document.getElementById('lista-enderecos').innerHTML = formatarEnderecos(d.enderecos);
                 
                 if (markerDest) mapa.removeLayer(markerDest);
@@ -763,7 +831,7 @@
         }
 
         // ==========================================
-        // O MOTOR DA SETA CORRIGIDO (O CURATIVO FOI MANTIDO)
+        // O MOTOR DA SETA CORRIGIDO
         // ==========================================
         function navegar() {
             if (!rotaSpx[idxDestino]) return;
@@ -879,8 +947,12 @@
 
                 document.getElementById('rel-total').innerText = msParaHoras(totalMs);
                 document.getElementById('rel-media').innerText = msParaTempo(mediaMs);
-                document.getElementById('rel-rapida').innerText = msParaTempo(rapida.ms) + " (Stop " + rapida.stop + ")";
-                document.getElementById('rel-lenta').innerText = msParaTempo(lenta.ms) + " (Stop " + lenta.stop + ")";
+                
+                let labelRapida = rotaSpx[historicoParadas.indexOf(rapida)].extra ? "EXTRA" : rapida.stop;
+                let labelLenta = rotaSpx[historicoParadas.indexOf(lenta)].extra ? "EXTRA" : lenta.stop;
+
+                document.getElementById('rel-rapida').innerText = msParaTempo(rapida.ms) + " (Stop " + labelRapida + ")";
+                document.getElementById('rel-lenta').innerText = msParaTempo(lenta.ms) + " (Stop " + labelLenta + ")";
 
                 document.getElementById('tela-navegacao').style.display = 'none';
                 document.getElementById('modal-relatorio').style.display = 'flex';
