@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SPX Ninja - V-Final (Pacotes Extras + Zíper + Seta)</title>
+    <title>SPX Ninja - V-Final (Mapa de Calor + Pacotes Extras)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -29,9 +29,9 @@
         .bag-item:last-child { border-bottom: none; }
         .bag-item strong { font-size: 18px; color: #fff; }
         .bag-item small { color: #aaa; display: block; margin-top: 3px; font-size: 12px;}
-        .bag-vol { background: #39FF14; color: #000; padding: 3px 8px; border-radius: 12px; font-weight: bold; font-size: 14px; }
+        .bag-vol { border-radius: 12px; font-weight: bold; font-size: 14px; padding: 3px 8px; text-align: center; }
         
-        /* Novas Tags Visuais */
+        /* Tags Visuais */
         .tag-comercial { background: #9d00ff; color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; margin-right: 5px; display: inline-block; margin-bottom: 3px;}
         .tag-extra { background: #FF8C00; color: #000; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; margin-right: 5px; display: inline-block; margin-bottom: 3px;}
 
@@ -97,7 +97,7 @@
             📦 CARREGAR PLANILHA SPX
             <input type="file" id="fileInput" accept=".xlsx, .xls, .csv">
         </label>
-        <div id="loading-msg" style="display:none; color:#FFCC00; font-weight:bold; margin-top:20px; font-size:18px;">⏳ Calculando Rotas...<br><small>Alocando Pacotes Misteriosos e Comerciais.</small></div>
+        <div id="loading-msg" style="display:none; color:#FFCC00; font-weight:bold; margin-top:20px; font-size:18px;">⏳ Calculando Rotas...<br><small>Alocando Pacotes e Gerando Mapa de Calor.</small></div>
     </div>
 
     <div id="modal-auditoria" class="modal-fullscreen">
@@ -134,7 +134,7 @@
             <p>Foco na <strong>Eficiência de Campo</strong>:</p>
             <p>1. <strong>Mão da Via:</strong> O algoritmo amarra as ruas seguindo a direção da Shopee para evitar contramão.</p>
             <p>2. <strong>Pacotes Misteriosos:</strong> Identificados e enxertados ao lado do hospedeiro mais próximo na sua Bag.</p>
-            <p>3. <strong>Seta Restaurada:</strong> O atraso de curva foi mantido para a navegação real.</p>
+            <p>3. <strong>Mapa de Calor:</strong> O volume de pacotes muda de cor do Verde ao Vermelho para alertar o peso da entrega.</p>
         </div>
         <button class="btn-modo btn-otimizada" onclick="avancarParaDocaOtimizada()">IR PARA SEPARAÇÃO (BAGS) 📦</button>
     </div>
@@ -205,6 +205,16 @@
         let listaRadares = [];
         let radarAtivo = null;
         let audioCtx = null;
+
+        // FUNÇÃO MAPA DE CALOR (HEATMAP DE VOLUMES)
+        function getCorVolume(vol) {
+            if (vol === 1) return { bg: '#39FF14', color: '#000' };
+            if (vol === 2) return { bg: '#FFCC00', color: '#000' };
+            if (vol === 3) return { bg: '#FFA500', color: '#000' };
+            if (vol === 4) return { bg: '#FF4500', color: '#fff' };
+            if (vol === 5) return { bg: '#FF0000', color: '#fff' };
+            return { bg: '#8B0000', color: '#fff' }; // 6 ou mais volumes
+        }
 
         async function requestWakeLock() {
             try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } 
@@ -635,6 +645,7 @@
                     if (tags !== "") tags = `<br>${tags}`;
 
                     let labelStop = p.extra ? `[❓ EXTRA]` : `[Stop ${p.stop}]`;
+                    let volColor = getCorVolume(p.pacotes); // Aplica Heatmap
 
                     bagsHtml += `
                     <div class="bag-item">
@@ -642,7 +653,7 @@
                             <strong><span style="color:#FFCC00;">#${globalIndex}</span> ➔ ${labelStop}</strong>
                             <small>${p.ruaPadrao}</small>${tags}
                         </div>
-                        <div class="bag-vol">${p.pacotes} vol</div>
+                        <div class="bag-vol" style="background:${volColor.bg}; color:${volColor.color};">${p.pacotes} vol</div>
                     </div>`;
                     globalIndex++;
                 });
@@ -663,11 +674,12 @@
 
                 let tagComercial = p.comercial ? `<span class="tag-comercial" style="float:none;">🏢</span>` : '';
                 let labelStop = p.extra ? `PACOTE EXTRA` : `STOP ${p.stop}`;
+                let volColor = getCorVolume(p.pacotes); // Aplica Heatmap
 
                 html += `<div style="background:${corFundo}; ${borda} border-radius:10px; padding:15px; margin-bottom:10px; text-align:left; color:${corTexto}; cursor:pointer;" onclick="pularParaStop(${index})">
                     <div style="font-size: 18px; font-weight: bold; margin-bottom: 5px;">
                         ${iconeStatus} <span style="color:#FFCC00;">#${index + 1}</span> ➔ ${labelStop} 
-                        <span style="float:right; font-size:14px; background:#333; padding:2px 8px; border-radius:10px;">${p.pacotes} vol</span>
+                        <span style="float:right; font-size:14px; background:${volColor.bg}; color:${volColor.color}; padding:2px 8px; border-radius:10px;">${p.pacotes} vol</span>
                     </div>
                     <div style="font-size: 13px; opacity: 0.8;">${tagComercial} ${p.ruaPadrao}</div>
                 </div>`;
@@ -796,8 +808,10 @@
                 
                 let tagComercial = d.comercial ? `<span class="tag-comercial" style="margin-left:10px;">🏢 COMERCIAL</span>` : '';
                 let labelStop = d.extra ? `❓ PACOTE EXTRA` : `STOP ${d.stop}`;
+                let volColor = getCorVolume(d.pacotes); // Aplica Heatmap
+                let volPill = `<span style="background:${volColor.bg}; color:${volColor.color}; padding:2px 8px; border-radius:10px; font-size:14px; margin-left:5px;">${d.pacotes} vol</span>`;
                 
-                document.getElementById('stop-badge').innerHTML = `<span style="color:#fff;">#${idxDestino + 1}</span> ➔ ${labelStop} <small>(${d.pacotes} vol)</small> ${tagComercial}`;
+                document.getElementById('stop-badge').innerHTML = `<span style="color:#fff;">#${idxDestino + 1}</span> ➔ ${labelStop} ${volPill} ${tagComercial}`;
                 document.getElementById('lista-enderecos').innerHTML = formatarEnderecos(d.enderecos);
                 
                 if (markerDest) mapa.removeLayer(markerDest);
