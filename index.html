@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SPX Ninja - V-Final (Mapa de Calor + Pacotes Extras)</title>
+    <title>SPX Ninja - V-Final (Baixa Manual no Menu + Zíper + Seta)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -87,6 +87,11 @@
         .rel-dado span { display: block; font-size: 14px; color: #aaa; text-transform: uppercase; }
         .rel-dado strong { font-size: 28px; color: #fff; }
         .rel-destaque { color: #FFCC00 !important; }
+        
+        /* Botões Ação Rápida Menu */
+        .btn-menu-acao { flex: 1; padding: 8px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
+        .btn-menu-check { background: #28a745; color: #fff; }
+        .btn-menu-fail { background: #dc3545; color: #fff; }
     </style>
 </head>
 <body>
@@ -134,7 +139,7 @@
             <p>Foco na <strong>Eficiência de Campo</strong>:</p>
             <p>1. <strong>Mão da Via:</strong> O algoritmo amarra as ruas seguindo a direção da Shopee para evitar contramão.</p>
             <p>2. <strong>Pacotes Misteriosos:</strong> Identificados e enxertados ao lado do hospedeiro mais próximo na sua Bag.</p>
-            <p>3. <strong>Mapa de Calor:</strong> O volume de pacotes muda de cor do Verde ao Vermelho para alertar o peso da entrega.</p>
+            <p>3. <strong>Baixa Rápida:</strong> Se você pular ou adiantar um pacote a pé, marque como concluído direto no Menu 📋.</p>
         </div>
         <button class="btn-modo btn-otimizada" onclick="avancarParaDocaOtimizada()">IR PARA SEPARAÇÃO (BAGS) 📦</button>
     </div>
@@ -148,7 +153,7 @@
     <div id="modal-menu-stops" class="modal-fullscreen" style="z-index: 4000;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 15px;">
             <h2 style="margin: 0;">📋 LISTA DE PARADAS</h2>
-            <button onclick="fecharMenuStops()" style="background:#dc3545; color:white; border:none; padding:10px 15px; border-radius:8px; font-weight:bold;">VOLTAR</button>
+            <button onclick="fecharMenuStops()" style="background:#dc3545; color:white; border:none; padding:10px 15px; border-radius:8px; font-weight:bold;">FECHAR</button>
         </div>
         <div id="conteudo-lista-stops" style="padding-bottom: 30px;"></div>
     </div>
@@ -172,8 +177,8 @@
             <div id="rodape-dist">---</div>
         </div>
         <div id="painel-acoes">
-            <button class="btn-status btn-check" onclick="finalizarParada('concluido')">CONCLUÍDO</button>
-            <button class="btn-status btn-fail" onclick="finalizarParada('pendente')">PENDENTE</button>
+            <button class="btn-status btn-check" onclick="finalizarParadaAtual('concluido')">CONCLUÍDO</button>
+            <button class="btn-status btn-fail" onclick="finalizarParadaAtual('pendente')">PENDENTE</button>
         </div>
     </div>
 
@@ -206,14 +211,14 @@
         let radarAtivo = null;
         let audioCtx = null;
 
-        // FUNÇÃO MAPA DE CALOR (HEATMAP DE VOLUMES)
+        // MAPA DE CALOR
         function getCorVolume(vol) {
             if (vol === 1) return { bg: '#39FF14', color: '#000' };
             if (vol === 2) return { bg: '#FFCC00', color: '#000' };
             if (vol === 3) return { bg: '#FFA500', color: '#000' };
             if (vol === 4) return { bg: '#FF4500', color: '#fff' };
             if (vol === 5) return { bg: '#FF0000', color: '#fff' };
-            return { bg: '#8B0000', color: '#fff' }; // 6 ou mais volumes
+            return { bg: '#8B0000', color: '#fff' }; 
         }
 
         async function requestWakeLock() {
@@ -365,9 +370,7 @@
             return { km: kmComMultaDeManobra, quebras: quebrasDeRua };
         }
 
-        // ============================================================================
-        // O ZÍPER DA RUA: Agrupa blocos e ordena sequencialmente (Mão da Via)
-        // ============================================================================
+        // MOTOR: ZÍPER DE RUA E SENTIDO ÚNICO
         function gerarRotaPorFluxo(rotaBase) {
             if (rotaBase.length <= 1) return rotaBase;
 
@@ -400,7 +403,6 @@
             }
             if (grupoAtual.length > 0) grupos.push(grupoAtual);
 
-            // Garante a mão única da Shopee
             grupos.forEach(g => g.sort((a, b) => a.idOriginal - b.idOriginal));
 
             let blocosPendentes = [...grupos];
@@ -460,7 +462,6 @@
                     const listaEnderecosPorStop = {};
                     const dadosComerciais = {};
 
-                    // TAG COMERCIAL: Pesquisa avançada
                     const regexComercial = /galp[aã]o|loja|sala|comercial|empresa|cl[íi]nica|consult[oó]rio|escola|pr[eé]dio|shopping|igreja|oficina|galeria|instituto|studio|centro/i;
 
                     let pacotesMisteriososRaw = [];
@@ -473,7 +474,6 @@
                         
                         let isComercial = regexComercial.test(end) || regexComercial.test(compl);
 
-                        // IDENTIFICAÇÃO DE ÓRFÃOS: Se o Stop for "-" ou vazio
                         if (!s || String(s).trim() === '-' || isNaN(parseInt(s))) {
                             pacotesMisteriososRaw.push({
                                 lat: parseFloat(String(i.latitude || i.lat).replace(',', '.')),
@@ -481,10 +481,9 @@
                                 ruaPadrao: extrairRuaPadrao(end),
                                 endereco: end,
                                 comercial: isComercial,
-                                pacotes: 1 // Linha única de mistério
+                                pacotes: 1
                             });
                         } else {
-                            // Paradas Roteirizadas
                             let numStop = parseInt(s);
                             contagemVolumes[numStop] = (contagemVolumes[numStop] || 0) + 1; 
                             if (!listaEnderecosPorStop[numStop]) listaEnderecosPorStop[numStop] = [];
@@ -497,7 +496,6 @@
 
                     const stopsUnicos = new Set();
 
-                    // ROTA ORIGINAL (Apenas a roteirizada, para não quebrar a lógica)
                     rotaOriginalData = paradasOficiaisRaw.filter(i => {
                             let s = i.stopLimpo;
                             if (stopsUnicos.has(s)) return false; 
@@ -523,14 +521,8 @@
 
                     if (rotaOriginalData.length === 0) throw new Error("Sem coordenadas válidas.");
 
-                    // ==========================================
-                    // 1. GERA A OTIMIZAÇÃO (SEM MISTERIOSOS)
-                    // ==========================================
                     rotaOtimizadaData = gerarRotaPorFluxo(rotaOriginalData);
 
-                    // ==========================================
-                    // 2. INJETA OS MISTERIOSOS COMO HOSPEDEIROS
-                    // ==========================================
                     let counterExtra = 1;
                     pacotesMisteriososRaw.forEach(mist => {
                         if (isNaN(mist.lat) || isNaN(mist.lon)) return;
@@ -548,20 +540,19 @@
 
                         if (melhorIdx !== -1) {
                             let objExtra = {
-                                idOriginal: 9999 + counterExtra, // Fake ID
+                                idOriginal: 9999 + counterExtra, 
                                 lat: mist.lat,
                                 lon: mist.lon,
                                 ruaPadrao: mist.ruaPadrao,
-                                stop: "EXTRA", // Apenas para debug logico
+                                stop: "EXTRA", 
                                 pacotes: mist.pacotes,
                                 enderecos: [mist.endereco],
                                 comercial: mist.comercial,
-                                extra: true, // Flag visual
+                                extra: true, 
                                 andaAPe: menorDist <= 70, 
                                 status: 'neutro', marker: null
                             };
                             
-                            // Insere o extra fisicamente APÓS o hospedeiro na lista
                             rotaOtimizadaData.splice(melhorIdx + 1, 0, objExtra);
                             counterExtra++;
                         }
@@ -645,7 +636,7 @@
                     if (tags !== "") tags = `<br>${tags}`;
 
                     let labelStop = p.extra ? `[❓ EXTRA]` : `[Stop ${p.stop}]`;
-                    let volColor = getCorVolume(p.pacotes); // Aplica Heatmap
+                    let volColor = getCorVolume(p.pacotes); 
 
                     bagsHtml += `
                     <div class="bag-item">
@@ -663,18 +654,33 @@
             container.innerHTML = bagsHtml;
         }
 
+        // ==========================================
+        // BAIXA MANUAL NO MENU + AUTO PULO DO GPS
+        // ==========================================
         function abrirMenuStops() {
             let html = '';
             rotaSpx.forEach((p, index) => {
-                let iconeStatus = p.status === 'concluido' ? '✅' : (p.status === 'pendente' ? '❌' : (index === idxDestino ? '📍' : (p.extra ? '❓' : '📦')));
+                let isAtivo = (index === idxDestino);
+                let iconeStatus = p.status === 'concluido' ? '✅' : (p.status === 'pendente' ? '❌' : (isAtivo ? '📍' : (p.extra ? '❓' : '📦')));
                 let corTexto = p.status === 'concluido' ? '#888' : (p.status === 'pendente' ? '#ff6666' : '#fff');
                 let corZebrada = Math.floor(index / 10) % 2 === 0 ? '#2a2a2a' : '#0a0a0a';
-                let corFundo = index === idxDestino ? '#003399' : corZebrada;
-                let borda = index === idxDestino ? 'border: 2px solid #39FF14;' : 'border: 1px solid #333;';
+                let corFundo = isAtivo ? '#003399' : corZebrada;
+                let borda = isAtivo ? 'border: 2px solid #39FF14;' : 'border: 1px solid #333;';
 
                 let tagComercial = p.comercial ? `<span class="tag-comercial" style="float:none;">🏢</span>` : '';
                 let labelStop = p.extra ? `PACOTE EXTRA` : `STOP ${p.stop}`;
-                let volColor = getCorVolume(p.pacotes); // Aplica Heatmap
+                let volColor = getCorVolume(p.pacotes); 
+
+                // BOTÕES DE AÇÃO RÁPIDA NO MENU
+                let botoesAcao = '';
+                if (p.status === 'neutro') {
+                    botoesAcao = `
+                        <div style="margin-top:12px; display:flex; gap:10px;">
+                            <button onclick="forcarBaixaMenu(event, ${index}, 'concluido')" class="btn-menu-acao btn-menu-check">✅ ENTREGUE</button>
+                            <button onclick="forcarBaixaMenu(event, ${index}, 'pendente')" class="btn-menu-acao btn-menu-fail">❌ FALHA</button>
+                        </div>
+                    `;
+                }
 
                 html += `<div style="background:${corFundo}; ${borda} border-radius:10px; padding:15px; margin-bottom:10px; text-align:left; color:${corTexto}; cursor:pointer;" onclick="pularParaStop(${index})">
                     <div style="font-size: 18px; font-weight: bold; margin-bottom: 5px;">
@@ -682,6 +688,7 @@
                         <span style="float:right; font-size:14px; background:${volColor.bg}; color:${volColor.color}; padding:2px 8px; border-radius:10px;">${p.pacotes} vol</span>
                     </div>
                     <div style="font-size: 13px; opacity: 0.8;">${tagComercial} ${p.ruaPadrao}</div>
+                    ${botoesAcao}
                 </div>`;
             });
             document.getElementById('conteudo-lista-stops').innerHTML = html;
@@ -690,6 +697,27 @@
 
         function fecharMenuStops() {
             document.getElementById('modal-menu-stops').style.display = 'none';
+        }
+
+        function forcarBaixaMenu(e, index, status) {
+            e.stopPropagation(); // Evita acionar o "pularParaStop" ao clicar no botão
+            
+            const p = rotaSpx[index];
+            p.status = status;
+            p.marker.setStyle({ fillColor: status === 'concluido' ? '#888' : '#ff0000', color: '#fff', weight: 2 });
+
+            let agora = new Date();
+            let tempoGasto = historicoParadas.length === 0 ? (agora - horaInicioExpediente) : (agora - historicoParadas[historicoParadas.length - 1].hora);
+            historicoParadas.push({ stop: p.stop, hora: agora, ms: tempoGasto, extra: p.extra });
+
+            abrirMenuStops(); // Atualiza as cores do menu na mesma hora
+
+            // Se você deu baixa manual no destino que o GPS estava apontando, ele avança sozinho.
+            if (index === idxDestino) {
+                avancarProximoDestino();
+            } else {
+                verificarFimDeRota(); // Só checa se por acaso foi a última do dia.
+            }
         }
 
         function pularParaStop(index) {
@@ -804,11 +832,12 @@
 
         async function calcularRota() {
             try {
+                if(idxDestino >= rotaSpx.length) return;
                 const d = rotaSpx[idxDestino];
                 
                 let tagComercial = d.comercial ? `<span class="tag-comercial" style="margin-left:10px;">🏢 COMERCIAL</span>` : '';
                 let labelStop = d.extra ? `❓ PACOTE EXTRA` : `STOP ${d.stop}`;
-                let volColor = getCorVolume(d.pacotes); // Aplica Heatmap
+                let volColor = getCorVolume(d.pacotes);
                 let volPill = `<span style="background:${volColor.bg}; color:${volColor.color}; padding:2px 8px; border-radius:10px; font-size:14px; margin-left:5px;">${d.pacotes} vol</span>`;
                 
                 document.getElementById('stop-badge').innerHTML = `<span style="color:#fff;">#${idxDestino + 1}</span> ➔ ${labelStop} ${volPill} ${tagComercial}`;
@@ -844,9 +873,6 @@
             } catch (e) { console.log("Erro rota", e); }
         }
 
-        // ==========================================
-        // O MOTOR DA SETA CORRIGIDO
-        // ==========================================
         function navegar() {
             if (!rotaSpx[idxDestino]) return;
             const dFinal = dist(minhaLat, minhaLon, rotaSpx[idxDestino].lat, rotaSpx[idxDestino].lon);
@@ -920,37 +946,51 @@
             return `${horas}h ${minutos}m`;
         }
 
-        function finalizarParada(status) {
-            const p = rotaSpx[idxDestino];
-            p.status = status;
-            p.marker.setStyle({ fillColor: status === 'concluido' ? '#888' : '#ff0000', color: '#fff', weight: 2 });
-
-            let agora = new Date();
-            let tempoGasto = historicoParadas.length === 0 ? 
-                             (agora - horaInicioExpediente) : 
-                             (agora - historicoParadas[historicoParadas.length - 1].hora);
-            
-            historicoParadas.push({ stop: p.stop, hora: agora, ms: tempoGasto });
-
+        // ==========================================
+        // AUTO-AVANÇO E VERIFICAÇÃO FINAL
+        // ==========================================
+        function avancarProximoDestino() {
             aguardandoConfirmacao = false;
             requestWakeLock();
-            
-            idxDestino++;
-            passosNavegacao = [];
             
             document.getElementById('painel-rodape').style.display = 'block';
             document.getElementById('seta-flutuante').style.display = 'block';
             document.getElementById('painel-acoes').style.display = 'none';
             document.getElementById('painel-topo').classList.remove('modo-confirmacao');
-            
-            if (idxDestino < rotaSpx.length) {
+
+            // Procura o próximo pacote 'neutro' na lista
+            let proximoIdx = -1;
+            for (let i = 0; i < rotaSpx.length; i++) {
+                if (rotaSpx[i].status === 'neutro') {
+                    proximoIdx = i;
+                    break;
+                }
+            }
+
+            if (proximoIdx !== -1) {
+                idxDestino = proximoIdx;
+                passosNavegacao = [];
                 calcularRota();
-            } else { 
+            } else {
+                verificarFimDeRota();
+            }
+        }
+
+        function verificarFimDeRota() {
+            let tudoFinalizado = rotaSpx.every(p => p.status !== 'neutro');
+            
+            if (tudoFinalizado) {
                 releaseWakeLock(); 
+                document.getElementById('rodape-rua').innerText = "ROTA FINALIZADA";
+                document.getElementById('tela-navegacao').style.display = 'none';
+                fecharMenuStops();
                 
+                let agora = new Date();
                 let totalMs = agora - horaInicioExpediente;
-                let mediaMs = totalMs / historicoParadas.length;
                 
+                if (historicoParadas.length === 0) return;
+                
+                let mediaMs = totalMs / historicoParadas.length;
                 let rapida = historicoParadas[0];
                 let lenta = historicoParadas[0];
                 
@@ -962,15 +1002,27 @@
                 document.getElementById('rel-total').innerText = msParaHoras(totalMs);
                 document.getElementById('rel-media').innerText = msParaTempo(mediaMs);
                 
-                let labelRapida = rotaSpx[historicoParadas.indexOf(rapida)].extra ? "EXTRA" : rapida.stop;
-                let labelLenta = rotaSpx[historicoParadas.indexOf(lenta)].extra ? "EXTRA" : lenta.stop;
+                let labelRapida = rapida.extra ? "PACOTE EXTRA" : rapida.stop;
+                let labelLenta = lenta.extra ? "PACOTE EXTRA" : lenta.stop;
 
                 document.getElementById('rel-rapida').innerText = msParaTempo(rapida.ms) + " (Stop " + labelRapida + ")";
                 document.getElementById('rel-lenta').innerText = msParaTempo(lenta.ms) + " (Stop " + labelLenta + ")";
 
-                document.getElementById('tela-navegacao').style.display = 'none';
                 document.getElementById('modal-relatorio').style.display = 'flex';
             }
+        }
+
+        function finalizarParadaAtual(status) {
+            const p = rotaSpx[idxDestino];
+            p.status = status;
+            p.marker.setStyle({ fillColor: status === 'concluido' ? '#888' : '#ff0000', color: '#fff', weight: 2 });
+
+            let agora = new Date();
+            let tempoGasto = historicoParadas.length === 0 ? (agora - horaInicioExpediente) : (agora - historicoParadas[historicoParadas.length - 1].hora);
+            
+            historicoParadas.push({ stop: p.stop, hora: agora, ms: tempoGasto, extra: p.extra });
+
+            avancarProximoDestino();
         }
     </script>
 </body>
