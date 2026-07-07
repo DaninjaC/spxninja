@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SPX Ninja - V-Final (Olho de Águia + Autosave)</title>
+    <title>SPX Ninja - V-Final (Relatório Corrigido)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -47,7 +47,7 @@
 
         #map-wrapper { flex: 1; position: relative; width: 100%; }
         #map { width: 100%; height: 100%; background: #eee; }
-        #seta-flutuante { position: absolute; top: 15px; left: 15px; z-index: 1000; background: #1877F2; border-radius: 15px; padding: 15px; text-align: center; color: white; border: 3px solid #fff; box-shadow: 0 4px 10px rgba(0,0,0,0.5); min-width: 100px;}
+        #seta-flutuante { position: absolute; top: 15px; left: 15px; z-index: 1000; background: #1877F2; border-radius: 15px; padding: 15px; text-align: center; color: white; border: 3px solid #fff; box-shadow: 0 4px 10px rgba(0,0,0,0.5); min-width: 100px; display: none;}
         #seta-icon { font-size: 60px; background: rgba(255,255,255,0.2); border-radius: 10px; padding: 10px; display: inline-block; line-height: 1; margin-bottom: 5px;}
         #seta-dist { font-size: 28px; font-weight: bold; }
         
@@ -958,9 +958,6 @@
             } catch (e) { console.log("Erro rota", e); }
         }
 
-        // ==========================================
-        // O "OLHO DE ÁGUIA" (Raio-X de Curvas)
-        // ==========================================
         function navegar() {
             if (!rotaSpx[idxDestino]) return;
             const dFinal = dist(minhaLat, minhaLon, rotaSpx[idxDestino].lat, rotaSpx[idxDestino].lon);
@@ -983,36 +980,29 @@
             document.getElementById('rodape-dist').innerText = minPrevisao + " min";
             
             if (passosNavegacao.length === 0) {
-                document.getElementById('seta-dist').innerText = dFinal > 1000 ? (dFinal/1000).toFixed(1) + " km" : Math.round(dFinal) + " m";
-                document.getElementById('seta-icon').innerText = "📦"; 
-                document.getElementById('seta-flutuante').style.display = 'block'; 
+                document.getElementById('seta-flutuante').style.display = 'none'; 
             } else {
-                
-                // LÓGICA ORIGINAL DE ATRASO (Para o motor do GPS saber onde o carro está)
                 const passoAtual = passosNavegacao[idxPasso];
                 if (!passoAtual) return;
                 
-                const dCurvaAtual = dist(minhaLat, minhaLon, passoAtual.lat, passoAtual.lon);
+                const dCurva = dist(minhaLat, minhaLon, passoAtual.lat, passoAtual.lon);
 
-                if (dCurvaAtual < distAnteriorCurva) {
-                    distAnteriorCurva = dCurvaAtual;
+                if (dCurva < distAnteriorCurva) {
+                    distAnteriorCurva = dCurva;
                 }
 
-                if (dCurvaAtual > distAnteriorCurva + 8 && distAnteriorCurva < 40) {
+                if (dCurva > distAnteriorCurva + 8 && distAnteriorCurva < 40) {
                     if (idxPasso < passosNavegacao.length - 1) { 
                         idxPasso++; 
                         distAnteriorCurva = Infinity; 
                     }
-                } else if (idxPasso === 0 && dCurvaAtual > 15) {
+                } else if (idxPasso === 0 && dCurva > 15) {
                     if (idxPasso < passosNavegacao.length - 1) { 
                         idxPasso++; 
                         distAnteriorCurva = Infinity; 
                     }
                 }
 
-                // ====================================================
-                // NOVA LÓGICA VISUAL: SOMA DE DISTÂNCIAS (LOOK-AHEAD)
-                // ====================================================
                 let distSomada = 0;
                 let pLat = minhaLat;
                 let pLon = minhaLon;
@@ -1038,14 +1028,13 @@
                     pLon = pFuturo.lon;
                 }
 
-                if (!achouCurva) {
-                    distSomada = dFinal;
-                    iconeFuturo = "📦";
+                if (achouCurva) {
+                    document.getElementById('seta-dist').innerText = distSomada > 1000 ? (distSomada/1000).toFixed(1) + " km" : Math.round(distSomada) + " m";
+                    document.getElementById('seta-icon').innerText = iconeFuturo;
+                    document.getElementById('seta-flutuante').style.display = 'block'; 
+                } else {
+                    document.getElementById('seta-flutuante').style.display = 'none'; 
                 }
-
-                document.getElementById('seta-dist').innerText = distSomada > 1000 ? (distSomada/1000).toFixed(1) + " km" : Math.round(distSomada) + " m";
-                document.getElementById('seta-icon').innerText = iconeFuturo;
-                document.getElementById('seta-flutuante').style.display = 'block'; 
             }
         }
 
@@ -1113,10 +1102,8 @@
                 if (economia < 0) economia = 0; 
                 
                 let rapida = historicoParadas[0];
-                let lenta = historicoParadas[0];
                 historicoParadas.forEach(hist => {
                     if(hist.ms < rapida.ms) rapida = hist;
-                    if(hist.ms > lenta.ms) lenta = hist;
                 });
 
                 document.getElementById('rel-total').innerText = msParaHoras(totalMs);
@@ -1127,10 +1114,8 @@
                 document.getElementById('rel-km-poupado').innerText = economia + " km";
                 
                 let labelRapida = rapida.extra ? "PACOTE EXTRA" : rapida.stop;
-                let labelLenta = lenta.extra ? "PACOTE EXTRA" : lenta.stop;
-
+                
                 document.getElementById('rel-rapida').innerText = msParaTempo(rapida.ms) + " (Stop " + labelRapida + ")";
-                document.getElementById('rel-lenta').innerText = msParaTempo(lenta.ms) + " (Stop " + labelLenta + ")";
 
                 document.getElementById('modal-relatorio').style.display = 'flex';
             }
