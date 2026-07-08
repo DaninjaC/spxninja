@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SPX Ninja - V-Final (Relatório Corrigido)</title>
+    <title>SPX Ninja - V-Final (Descrição Comercial)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -19,8 +19,8 @@
         .btn-padrao { background: #ff4444; color: #fff; }
         .btn-otimizada { background: #39FF14; }
         
-        .info-container { background: #111; border: 1px solid #333; border-radius: 10px; padding: 20px; text-align: left; margin-bottom: 25px; line-height: 1.6; font-size: 16px; color: #ccc;}
-        .info-container p { margin-top: 0; margin-bottom: 15px; }
+        .info-container { background: #111; border: 1px solid #333; border-radius: 10px; padding: 20px; text-align: left; margin-bottom: 25px; line-height: 1.6; font-size: 15px; color: #ccc;}
+        .info-container p { margin-top: 0; margin-bottom: 12px; }
         .info-container strong { color: #39FF14; }
 
         .bag-container { background: #111; border: 1px solid #39FF14; border-radius: 10px; margin-bottom: 15px; padding: 15px; text-align: left; }
@@ -141,12 +141,16 @@
     </div>
 
     <div id="modal-info-otimizada" class="modal-fullscreen">
-        <h2>🚀 MODO: OTIMIZADA SPX (Zíper + Extras)</h2>
+        <h2>🚀 MODO: OTIMIZADA SPX</h2>
         <div class="info-container">
-            <p>Foco na <strong>Eficiência de Campo</strong>:</p>
-            <p>1. <strong>Seta Olho de Águia:</strong> O GPS soma as retas e só apita (Esquerda/Direita) quando realmente tem uma curva. Foco no trânsito.</p>
-            <p>2. <strong>Mão da Via:</strong> Amarra as ruas seguindo a direção da Shopee para evitar contramão.</p>
-            <p>3. <strong>Baixa Rápida & Autosave:</strong> Marcador no menu para pacotes adiantados e salvamento anti-falhas.</p>
+            <p style="text-align: center; margin-bottom: 15px; font-size: 16px;"><strong>Diferenciais da Otimização Ninja:</strong></p>
+            <p>📦 <strong>Encaixe de Extras:</strong> Junta pacotes sem número com os vizinhos mais próximos para evitar viagem perdida.</p>
+            <p>🧵 <strong>Modo Varal:</strong> Agrupa todas as entregas da mesma rua de uma só vez. Nunca mais volte na mesma rua.</p>
+            <p>🤐 <strong>Efeito Zíper:</strong> Segue o sentido real do trânsito, eliminando contramãos e zigue-zagues entre calçadas.</p>
+            <p>🦘 <strong>Pulo Curto:</strong> Ao terminar um quarteirão, pula direto para a via vizinha mais colada no bico do seu carro.</p>
+            <p>✂️ <strong>Quebra de Avenidas:</strong> Divide vias muito longas para você não perder tempo cruzando o bairro à toa.</p>
+            <p>🚶 <strong>Combo a Pé:</strong> Identifica casas coladas (menos de 70m) para estacionar uma única vez e fazer as entregas caminhando.</p>
+            <p>⏩ <strong>Avanço Automático:</strong> O GPS pula sozinho para o próximo destino correto logo após a baixa, sem toques na tela.</p>
         </div>
         <button class="btn-modo btn-otimizada" onclick="avancarParaDocaOtimizada()">IR PARA SEPARAÇÃO (BAGS) 📦</button>
     </div>
@@ -224,7 +228,6 @@
         let radarAtivo = null;
         let audioCtx = null;
 
-        // INICIALIZAÇÃO E CHECAGEM DE AUTOSAVE
         window.onload = function() {
             let estadoStr = localStorage.getItem('spx_ninja_estado');
             if (estadoStr) {
@@ -237,7 +240,6 @@
             }
         };
 
-        // SISTEMA DE SALVAMENTO (AUTOSAVE)
         function salvarEstadoRota() {
             if (!rotaSpx || rotaSpx.length === 0) return;
             let estado = {
