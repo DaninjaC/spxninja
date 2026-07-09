@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Teste - Rota Manual (Planilha Real)</title>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <style>
+        body { margin: 0; padding: 0; font-family: sans-serif; background-color: #111; color: #fff; display: flex; flex-direction: column; height: 100vh; }
+        
+        #painel-topo { background: #222; padding: 20px; text-align: center; border-bottom: 2px solid #444; z-index: 1000; position: relative; }
+        h2 { margin: 0 0 10px 0; color: #FFCC00; font-size: 20px;}
+        p { margin: 0 0 15px 0; font-size: 14px; color: #aaa; }
+        
+        .btn-file { background: #39FF14; color: #000; padding: 12px 20px; border-radius: 8px; font-weight: bold; font-size: 16px; cursor: pointer; display: inline-block; margin-bottom: 10px; width: 90%; max-width: 300px;}
+        input[type="file"] { display: none; }
+
+        .btn-desenho { background: #FF8C00; color: #000; padding: 12px 20px; border: none; border-radius: 8px; font-weight: bold; font-size: 16px; cursor: pointer; transition: 0.3s; width: 90%; max-width: 300px; display: none; margin: 0 auto;}
+        .btn-desenho.ativo { background: #dc3545; color: #fff; }
+        
+        #map { flex: 1; width: 100%; background: #000; cursor: grab; }
+        .modo-desenho-ativo { cursor: crosshair !important; }
+        
+        #painel-resultado { background: #000; padding: 15px; border-top: 2px solid #39FF14; text-align: center; min-height: 80px; max-height: 150px; overflow-y: auto;}
+        #ordem-selecionada { font-size: 18px; color: #39FF14; font-weight: bold; letter-spacing: 2px; word-wrap: break-word; line-height: 1.5;}
+        .stop-label { background: rgba(0,0,0,0.8); color: #fff; border: 1px solid #777; font-weight: bold; padding: 2px 4px; border-radius: 3px; font-size: 12px; }
+        
+        /* Tema Escuro para o Mapa */
+        .leaflet-tile-container { filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%); }
+    </style>
+</head>
+<body>
+
+    <div id="painel-topo">
+        <h2>Teste de Rota Manual</h2>
+        <p id="instrucao">Carregue uma planilha real para plotar os pontos no mapa.</p>
+        
+        <label class="btn-file" id="btn-carregar">
+            📦 CARREGAR PLANILHA SHOPEE
+            <input type="file" id="fileInput" accept=".xlsx, .xls, .csv">
+        </label>
+
+        <button id="btn-toggle" class="btn-desenho" onclick="toggleModoDesenho()">✏️ ATIVAR MODO DESENHO</button>
+    </div>
+
+    <div id="map"></div>
+
+    <div id="painel-resultado">
+        <div style="font-size:12px; color:#aaa; margin-bottom: 5px;">Ordem capturada pelo laço:</div>
+        <div id="ordem-selecionada">Nenhuma parada selecionada.</div>
+    </div>
+
+    <script>
+        // Configuração inicial do mapa (inicia no Brasil genérico, ajusta depois de carregar a planilha)
+        const map = L.map('map', { zoomControl: false }).setView([-14.235, -51.925], 4);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+        let marcadores = [];
+        let modoDesenho = false;
+        let desenhando = false;
+        
+        let linhaDesenhada = L.polyline([], { color: '#FFCC00', weight: 5, opacity: 0.8 }).addTo(map);
+        let sequenciaSelecionada = [];
+
+        // ====== LEITURA DA PLANILHA ======
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            const reader = new FileReader();
+            
+            document.getElementById('btn-carregar').style.display = 'none';
+            document.getElementById('instrucao').innerText = "Lendo coordenadas...";
+
+            reader.onload = function(evt) {
+                try {
+                    const wb = XLSX.read(evt.target.result, { type: 'binary' });
+                    const dataRaw = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+                    
+                    const json = dataRaw.map(row => {
+                        const normalized = {};
+                        for (let key in row) normalized[key.trim().toLowerCase()] = row[key];
+                        return normalized;
+                    });
+
+                    const stopsUnicos = new Map();
+                    let extraCount = 1;
+
+                    // Limpa marcadores antigos se houver
+                    marcadores.forEach(m => map.removeLayer(m));
+                    marcadores = [];
+
+                    json.forEach(i => {
+                        let lat = parseFloat(String(i.latitude || i.lat).replace(',', '.'));
+                        let lon = parseFloat(String(i.longitude || i.lon || i.lng).replace(',', '.'));
+                        let stopRaw = i.stop || i.parada || i.sequence;
+                        
+                        if (isNaN(lat) || isNaN(lon)) return; // Pula sem coordenada
+
+                        let stopLabel = "";
+                        if (!stopRaw || String(stopRaw).trim() === '-' || isNaN(parseInt(stopRaw))) {
+                            stopLabel = "E" + extraCount; // Trata os misteriosos como Extra 1, Extra 2...
+                            extraCount++;
+                        } else {
+                            stopLabel = parseInt(stopRaw).toString();
+                        }
+
+                        // Evita criar 5 pinos no mesmo lugar para a mesma parada (vários volumes)
+                        if (!stopsUnicos.has(stopLabel)) {
+                            stopsUnicos.set(stopLabel, { id: stopLabel, lat: lat, lon: lon });
+                        }
+                    });
+
+                    if (stopsUnicos.size === 0) throw new Error("Nenhuma coordenada válida encontrada na planilha.");
+
+                    let boundsCoords = [];
+
+                    // Plota os pontos reais no mapa
+                    stopsUnicos.forEach(p => {
+                        let cor = p.id.startsWith("E") ? '#FF8C00' : '#555'; // Extras ficam laranjas
+                        
+                        let marker = L.circleMarker([p.lat, p.lon], { 
+                            radius: 7, color: '#fff', fillColor: cor, fillOpacity: 1, weight: 2 
+                        })
+                        .bindTooltip(p.id, { permanent: true, direction: 'top', className: 'stop-label', offset: [0, -5] })
+                        .addTo(map);
+                        
+                        marker.spxId = p.id;
+                        marker.spxLatLng = L.latLng(p.lat, p.lon);
+                        marker.corOriginal = cor;
+                        
+                        marcadores.push(marker);
+                        boundsCoords.push([p.lat, p.lon]);
+                    });
+
+                    // Centraliza o mapa certinho na rota carregada
+                    map.fitBounds(boundsCoords, { padding: [30, 30] });
+
+                    // Libera o botão de desenho
+                    document.getElementById('instrucao').innerText = "Risque a tela ligando os pontos para criar sua sequência.";
+                    document.getElementById('btn-toggle').style.display = 'inline-block';
+
+                } catch (err) {
+                    alert("Erro ao ler planilha: " + err.message);
+                    document.getElementById('btn-carregar').style.display = 'inline-block';
+                    document.getElementById('instrucao').innerText = "Erro. Tente carregar novamente.";
+                }
+            };
+            reader.readAsBinaryString(e.target.files[0]);
+        });
+
+
+        // ====== LÓGICA DE DETECÇÃO DO LAÇO (MOUSE / TOQUE) ======
+        function toggleModoDesenho() {
+            const btn = document.getElementById('btn-toggle');
+            const mapDiv = document.getElementById('map');
+            
+            modoDesenho = !modoDesenho;
+
+            if (modoDesenho) {
+                btn.innerHTML = "❌ DESATIVAR MODO DESENHO";
+                btn.classList.add('ativo');
+                
+                // Trava o mapa para não arrastar quando passar o dedo
+                map.dragging.disable();
+                if (map.tap) map.tap.disable();
+                mapDiv.classList.add('modo-desenho-ativo');
+            } else {
+                btn.innerHTML = "✏️ ATIVAR MODO DESENHO";
+                btn.classList.remove('ativo');
+                
+                // Destrava o mapa
+                map.dragging.enable();
+                if (map.tap) map.tap.enable();
+                mapDiv.classList.remove('modo-desenho-ativo');
+            }
+        }
+
+        // Quando aperta o botão/dedo na tela
+        map.on('mousedown touchstart', function(e) {
+            if (!modoDesenho) return;
+            desenhando = true;
+            
+            // Limpa o desenho e a seleção anterior
+            linhaDesenhada.setLatLngs([]);
+            sequenciaSelecionada = [];
+            document.getElementById('ordem-selecionada').innerText = "Riscando...";
+            
+            // Volta todos os marcadores para a cor original
+            marcadores.forEach(m => m.setStyle({ fillColor: m.corOriginal }));
+            
+            // Adiciona o primeiro ponto da linha
+            let latlng = e.latlng || e.touches[0].latlng; 
+            if(latlng) linhaDesenhada.addLatLng(latlng);
+        });
+
+        // Quando move o mouse/dedo pela tela
+        map.on('mousemove touchmove', function(e) {
+            if (!desenhando || !modoDesenho) return;
+
+            // Compatibilidade para pegar a coordenada no celular ou PC
+            let latlng = e.latlng;
+            if (e.originalEvent && e.originalEvent.touches && e.originalEvent.touches.length > 0) {
+                let touch = e.originalEvent.touches[0];
+                latlng = map.containerPointToLatLng([touch.clientX, touch.clientY]);
+            }
+            if(!latlng) return;
+
+            // Adiciona o traço na linha amarela
+            linhaDesenhada.addLatLng(latlng);
+
+            // "EFEITO IMÃ": Checa se a caneta passou perto de algum ponto
+            marcadores.forEach(m => {
+                // Se o ponto ainda não foi pego no laço
+                if (!sequenciaSelecionada.includes(m.spxId)) {
+                    // Calcula a distância do dedo até o pino
+                    let distanciaMetros = map.distance(latlng, m.spxLatLng);
+                    
+                    // Se passar a menos de 60 metros do pino, ele "suga" o ponto
+                    if (distanciaMetros < 60) {
+                        sequenciaSelecionada.push(m.spxId);
+                        m.setStyle({ fillColor: '#39FF14' }); // Fica verde confirmando a captura
+                        
+                        // Atualiza o painel em tempo real
+                        document.getElementById('ordem-selecionada').innerText = sequenciaSelecionada.join(" ➔ ");
+                    }
+                }
+            });
+        });
+
+        // Quando solta o botão/dedo da tela
+        map.on('mouseup touchend', function(e) {
+            if (!modoDesenho) return;
+            desenhando = false;
+            
+            if (sequenciaSelecionada.length === 0) {
+                document.getElementById('ordem-selecionada').innerText = "Nenhuma parada capturada. Tente novamente.";
+            } else {
+                document.getElementById('ordem-selecionada').innerHTML = "<b>" + sequenciaSelecionada.join(" ➔ ") + "</b>";
+            }
+        });
+    </script>
+</body>
+</html>
