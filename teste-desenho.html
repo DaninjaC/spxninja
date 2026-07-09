@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Teste - Rota Manual (Toque Inteligente)</title>
+    <title>Teste - Rota Manual (Legenda Tática)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -84,7 +84,6 @@
         let desenhando = false;
         let vagaCount = 0;
         
-        // Variáveis para diferenciar Toque de Arrasto
         let startX = 0, startY = 0;
         let mudouDeLugar = false;
         let houveCapturaNesteCiclo = false;
@@ -97,6 +96,24 @@
         let vagasCriadas = []; 
         
         const camadaVidro = document.getElementById('camada-desenho');
+
+        // ====== FUNÇÃO PARA RENDERIZAR A LEGENDA COM OS PACOTES DA VAGA ======
+        function renderizarOrdem() {
+            if (sequenciaSelecionada.length === 0) return "Nenhuma parada capturada.";
+
+            let textoMapeado = sequenciaSelecionada.map(id => {
+                if (id.startsWith("Vaga")) {
+                    let vagaObj = vagasCriadas.find(v => v.marker.spxId === id);
+                    if (vagaObj && vagaObj.clientesSugados.length > 0) {
+                        let pacotes = vagaObj.clientesSugados.map(m => m.spxId).join(", ");
+                        return `${id} (${pacotes})`;
+                    }
+                }
+                return id;
+            });
+
+            return textoMapeado.join(" ➔ ");
+        }
 
         // ====== LEITURA DA PLANILHA ======
         document.getElementById('fileInput').addEventListener('change', function(e) {
@@ -199,7 +216,7 @@
             return map.containerPointToLatLng([x, y]);
         }
 
-        // ====== CRIAR VAGA TRAVADA NA RUA (OSRM SNAP) ======
+        // ====== CRIAR VAGA ======
         function projetarECriarVaga(latlng) {
             document.getElementById('status-texto').innerText = "⏳ Alinhando vaga com a rua mais próxima...";
             
@@ -235,7 +252,6 @@
                         clientesSugados: []
                     };
 
-                    // Agrupa pacotes num raio de 70 metros
                     marcadores.forEach(m => {
                         if (m !== markerVaga && !m.isGrouped && !sequenciaSelecionada.includes(m.spxId) && !m.spxId.startsWith("Vaga")) {
                             let dist = map.distance(snappedLatLng, m.spxLatLng);
@@ -256,6 +272,9 @@
                     document.getElementById('status-texto').innerText = "✅ " + vId + " fixada no asfalto!";
 
                     if(navigator.vibrate) navigator.vibrate([100, 50, 100]);
+                    
+                    // Atualiza a legenda para mostrar os pacotes se a vaga já foi inserida na rota, ou só a lista normal
+                    document.getElementById('ordem-selecionada').innerHTML = renderizarOrdem();
                     atualizarTelaERota();
                 })
                 .catch(err => {
@@ -286,11 +305,12 @@
                 }
 
                 document.getElementById('status-texto').innerText = "🚙 Última Vaga desfeita com sucesso.";
+                document.getElementById('ordem-selecionada').innerHTML = renderizarOrdem();
                 atualizarTelaERota();
             }
         }
 
-        // Função de captura super precisa (Raio Cirúrgico de 12m)
+        // ====== VERIFICA CAPTURA ======
         function verificarCaptura(latlng) {
             let capturouAlgo = false;
             marcadores.forEach(m => {
@@ -299,16 +319,18 @@
                     if (distanciaMetros < 12) {
                         sequenciaSelecionada.push(m.spxId); 
                         m.setStyle({ fillColor: '#39FF14', color: '#000', weight: 3 }); 
-                        document.getElementById('ordem-selecionada').innerText = sequenciaSelecionada.join(" ➔ ");
+                        
+                        document.getElementById('ordem-selecionada').innerHTML = renderizarOrdem();
+                        
                         capturouAlgo = true;
-                        houveCapturaNesteCiclo = true; // Avisa o sistema que não foi um clique no vazio
+                        houveCapturaNesteCiclo = true;
                     }
                 }
             });
             return capturouAlgo;
         }
 
-        // ====== EVENTOS DO TOQUE INTELIGENTE (FIM DO LAG!) ======
+        // ====== EVENTOS DO TOQUE ======
         camadaVidro.addEventListener('pointerdown', function(e) {
             desenhando = true;
             mudouDeLugar = false;
@@ -331,7 +353,6 @@
             let currentY = e.clientY;
             let distPixels = Math.sqrt((currentX - startX)**2 + (currentY - startY)**2);
             
-            // Se mover o dedo mais de 8 pixels na tela, assume que é um desenho/arrasto
             if (distPixels > 8) {
                 mudouDeLugar = true;
             }
@@ -348,17 +369,14 @@
             
             let latlng = getLatLngFromEvent(e);
 
-            // [MÁGICA DO TOQUE] Se foi apenas um clique rápido sem arrastar e sem pegar pino existente
             if (!mudouDeLugar && !houveCapturaNesteCiclo) {
                 let proximaVaga = vagaCount + 1;
-                // Abre o prompt nativo pedindo confirmação
                 if (confirm(`Deseja criar a "Vaga ${proximaVaga}" neste ponto da rua?`)) {
                     projetarECriarVaga(latlng);
-                    return; // Interrompe para não rodar a lógica de histórico à toa
+                    return; 
                 }
             }
 
-            // Lógica normal de salvar o risco no histórico se a rota aumentou de tamanho
             let ultimaSalva = historicoDeRoteamento[historicoDeRoteamento.length - 1];
             if (sequenciaSelecionada.length > ultimaSalva.length) {
                 historicoDeRoteamento.push([...sequenciaSelecionada]);
@@ -386,6 +404,8 @@
                         m.setStyle({ fillColor: '#39FF14', color: '#000', weight: 3 });
                     }
                 });
+                
+                document.getElementById('ordem-selecionada').innerHTML = renderizarOrdem();
                 atualizarTelaERota();
             }
         }
@@ -398,7 +418,8 @@
                 rotaReal.setLatLngs([]);
             } 
             else if (sequenciaSelecionada.length === 1) {
-                document.getElementById('ordem-selecionada').innerHTML = "<b>" + sequenciaSelecionada[0] + "</b> (Toque no próximo)";
+                // Preserva o texto da Vaga com parênteses caso o único item selecionado seja uma Vaga
+                document.getElementById('ordem-selecionada').innerHTML = `<b>${renderizarOrdem()}</b> (Toque no próximo)`;
                 document.getElementById('status-texto').innerText = "Ordem capturada:";
                 rotaReal.setLatLngs([]);
             } 
@@ -420,11 +441,11 @@
                         rotaReal.setLatLngs(latLngsReais); 
                         
                         document.getElementById('status-texto').innerText = "✅ Rota Manual Confirmada:";
-                        document.getElementById('ordem-selecionada').innerText = sequenciaSelecionada.join(" ➔ ");
+                        document.getElementById('ordem-selecionada').innerHTML = renderizarOrdem();
                     }
                 } catch (err) {
                     document.getElementById('status-texto').innerText = "⚠️ Sem internet. Ordem de paradas salva:";
-                    document.getElementById('ordem-selecionada').innerText = sequenciaSelecionada.join(" ➔ ");
+                    document.getElementById('ordem-selecionada').innerHTML = renderizarOrdem();
                 }
             }
         }
