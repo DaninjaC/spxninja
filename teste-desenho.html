@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SPX Ninja - Rota Manual e Vagas Inteligentes</title>
+    <title>SPX Ninja - Rota Manual (Padrão Oficial)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -46,16 +46,15 @@
         .endereco-item { font-size: 16px; color: #39FF14; font-weight: bold; text-transform: uppercase; margin-bottom: 10px; text-align: left; line-height: 1.4;}
         .num-box { background: #000; border: 2px solid #FFCC00; color: #FFCC00; padding: 2px 6px; border-radius: 5px; margin: 0 4px; }
 
-        #btn-menu-stops { position: absolute; top: 15px; right: 15px; width: 45px; height: 45px; background: #000; border: 2px solid #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 1005; }
+        #btn-menu-stops { position: absolute; top: 15px; right: 15px; width: 45px; height: 45px; background: #000; border: 2px solid #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 1005; box-shadow: 0 4px 8px rgba(0,0,0,0.4); }
         #btn-menu-stops span { font-size: 22px; }
 
         #map-wrapper { flex: 1; position: relative; width: 100%; }
         .mapa-janela { width: 100%; height: 100%; background: #000; }
         
-        /* Camada de Vidro Protetora para o Toque */
         #camada-desenho { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2000; display: none; cursor: crosshair; touch-action: none; }
         
-        #seta-flutuante { position: absolute; top: 15px; left: 15px; z-index: 1000; background: #1877F2; border-radius: 15px; padding: 15px; text-align: center; color: white; border: 3px solid #fff; min-width: 100px; display: none;}
+        #seta-flutuante { position: absolute; top: 15px; left: 15px; z-index: 1000; background: #1877F2; border-radius: 15px; padding: 15px; text-align: center; color: white; border: 3px solid #fff; min-width: 100px; display: none; box-shadow: 0 4px 10px rgba(0,0,0,0.5);}
         #seta-icon { font-size: 50px; background: rgba(255,255,255,0.2); border-radius: 10px; padding: 5px; display: inline-block; line-height: 1; margin-bottom: 5px;}
         #seta-dist { font-size: 24px; font-weight: bold; }
         
@@ -68,7 +67,6 @@
         .btn-check { background: #28a745; }
         .btn-fail { background: #dc3545; }
 
-        /* Lista Multicheck para Combo a Pé */
         #combo-checklist-container { display: none; text-align: left; background: #111; border: 1px solid #007AFF; padding: 15px; border-radius: 10px; margin-bottom: 10px; max-height: 160px; overflow-y: auto; }
         .combo-check-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed #222; }
         .combo-check-item:last-child { border-bottom: none; }
@@ -92,7 +90,8 @@
         .rel-destaque { color: #FFCC00 !important; }
         .rel-full { grid-column: span 2; }
         
-        .btn-menu-acao { flex: 1; padding: 8px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
+        /* Botões do Menu Lateral (Forçar Baixa) */
+        .btn-menu-acao { flex: 1; padding: 10px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 13px; }
         .btn-menu-check { background: #28a745; color: #fff; }
         .btn-menu-fail { background: #dc3545; color: #fff; }
 
@@ -109,6 +108,7 @@
 </head>
 <body>
 
+    <!-- 1. TELA INICIAL -->
     <div id="controles-iniciais">
         <img src="ninjaspx.png" alt="SPX Ninja Logo" class="logo-ninja-img" onerror="this.style.display='none'">
         <label class="btn-ini" id="btnLabel">
@@ -131,6 +131,7 @@
         </div>
     </div>
 
+    <!-- 2. TELA DE DESENHO MANUAL -->
     <div id="modal-desenho-manual" class="modal-fullscreen" style="padding:0;">
         <div id="painel-topo-desenho" style="background:#222; padding:15px; border-bottom:1px solid #444; z-index:3500;">
             <h2 style="margin:0; font-size:18px;">✏️ MAPEAR TRAJETO MANUAL</h2>
@@ -159,6 +160,7 @@
         </div>
     </div>
 
+    <!-- 3. MODO DOCA -->
     <div id="modal-doca" class="modal-fullscreen">
         <h2>📦 MODO DOCA - SEPARAÇÃO MANUAL</h2>
         <p style="color:#aaa; font-size:13px; margin-top:-15px; margin-bottom:20px;">Organize o porta-malas na sequência exata que você desenhou.</p>
@@ -166,6 +168,7 @@
         <button class="btn-modo btn-otimizada" style="margin-top:10px; margin-bottom:40px;" onclick="iniciarGPSPosDoca()">INICIAR VIAGEM DE CARRO 🚀</button>
     </div>
 
+    <!-- 4. NAVEGAÇÃO -->
     <div id="tela-navegacao">
         <div id="radar-alert">📸 RADAR à frente</div> 
         <div id="painel-topo">
@@ -186,20 +189,21 @@
         </div>
         <div id="painel-acoes">
             <div id="combo-checklist-container"></div>
-            
             <button class="btn-status btn-check" id="btn-confirmar-entrega" onclick="finalizarParadaAtual('concluido')">CONCLUÍDO (BAIXA)</button>
             <button class="btn-status btn-fail" id="btn-falhar-entrega" onclick="finalizarParadaAtual('pendente')">FALHA NA ENTREGA</button>
         </div>
     </div>
 
+    <!-- 5. MENU LATERAL (LISTA DE PARADAS COM AÇÕES) -->
     <div id="modal-menu-stops" class="modal-fullscreen" style="z-index: 4000;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 15px;">
-            <h2 style="margin: 0;">📋 SEQUÊNCIAS DO EXPEDIENTE</h2>
+            <h2 style="margin: 0;">📋 LISTA DE PARADAS</h2>
             <button onclick="fecharMenuStops()" style="background:#dc3545; color:white; border:none; padding:10px 15px; border-radius:8px; font-weight:bold;">FECHAR</button>
         </div>
         <div id="conteudo-lista-stops" style="padding-bottom: 30px;"></div>
     </div>
 
+    <!-- 6. RELATÓRIO -->
     <div id="modal-relatorio" class="modal-fullscreen" style="z-index: 5000;">
         <h2>🏆 EXPEDIENTE FINALIZADO!</h2>
         <p>Ótimo trabalho, Ninja! Veja abaixo os resultados táticos da sua rota desenhada:</p>
@@ -215,8 +219,8 @@
         <button class="btn-modo btn-otimizada" style="margin-top: 30px;" onclick="limparERecarregar()">CARREGAR NOVA PLANILHA</button>
     </div>
 
+    <!-- SCRIPT DO MOTOR (DESENHO + GPS) -->
     <script>
-        // Variáveis globais do sistema
         let planilhaStopsData = []; 
         let marcadoresDesenho = [];
         let marcadoresGps = [];
@@ -231,14 +235,12 @@
         let mudouDeLugar = false;
         let houveCapturaNesteCiclo = false;
 
-        // Mapas e Camadas Vetoriais
         let mapDesenho, mapGps;
         let linhaDedoDesenho, rotaRealDesenho;
         let trilhaMestreGps, rotaRealGps;
         let markerUserGps, markerDestGps;
         let camadaFundoGps = L.layerGroup();
 
-        // Variáveis de Controle de Navegação e Métricas
         let idxDestino = 0, idxPasso = 0;
         let minhaLat, minhaLon, ultimaLatReq, ultimaLonReq;
         let passosNavegacao = [], distAnteriorCurva = Infinity;
@@ -319,7 +321,7 @@
             } catch(e) {}
         }
 
-        // ====== 1. LEITURA E PROCESSAMENTO DA PLANILHA SHOPEE ======
+        // ====== 1. LEITURA PLANILHA ======
         document.getElementById('fileInput').addEventListener('change', function(e) {
             document.getElementById('btnLabel').style.display = 'none';
             document.getElementById('faq-box').style.display = 'none';
@@ -404,7 +406,7 @@
             reader.readAsBinaryString(e.target.files[0]);
         });
 
-        // ====== 2. SISTEMA VANGUARDA DE DESENHO MANUAL E VAGAS ======
+        // ====== 2. DESENHO MANUAL ======
         function montarMapaDesenho() {
             if (!mapDesenho) {
                 mapDesenho = L.map('mapa-desenho', { zoomControl: false }).setView([-23.615, -46.575], 14);
@@ -414,11 +416,7 @@
             }
 
             marcadoresDesenho.forEach(m => mapDesenho.removeLayer(m));
-            marcadoresDesenho = [];
-            sequenciaSelecionada = [];
-            historicoDeRoteamento = [[]];
-            vagasCriadas = [];
-            vagaCount = 0;
+            marcadoresDesenho = []; sequenciaSelecionada = []; historicoDeRoteamento = [[]]; vagasCriadas = []; vagaCount = 0;
 
             let bounds = [];
             planilhaStopsData.forEach(p => {
@@ -427,12 +425,9 @@
                     .bindTooltip(p.stop, { permanent: true, direction: 'top', className: 'stop-label', offset: [0, -5] })
                     .addTo(mapDesenho);
                 
-                marker.spxId = p.stop;
-                marker.spxLatLng = L.latLng(p.lat, p.lon);
-                marker.corOriginal = cor;
-                marker.isGrouped = false;
-                marcadoresDesenho.push(marker);
-                bounds.push([p.lat, p.lon]);
+                marker.spxId = p.stop; marker.spxLatLng = L.latLng(p.lat, p.lon);
+                marker.corOriginal = cor; marker.isGrouped = false;
+                marcadoresDesenho.push(marker); bounds.push([p.lat, p.lon]);
             });
 
             mapDesenho.fitBounds(bounds, { padding: [30, 30] });
@@ -500,7 +495,7 @@
         }
 
         function encaixarVagaNoAsfalto(latlng) {
-            document.getElementById('status-texto-desenho').innerText = "⏳ Magnetizando vaga na guia da rua...";
+            document.getElementById('status-texto-desenho').innerText = "⏳ Magnetizando vaga na rua...";
             fetch(`https://router.project-osrm.org/nearest/v1/driving/${latlng.lng},${latlng.lat}`)
                 .then(r => r.json()).then(data => {
                     let rLatLng = latlng;
@@ -591,12 +586,11 @@
             montarEstruturaModoDoca();
         }
 
-        // ====== 3. MODO DOCA EMBUTIDO E ADAPTADO PARA AS VAGAS ======
+        // ====== 3. MODO DOCA ======
         function montarEstruturaModoDoca() {
             let container = document.getElementById('lista-bags'); container.innerHTML = '';
             let html = '', bagNum = 1, globalIndex = 1;
             
-            // Resolvemos a lista expandida completa que o motorista escolheu mapear
             let listaCompletaDoca = [];
             sequenciaSelecionada.forEach(id => {
                 if (id.startsWith("Vaga")) {
@@ -644,9 +638,9 @@
             container.innerHTML = html;
         }
 
-        // ====== 4. INTERFACE FINAL DO GPS E DUAL-LINE PARADIGM ======
+        // ====== 4. GPS E NAVEGAÇÃO ======
         function iniciarGPSPosDoca() {
-            initAudio(); requestWakeLock();
+            initAudio(); requestWakeLock(); // Trava a tela ativa (Evita que o celular apague)
             document.getElementById('modal-doca').style.display = 'none';
             document.getElementById('tela-navegacao').style.display = 'flex';
             horaInicioExpediente = new Date();
@@ -656,15 +650,12 @@
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(mapGps);
                 camadaFundoGps.addTo(mapGps);
                 
-                // Trilha Mestre Fixa (Roxo Tracejado)
                 trilhaMestreGps = L.polyline([], { color: '#8844aa', weight: 5, opacity: 0.7, dashArray: '8, 8' }).addTo(mapGps);
-                // Rota Real Dinâmica de Carro (Azul Viva)
                 rotaRealGps = L.polyline([], { color: '#007AFF', weight: 6, opacity: 0.9 }).addTo(mapGps);
             }
 
             camadaFundoGps.clearLayers();
             
-            // Plotar os pinos na tela de viagem respeitando se viraram vaga ou não
             sequenciaSelecionada.forEach(id => {
                 if (id.startsWith("Vaga")) {
                     let v = vagasCriadas.find(x => x.marker.spxId === id);
@@ -698,9 +689,7 @@
                 }).join(';');
                 let res = await fetch(`https://router.project-osrm.org/route/v1/driving/${urlCoords}?overview=full&geometries=geojson`);
                 let data = await res.json();
-                if (data.routes?.length > 0) {
-                    trilhaMestreGps.setLatLngs(data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]));
-                }
+                if (data.routes?.length > 0) trilhaMestreGps.setLatLngs(data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]));
             } catch(e){}
         }
 
@@ -708,32 +697,21 @@
             navigator.geolocation.watchPosition(async pos => {
                 minhaLat = pos.coords.latitude; minhaLon = pos.coords.longitude;
                 
-                if (pos.coords.speed && pos.coords.speed > 2 && pos.coords.heading !== null) {
-                    headingCarro = Math.round(pos.coords.heading);
-                } else if (latAntGps !== null && lonAntGps !== null) {
-                    if (dist(latAntGps, lonAntGps, minhaLat, minhaLon) > 5) {
-                        headingCarro = Math.round((Math.atan2(minhaLon - lonAntGps, minhaLat - latAntGps) * 180 / Math.PI + 360) % 360);
-                    }
+                if (pos.coords.speed && pos.coords.speed > 2 && pos.coords.heading !== null) headingCarro = Math.round(pos.coords.heading);
+                else if (latAntGps !== null && lonAntGps !== null) {
+                    if (dist(latAntGps, lonAntGps, minhaLat, minhaLon) > 5) headingCarro = Math.round((Math.atan2(minhaLon - lonAntGps, minhaLat - latAntGps) * 180 / Math.PI + 360) % 360);
                 }
                 latAntGps = minhaLat; lonAntGps = minhaLon;
 
-                if (!markerUserGps) {
-                    markerUserGps = L.circleMarker([minhaLat, minhaLon], { color: '#007AFF', fillOpacity: 1, radius: 8, zIndexOffset: 1000 }).addTo(mapGps);
-                } else {
-                    markerUserGps.setLatLng([minhaLat, minhaLon]);
-                }
+                if (!markerUserGps) markerUserGps = L.circleMarker([minhaLat, minhaLon], { color: '#007AFF', fillOpacity: 1, radius: 8, zIndexOffset: 1000 }).addTo(mapGps);
+                else markerUserGps.setLatLng([minhaLat, minhaLon]);
 
-                // Radar Alerta
                 if (listaRadares.length > 0) {
                     let radarProx = null, mDist = Infinity;
-                    listaRadares.forEach(r => {
-                        let dR = dist(minhaLat, minhaLon, r.lat, r.lon);
-                        if (dR <= 75 && dR < mDist) { mDist = dR; radarProx = r; }
-                    });
+                    listaRadares.forEach(r => { let dR = dist(minhaLat, minhaLon, r.lat, r.lon); if (dR <= 75 && dR < mDist) { mDist = dR; radarProx = r; } });
                     let domAlert = document.getElementById('radar-alert');
-                    if (radarProx) {
-                        if (radarAtivo !== radarProx) { radarAtivo = radarProx; playBipeRadar(); domAlert.innerHTML = `📸 RADAR ${radarProx.speed ? radarProx.speed+'km/h':''}`; domAlert.style.display = 'flex'; }
-                    } else { radarAtivo = null; domAlert.style.display = 'none'; }
+                    if (radarProx) { if (radarAtivo !== radarProx) { radarAtivo = radarProx; playBipeRadar(); domAlert.innerHTML = `📸 RADAR ${radarProx.speed ? radarProx.speed+'km/h':''}`; domAlert.style.display = 'flex'; } } 
+                    else { radarAtivo = null; domAlert.style.display = 'none'; }
                 }
 
                 const desviouDoTrilhoRequest = ultimaLatReq && dist(minhaLat, minhaLon, ultimaLatReq, ultimaLonReq) > 30;
@@ -756,7 +734,7 @@
             if (idAlvo.startsWith("Vaga")) {
                 let v = vagasCriadas.find(x => x.marker.spxId === idAlvo);
                 tLat = v.marker.getLatLng().lat; tLon = v.marker.getLatLng().lng;
-                labelBadge = `${idAlvo} (Combo a Pé)`;
+                labelBadge = `${idAlvo} (A Pé)`;
                 isComercial = v.sugados.some(m => planilhaStopsData.find(p=>p.stop===m.spxId).comercial);
                 totalVol = v.sugados.reduce((acc, m) => acc + planilhaStopsData.find(p=>p.stop===m.spxId).pacotes, 0);
                 txtEnderecos = v.sugados.map(m => {
@@ -786,7 +764,7 @@
                     const r = data.routes[0];
                     passosNavegacao = r.legs[0].steps.map(s => ({ lat: s.maneuver.location[1], lon: s.maneuver.location[0], manobra: s.maneuver.modifier || s.maneuver.type || "", rua: s.name || "Frente" }));
                     idxPasso = 0; distAnteriorCurva = Infinity;
-                    rotaRealGps.setLatLngs(r.geometry.coordinates.map(c => [c[1], c[0]])); // Desenha a linha dinâmica viva azul por cima da roxa
+                    rotaRealGps.setLatLngs(r.geometry.coordinates.map(c => [c[1], c[0]])); 
                 }
             } catch(e){}
         }
@@ -801,18 +779,18 @@
             document.getElementById('rodape-rua').innerText = "PREVISÃO DE CHEGADA";
             document.getElementById('rodape-dist').innerText = Math.ceil((dFinal/5.5)/60) + " min";
 
-            // Chegada na Parada (Raio de 30 metros atingido)
+            // Gatilho de Aproximação (30 metros)
             if (dFinal < 30) {
-                aguardandoConfirmacao = true; releaseWakeLock();
+                aguardandoConfirmacao = true; releaseWakeLock(); // Pausa o WakeLock ao chegar para economizar bateria enquanto o cara tá na rua a pé
                 document.getElementById('painel-rodape').style.display = 'none';
                 document.getElementById('seta-flutuante').style.display = 'none';
                 document.getElementById('painel-topo').classList.add('modo-confirmacao');
+                document.getElementById('painel-acoes').style.display = 'flex'; // Exibe Botões de Baixa
                 
                 let containerCheck = document.getElementById('combo-checklist-container');
                 containerCheck.innerHTML = '';
                 
                 if (idAlvo.startsWith("Vaga")) {
-                    // Ativa o checklist obrigatório do Combo a Pé antes de liberar o botão de Baixa
                     containerCheck.style.display = 'block';
                     document.getElementById('btn-confirmar-entrega').style.display = 'none';
                     document.getElementById('btn-falhar-entrega').style.display = 'none';
@@ -836,7 +814,6 @@
                 if (navigator.vibrate) navigator.vibrate([200, 100, 200]); return;
             }
 
-            // Tratamento das Setas Azuis de Curva Flutuante
             if (passosNavegacao.length > 0) {
                 const pAtual = passosNavegacao[idxPasso]; if (!pAtual) return;
                 const dC = dist(minhaLat, minhaLon, pAtual.lat, pAtual.lon);
@@ -890,11 +867,12 @@
                 historicoParadas.push({ stop: p.stop, hora: agora, ms: tempoGasto, extra: p.extra, status: status });
             }
 
-            aguardandoConfirmacao = false; requestWakeLock();
+            aguardandoConfirmacao = false; requestWakeLock(); // Reativa WakeLock após apertar Concluído para dirigir ao próximo alvo
             document.getElementById('painel-rodape').style.display = 'block';
             document.getElementById('seta-flutuante').style.display = 'block';
             document.getElementById('painel-topo').classList.remove('modo-confirmacao');
             document.getElementById('combo-checklist-container').style.display = 'none';
+            document.getElementById('painel-acoes').style.display = 'none';
 
             idxDestino++;
             passosNavegacao = [];
@@ -919,7 +897,7 @@
             let txtRapida = rapida ? `${Math.floor(rapida.ms/60000)}m ${Math.floor((rapida.ms%60000)/1000)}s (Stop ${rapida.stop})` : '--';
 
             document.getElementById('rel-total').innerText = Math.floor(totalMs/3600000) + "h " + Math.floor((totalMs%3600000)/60000) + "m";
-            document.getElementById('rel-ritmo').innerText = ritmo + " pacotes/h";
+            document.getElementById('rel-ritmo').innerText = ritmo + " vol/h";
             document.getElementById('rel-sucesso').innerText = taxa + "%";
             document.getElementById('rel-raiox').innerText = `${planilhaStopsData.length} Stops | ${totalVols} Vol`;
             document.getElementById('rel-rapida').innerText = txtRapida;
@@ -927,29 +905,60 @@
             document.getElementById('modal-relatorio').style.display = 'flex';
         }
 
-        // ====== 5. INTERFACE DO SIDEBAR MENU LIST ======
+        // ====== 5. MENU LATERAL ======
         function abrirMenuStops() {
             let html = '';
             sequenciaSelecionada.forEach((id, index) => {
                 let isAtivo = (index === idxDestino);
-                let corFundo = isAtivo ? '#003399' : (index % 2 === 0 ? '#1a1a1a' : '#0a0a0a');
+                // Zebra de 10 em 10 (Separando por Bags visualmente)
+                let corZebrada = Math.floor(index / 10) % 2 === 0 ? '#1a1a1a' : '#0a0a0a';
+                let corFundo = isAtivo ? '#003399' : corZebrada;
                 let borda = isAtivo ? 'border: 2px solid #39FF14;' : 'border: 1px solid #222;';
 
                 if (id.startsWith("Vaga")) {
                     let v = vagasCriadas.find(x => x.marker.spxId === id);
                     let sugadosText = v.sugados.map(m => m.spxId).join(', ');
+                    
+                    let pExemplo = planilhaStopsData.find(x => x.stop === v.sugados[0].spxId);
+                    let statusIcon = pExemplo.status === 'concluido' ? '✅' : (pExemplo.status === 'pendente' ? '❌' : (isAtivo ? '📍' : '🚙'));
+                    let corTexto = pExemplo.status === 'concluido' ? '#888' : (pExemplo.status === 'pendente' ? '#ff6666' : '#fff');
+
+                    let botoesAcao = '';
+                    if (pExemplo.status === 'neutro') {
+                        botoesAcao = `
+                            <div style="margin-top:12px; display:flex; gap:10px;">
+                                <button onclick="forcarBaixaMenuManual(event, ${index}, 'concluido')" class="btn-menu-acao btn-menu-check">✅ ENTREGUE (TODOS)</button>
+                                <button onclick="forcarBaixaMenuManual(event, ${index}, 'pendente')" class="btn-menu-acao btn-menu-fail">❌ FALHA</button>
+                            </div>
+                        `;
+                    }
+
                     html += `
-                    <div style="background:${corFundo}; ${borda} border-radius:10px; padding:15px; margin-bottom:10px; text-align:left;">
-                        <div style="font-size:16px; font-weight:bold; color:#007AFF;">🚙 #${index+1} ➔ ${id}</div>
-                        <div style="font-size:12px; color:#aaa; margin-top:3px;">Combo a pé contendo Stops: ${sugadosText}</div>
+                    <div style="background:${corFundo}; ${borda} border-radius:10px; padding:15px; margin-bottom:10px; text-align:left; color:${corTexto}; cursor:pointer;" onclick="pularParaParadaManual(${index})">
+                        <div style="font-size:16px; font-weight:bold; color:${isAtivo ? '#fff' : '#007AFF'};">${statusIcon} <span style="color:#FFCC00;">#${index+1}</span> ➔ ${id}</div>
+                        <div style="font-size:12px; opacity:0.8; margin-top:3px;">Combo a pé contendo Stops: ${sugadosText}</div>
+                        ${botoesAcao}
                     </div>`;
                 } else {
                     let p = planilhaStopsData.find(x => x.stop === id);
                     let statusIcon = p.status === 'concluido' ? '✅' : (p.status === 'pendente' ? '❌' : (isAtivo ? '📍' : '📦'));
+                    let corTexto = p.status === 'concluido' ? '#888' : (p.status === 'pendente' ? '#ff6666' : '#fff');
+                    
+                    let botoesAcao = '';
+                    if (p.status === 'neutro') {
+                        botoesAcao = `
+                            <div style="margin-top:12px; display:flex; gap:10px;">
+                                <button onclick="forcarBaixaMenuManual(event, ${index}, 'concluido')" class="btn-menu-acao btn-menu-check">✅ ENTREGUE</button>
+                                <button onclick="forcarBaixaMenuManual(event, ${index}, 'pendente')" class="btn-menu-acao btn-menu-fail">❌ FALHA</button>
+                            </div>
+                        `;
+                    }
+
                     html += `
-                    <div style="background:${corFundo}; ${borda} border-radius:10px; padding:15px; margin-bottom:10px; text-align:left; cursor:pointer;" onclick="pularParaParadaManual(${index})">
+                    <div style="background:${corFundo}; ${borda} border-radius:10px; padding:15px; margin-bottom:10px; text-align:left; color:${corTexto}; cursor:pointer;" onclick="pularParaParadaManual(${index})">
                         <div style="font-size:16px; font-weight:bold;">${statusIcon} <span style="color:#FFCC00;">#${index+1}</span> ➔ Stop ${p.stop}</div>
-                        <div style="font-size:12px; color:#aaa; margin-top:3px;">${p.ruaPadrao}</div>
+                        <div style="font-size:12px; opacity:0.8; margin-top:3px;">${p.ruaPadrao}</div>
+                        ${botoesAcao}
                     </div>`;
                 }
             });
@@ -958,6 +967,57 @@
         }
 
         function fecharMenuStops() { document.getElementById('modal-menu-stops').style.display = 'none'; }
+
+        function forcarBaixaMenuManual(e, index, status) {
+            e.stopPropagation(); // Evita que clique no botão dispare o pularParaParadaManual
+            
+            let idAlvo = sequenciaSelecionada[index];
+            let agora = new Date();
+            let tempoGasto = historicoParadas.length === 0 ? (agora - horaInicioExpediente) : (agora - historicoParadas[historicoParadas.length - 1].hora);
+
+            if (idAlvo.startsWith("Vaga")) {
+                let v = vagasCriadas.find(x => x.marker.spxId === idAlvo);
+                v.sugados.forEach(m => {
+                    let p = planilhaStopsData.find(x => x.stop === m.spxId); 
+                    p.status = status;
+                    historicoParadas.push({ stop: p.stop, hora: agora, ms: Math.round(tempoGasto / v.sugados.length), extra: p.extra, status: status });
+                });
+            } else {
+                let p = planilhaStopsData.find(x => x.stop === idAlvo); 
+                p.status = status;
+                if(p.gpsMarker) p.gpsMarker.setStyle({ fillColor: status === 'concluido' ? '#888' : '#ff0000', weight: 2 });
+                historicoParadas.push({ stop: p.stop, hora: agora, ms: tempoGasto, extra: p.extra, status: status });
+            }
+
+            abrirMenuStops(); // Atualiza as cores e icones do menu na hora
+
+            // Se forçou baixa da parada que estava ativa no mapa, pula o GPS
+            if (index === idxDestino) {
+                aguardandoConfirmacao = false; 
+                requestWakeLock();
+                document.getElementById('painel-rodape').style.display = 'block';
+                document.getElementById('seta-flutuante').style.display = 'block';
+                document.getElementById('painel-topo').classList.remove('modo-confirmacao');
+                document.getElementById('combo-checklist-container').style.display = 'none';
+                document.getElementById('painel-acoes').style.display = 'none';
+                
+                idxDestino++;
+                passosNavegacao = [];
+                
+                if (idxDestino < sequenciaSelecionada.length) recalcularRotaGpsTaticaProximoAlvo();
+                else avaliarConclusaoExpedienteTotal();
+            } else {
+                // Checa se o cara forçou baixa em tudo pelo menu (fim do expediente)
+                let tudoFinalizado = sequenciaSelecionada.every(id => {
+                    if (id.startsWith("Vaga")) {
+                         let v = vagasCriadas.find(x => x.marker.spxId === id);
+                         return v.sugados.every(m => planilhaStopsData.find(p => p.stop === m.spxId).status !== 'neutro');
+                    }
+                    return planilhaStopsData.find(x => x.stop === id).status !== 'neutro';
+                });
+                if (tudoFinalizado) avaliarConclusaoExpedienteTotal();
+            }
+        }
 
         function pularParaParadaManual(index) {
             fecharMenuStops(); idxDestino = index; passosNavegacao = []; aguardandoConfirmacao = false;
