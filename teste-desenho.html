@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Teste - Rota Manual (Vagas Inteligentes)</title>
+    <title>Teste - Rota Manual (Toque Inteligente)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -49,7 +49,7 @@
 
     <div id="painel-topo">
         <h2>Teste de Rota Manual</h2>
-        <p id="instrucao">Carregue a planilha. Dica: <b>Segure o dedo 1s</b> na tela para criar uma vaga direto na rua.</p>
+        <p id="instrucao">Carregue a planilha. Dica: <b>Um toque rápido</b> na rua abre a opção de criar Vaga.</p>
         
         <label class="btn-file" id="btn-carregar">
             📦 CARREGAR PLANILHA SHOPEE
@@ -82,15 +82,19 @@
         let marcadores = [];
         let modoDesenho = false;
         let desenhando = false;
-        let pressTimer; 
         let vagaCount = 0;
         
+        // Variáveis para diferenciar Toque de Arrasto
+        let startX = 0, startY = 0;
+        let mudouDeLugar = false;
+        let houveCapturaNesteCiclo = false;
+
         let linhaDedo = L.polyline([], { color: '#FFCC00', weight: 5, opacity: 0.8, dashArray: '10, 10' }).addTo(map);
         let rotaReal = L.polyline([], { color: '#007AFF', weight: 6, opacity: 0.9 }).addTo(map);
         
         let sequenciaSelecionada = [];
         let historicoDeRoteamento = [[]]; 
-        let vagasCriadas = []; // Histórico das vagas para permitir o "Desfazer Vaga"
+        let vagasCriadas = []; 
         
         const camadaVidro = document.getElementById('camada-desenho');
 
@@ -161,7 +165,7 @@
 
                     map.fitBounds(boundsCoords, { padding: [30, 30] });
 
-                    document.getElementById('instrucao').innerText = "Toque nos pinos ou segure 1s na tela para criar uma Vaga numerada na rua.";
+                    document.getElementById('instrucao').innerText = "Arraste para ligar os pinos, ou dê um toque na rua vazia para criar uma Vaga.";
                     document.getElementById('btn-toggle').style.display = 'inline-block';
 
                 } catch (err) {
@@ -179,7 +183,7 @@
 
             if (modoDesenho) {
                 btn.innerHTML = "❌ DESATIVAR MODO DESENHO";
-                btn.classList.add('active');
+                btn.classList.add('ativo');
                 camadaVidro.style.display = 'block'; 
             } else {
                 btn.innerHTML = "✏️ ATIVAR MODO DESENHO";
@@ -199,7 +203,6 @@
         function projetarECriarVaga(latlng) {
             document.getElementById('status-texto').innerText = "⏳ Alinhando vaga com a rua mais próxima...";
             
-            // Consulta o motor de rotas para achar o asfalto mais perto do clique
             fetch(`https://router.project-osrm.org/nearest/v1/driving/${latlng.lng},${latlng.lat}`)
                 .then(res => res.json())
                 .then(data => {
@@ -207,7 +210,7 @@
                     
                     if (data.code === 'Ok' && data.waypoints && data.waypoints.length > 0) {
                         let loc = data.waypoints[0].location;
-                        snappedLatLng = L.latLng(loc[1], loc[0]); // Posição real da rua
+                        snappedLatLng = L.latLng(loc[1], loc[0]); 
                     }
 
                     vagaCount++;
@@ -234,7 +237,6 @@
 
                     // Agrupa pacotes num raio de 70 metros
                     marcadores.forEach(m => {
-                        // Não suga outras vagas e nem pontos já comprometidos
                         if (m !== markerVaga && !m.isGrouped && !sequenciaSelecionada.includes(m.spxId) && !m.spxId.startsWith("Vaga")) {
                             let dist = map.distance(snappedLatLng, m.spxLatLng);
                             if (dist <= 70) {
@@ -251,7 +253,7 @@
 
                     vagasCriadas.push(novaVagaObj);
                     document.getElementById('btn-desfazer-vaga').style.display = 'inline-block';
-                    document.getElementById('status-texto').innerText = "✅ " + vId + " fixada no asfalto com sucesso!";
+                    document.getElementById('status-texto').innerText = "✅ " + vId + " fixada no asfalto!";
 
                     if(navigator.vibrate) navigator.vibrate([100, 50, 100]);
                     atualizarTelaERota();
@@ -267,17 +269,12 @@
             if (vagasCriadas.length > 0) {
                 let ultimaVaga = vagasCriadas.pop();
                 
-                // Remove o pino azul do mapa e do array
                 map.removeLayer(ultimaVaga.marker);
                 marcadores = marcadores.filter(m => m !== ultimaVaga.marker);
-                
-                // Se a vaga já estava inclusa na rota, limpa ela
                 sequenciaSelecionada = sequenciaSelecionada.filter(id => id !== ultimaVaga.marker.spxId);
                 
-                // Apaga as cordinhas tracejadas
                 ultimaVaga.linhasConectoras.forEach(l => map.removeLayer(l));
                 
-                // Devolve os clientes para o estado original livre
                 ultimaVaga.clientesSugados.forEach(m => {
                     m.isGrouped = false;
                     m.setStyle({ fillColor: m.corOriginal, color: '#fff', weight: 2, dashArray: '' });
@@ -288,45 +285,56 @@
                     document.getElementById('btn-desfazer-vaga').style.display = 'none';
                 }
 
-                document.getElementById('status-texto').innerText = "↩️ Última Vaga desfeita com sucesso.";
+                document.getElementById('status-texto').innerText = "🚙 Última Vaga desfeita com sucesso.";
                 atualizarTelaERota();
             }
         }
 
-        // Função de captura super precisa (Raio Cirúrgico de 10m)
+        // Função de captura super precisa (Raio Cirúrgico de 12m)
         function verificarCaptura(latlng) {
+            let capturouAlgo = false;
             marcadores.forEach(m => {
                 if (!sequenciaSelecionada.includes(m.spxId) && !m.isGrouped) {
                     let distanciaMetros = map.distance(latlng, m.spxLatLng);
-                    if (distanciaMetros < 10) {
+                    if (distanciaMetros < 12) {
                         sequenciaSelecionada.push(m.spxId); 
                         m.setStyle({ fillColor: '#39FF14', color: '#000', weight: 3 }); 
                         document.getElementById('ordem-selecionada').innerText = sequenciaSelecionada.join(" ➔ ");
+                        capturouAlgo = true;
+                        houveCapturaNesteCiclo = true; // Avisa o sistema que não foi um clique no vazio
                     }
                 }
             });
+            return capturouAlgo;
         }
 
-        // ====== EVENTOS DO TOQUE ======
+        // ====== EVENTOS DO TOQUE INTELIGENTE (FIM DO LAG!) ======
         camadaVidro.addEventListener('pointerdown', function(e) {
             desenhando = true;
-            linhaDedo.setLatLngs([]); 
+            mudouDeLugar = false;
+            houveCapturaNesteCiclo = false;
+            
+            startX = e.clientX;
+            startY = e.clientY;
             
             let latlng = getLatLngFromEvent(e);
+            linhaDedo.setLatLngs([]); 
             linhaDedo.addLatLng(latlng);
+            
             verificarCaptura(latlng);
-
-            // Temporizador de 1 segundo para virar Toque Longo e criar a Vaga
-            pressTimer = setTimeout(() => {
-                desenhando = false; 
-                linhaDedo.setLatLngs([]);
-                projetarECriarVaga(latlng);
-            }, 1000);
         });
 
         camadaVidro.addEventListener('pointermove', function(e) {
             if (!desenhando) return;
-            clearTimeout(pressTimer); // Se arrastou o dedo, cancela a criação de vaga
+
+            let currentX = e.clientX;
+            let currentY = e.clientY;
+            let distPixels = Math.sqrt((currentX - startX)**2 + (currentY - startY)**2);
+            
+            // Se mover o dedo mais de 8 pixels na tela, assume que é um desenho/arrasto
+            if (distPixels > 8) {
+                mudouDeLugar = true;
+            }
 
             let latlng = getLatLngFromEvent(e);
             linhaDedo.addLatLng(latlng);
@@ -334,11 +342,23 @@
         });
 
         camadaVidro.addEventListener('pointerup', async function(e) {
-            clearTimeout(pressTimer); 
-            if(!desenhando) return; 
+            if (!desenhando) return;
             desenhando = false;
             linhaDedo.setLatLngs([]); 
             
+            let latlng = getLatLngFromEvent(e);
+
+            // [MÁGICA DO TOQUE] Se foi apenas um clique rápido sem arrastar e sem pegar pino existente
+            if (!mudouDeLugar && !houveCapturaNesteCiclo) {
+                let proximaVaga = vagaCount + 1;
+                // Abre o prompt nativo pedindo confirmação
+                if (confirm(`Deseja criar a "Vaga ${proximaVaga}" neste ponto da rua?`)) {
+                    projetarECriarVaga(latlng);
+                    return; // Interrompe para não rodar a lógica de histórico à toa
+                }
+            }
+
+            // Lógica normal de salvar o risco no histórico se a rota aumentou de tamanho
             let ultimaSalva = historicoDeRoteamento[historicoDeRoteamento.length - 1];
             if (sequenciaSelecionada.length > ultimaSalva.length) {
                 historicoDeRoteamento.push([...sequenciaSelecionada]);
@@ -346,8 +366,8 @@
             atualizarTelaERota();
         });
 
-        camadaVidro.addEventListener('pointercancel', () => { desenhando = false; clearTimeout(pressTimer); });
-        camadaVidro.addEventListener('pointerout', () => { desenhando = false; clearTimeout(pressTimer); });
+        camadaVidro.addEventListener('pointercancel', () => desenhando = false);
+        camadaVidro.addEventListener('pointerout', () => desenhando = false);
 
         // ====== BOTÃO DESFAZER RISCO ======
         function desfazerUltimoRisco() {
