@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Teste - Rota Manual (Multi-toques + Desfazer)</title>
+    <title>Teste - Rota Manual (Combo a Pé)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -12,14 +12,14 @@
     <style>
         body { margin: 0; padding: 0; font-family: sans-serif; background-color: #111; color: #fff; display: flex; flex-direction: column; height: 100vh; overflow: hidden; touch-action: none;}
         
-        #painel-topo { background: #222; padding: 20px; text-align: center; border-bottom: 2px solid #444; z-index: 1000; position: relative; }
-        h2 { margin: 0 0 10px 0; color: #FFCC00; font-size: 20px;}
-        p { margin: 0 0 15px 0; font-size: 14px; color: #aaa; }
+        #painel-topo { background: #222; padding: 15px; text-align: center; border-bottom: 2px solid #444; z-index: 1000; position: relative; }
+        h2 { margin: 0 0 5px 0; color: #FFCC00; font-size: 18px;}
+        p { margin: 0 0 10px 0; font-size: 12px; color: #aaa; }
         
-        .btn-file { background: #39FF14; color: #000; padding: 12px 20px; border-radius: 8px; font-weight: bold; font-size: 16px; cursor: pointer; display: inline-block; margin-bottom: 10px; width: 90%; max-width: 300px;}
+        .btn-file { background: #39FF14; color: #000; padding: 10px 20px; border-radius: 8px; font-weight: bold; font-size: 14px; cursor: pointer; display: inline-block; margin-bottom: 5px; width: 90%; max-width: 300px;}
         input[type="file"] { display: none; }
 
-        .btn-desenho { background: #FF8C00; color: #000; padding: 12px 20px; border: none; border-radius: 8px; font-weight: bold; font-size: 16px; cursor: pointer; transition: 0.3s; width: 90%; max-width: 300px; display: none; margin: 0 auto;}
+        .btn-desenho { background: #FF8C00; color: #000; padding: 10px 20px; border: none; border-radius: 8px; font-weight: bold; font-size: 14px; cursor: pointer; transition: 0.3s; width: 90%; max-width: 300px; display: none; margin: 0 auto;}
         .btn-desenho.ativo { background: #dc3545; color: #fff; }
         
         #map-container { flex: 1; position: relative; width: 100%; height: 100%; }
@@ -34,11 +34,12 @@
         #status-texto { font-size: 12px; color: #aaa; }
         
         #btn-desfazer { display: none; background: #ff4444; color: #fff; border: none; padding: 6px 12px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 12px; }
-        #btn-desfazer:active { background: #cc0000; }
 
-        #ordem-selecionada { font-size: 18px; color: #39FF14; font-weight: bold; letter-spacing: 2px; word-wrap: break-word; line-height: 1.5; text-align: center;}
+        #ordem-selecionada { font-size: 16px; color: #39FF14; font-weight: bold; letter-spacing: 1px; word-wrap: break-word; line-height: 1.5; text-align: center;}
         
         .stop-label { background: rgba(0,0,0,0.8); color: #fff; border: 1px solid #777; font-weight: bold; padding: 2px 4px; border-radius: 3px; font-size: 12px; }
+        .vaga-label { background: #007AFF; color: #fff; border: 1px solid #fff; font-weight: bold; padding: 2px 4px; border-radius: 3px; font-size: 12px; }
+        
         .leaflet-tile-container { filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%); }
     </style>
 </head>
@@ -46,7 +47,7 @@
 
     <div id="painel-topo">
         <h2>Teste de Rota Manual</h2>
-        <p id="instrucao">Carregue uma planilha real para plotar os pontos no mapa.</p>
+        <p id="instrucao">Carregue a planilha. Dica: <b>Segure o dedo</b> no mapa para criar uma Vaga.</p>
         
         <label class="btn-file" id="btn-carregar">
             📦 CARREGAR PLANILHA SHOPEE
@@ -63,7 +64,7 @@
 
     <div id="painel-resultado">
         <div class="header-resultado">
-            <div id="status-texto">Ordem capturada pelo laço:</div>
+            <div id="status-texto">Ordem capturada:</div>
             <button id="btn-desfazer" onclick="desfazerUltimoRisco()">↩️ DESFAZER</button>
         </div>
         <div id="ordem-selecionada">Nenhuma parada selecionada.</div>
@@ -76,14 +77,14 @@
         let marcadores = [];
         let modoDesenho = false;
         let desenhando = false;
+        let pressTimer; // Timer para o toque longo (criar vaga)
+        let vagaCount = 0;
         
-        // Linhas de navegação
         let linhaDedo = L.polyline([], { color: '#FFCC00', weight: 5, opacity: 0.8, dashArray: '10, 10' }).addTo(map);
         let rotaReal = L.polyline([], { color: '#007AFF', weight: 6, opacity: 0.9 }).addTo(map);
         
-        // Memória da rota
         let sequenciaSelecionada = [];
-        let historicoDeRoteamento = [[]]; // Guarda cada etapa para permitir o "Desfazer"
+        let historicoDeRoteamento = [[]]; 
         
         const camadaVidro = document.getElementById('camada-desenho');
 
@@ -138,7 +139,7 @@
                         let cor = p.id.startsWith("E") ? '#FF8C00' : '#555'; 
                         
                         let marker = L.circleMarker([p.lat, p.lon], { 
-                            radius: 7, color: '#fff', fillColor: cor, fillOpacity: 1, weight: 2 
+                            radius: 8, color: '#fff', fillColor: cor, fillOpacity: 1, weight: 2 
                         })
                         .bindTooltip(p.id, { permanent: true, direction: 'top', className: 'stop-label', offset: [0, -5] })
                         .addTo(map);
@@ -146,6 +147,7 @@
                         marker.spxId = p.id;
                         marker.spxLatLng = L.latLng(p.lat, p.lon);
                         marker.corOriginal = cor;
+                        marker.isGrouped = false; // Flag para saber se virou Combo a Pé
                         
                         marcadores.push(marker);
                         boundsCoords.push([p.lat, p.lon]);
@@ -153,7 +155,7 @@
 
                     map.fitBounds(boundsCoords, { padding: [30, 30] });
 
-                    document.getElementById('instrucao').innerText = "Risque a tela para ligar os pontos. Faça por partes se preferir.";
+                    document.getElementById('instrucao').innerText = "Toque nos pinos ou segure o dedo 1 segundo para criar uma Vaga (Combo a pé).";
                     document.getElementById('btn-toggle').style.display = 'inline-block';
 
                 } catch (err) {
@@ -164,8 +166,7 @@
             reader.readAsBinaryString(e.target.files[0]);
         });
 
-
-        // ====== LÓGICA DE DETECÇÃO DE DESENHO (MÚLTIPLOS TOQUES) ======
+        // ====== CONTROLE DE DESENHO ======
         function toggleModoDesenho() {
             const btn = document.getElementById('btn-toggle');
             modoDesenho = !modoDesenho;
@@ -188,105 +189,154 @@
             return map.containerPointToLatLng([x, y]);
         }
 
-        // 1. Ao encostar o dedo
-        camadaVidro.addEventListener('pointerdown', function(e) {
-            desenhando = true;
-            linhaDedo.setLatLngs([]); // Limpa só a linha amarela, MANTÉM a sequência!
-            linhaDedo.addLatLng(getLatLngFromEvent(e));
-        });
+        // ====== CRIAR VAGA DE ESTACIONAMENTO ======
+        function criarVaga(latlng) {
+            vagaCount++;
+            let vId = "V" + vagaCount;
+            
+            // Plota o pino da vaga em Azul Escuro
+            let markerVaga = L.circleMarker(latlng, { 
+                radius: 10, color: '#fff', fillColor: '#007AFF', fillOpacity: 1, weight: 3 
+            })
+            .bindTooltip("VAGA", { permanent: true, direction: 'top', className: 'vaga-label', offset: [0, -5] })
+            .addTo(map);
 
-        // 2. Ao arrastar o dedo
-        camadaVidro.addEventListener('pointermove', function(e) {
-            if (!desenhando) return;
+            markerVaga.spxId = vId;
+            markerVaga.spxLatLng = latlng;
+            markerVaga.corOriginal = '#007AFF';
+            markerVaga.isGrouped = false; 
+            
+            marcadores.push(markerVaga);
 
-            let latlng = getLatLngFromEvent(e);
-            linhaDedo.addLatLng(latlng);
-
-            // Captura magnética de novos pontos
+            // Suga os pacotes num raio de 70 metros
             marcadores.forEach(m => {
-                if (!sequenciaSelecionada.includes(m.spxId)) {
+                // Se não for a própria vaga, não estiver selecionado e não estiver agrupado ainda
+                if (m !== markerVaga && !m.isGrouped && !sequenciaSelecionada.includes(m.spxId)) {
+                    let dist = map.distance(latlng, m.spxLatLng);
+                    if (dist <= 70) {
+                        m.isGrouped = true; // Bloqueia esse pino, ele virou "A pé"
+                        m.setStyle({ fillColor: '#007AFF', color: '#333', weight: 1, dashArray: '2, 2' });
+                        // Desenha uma cordinha azul ligando o pacote à Vaga
+                        L.polyline([latlng, m.spxLatLng], {color: '#007AFF', weight: 2, dashArray: '4, 4', opacity: 0.6}).addTo(map);
+                    }
+                }
+            });
+
+            if(navigator.vibrate) navigator.vibrate([100, 50, 100]); // Vibra para confirmar
+        }
+
+        // Função de captura super rigorosa (Apenas 10 metros ou exatidão)
+        function verificarCaptura(latlng) {
+            marcadores.forEach(m => {
+                // Só captura se NÃO estiver agrupado numa vaga
+                if (!sequenciaSelecionada.includes(m.spxId) && !m.isGrouped) {
                     let distanciaMetros = map.distance(latlng, m.spxLatLng);
-                    if (distanciaMetros < 60) {
-                        sequenciaSelecionada.push(m.spxId); // Adiciona na memória contínua
+                    
+                    if (distanciaMetros < 10) {
+                        sequenciaSelecionada.push(m.spxId); 
                         m.setStyle({ fillColor: '#39FF14', color: '#000', weight: 3 }); 
                         document.getElementById('ordem-selecionada').innerText = sequenciaSelecionada.join(" ➔ ");
                     }
                 }
             });
+        }
+
+        // ====== EVENTOS DE TOQUE ======
+        camadaVidro.addEventListener('pointerdown', function(e) {
+            desenhando = true;
+            linhaDedo.setLatLngs([]); 
+            
+            let latlng = getLatLngFromEvent(e);
+            linhaDedo.addLatLng(latlng);
+            
+            verificarCaptura(latlng);
+
+            // Inicia o timer do toque longo para criar a Vaga (800 milissegundos)
+            pressTimer = setTimeout(() => {
+                desenhando = false; // Cancela o risco
+                linhaDedo.setLatLngs([]);
+                criarVaga(latlng);
+            }, 800);
         });
 
-        // 3. Ao soltar o dedo
+        camadaVidro.addEventListener('pointermove', function(e) {
+            if (!desenhando) return;
+
+            // Se o dedo se mover, cancela a criação da Vaga
+            clearTimeout(pressTimer); 
+
+            let latlng = getLatLngFromEvent(e);
+            linhaDedo.addLatLng(latlng);
+
+            verificarCaptura(latlng);
+        });
+
         camadaVidro.addEventListener('pointerup', async function(e) {
-            desenhando = false;
-            linhaDedo.setLatLngs([]); // O rascunho some
+            clearTimeout(pressTimer); // Limpa o timer para não criar vaga acidental
             
-            // Verifica se a sequência aumentou neste último risco
+            if(!desenhando) return; // Se criou a vaga, ignora o pointerup
+            desenhando = false;
+            linhaDedo.setLatLngs([]); 
+            
             let ultimaSalva = historicoDeRoteamento[historicoDeRoteamento.length - 1];
             if (sequenciaSelecionada.length > ultimaSalva.length) {
-                // Se pegou pontos novos, guarda o estado no histórico para poder Desfazer
                 historicoDeRoteamento.push([...sequenciaSelecionada]);
             }
 
-            // Exibe botão Desfazer se tiver o que desfazer
             if (historicoDeRoteamento.length > 1) {
                 document.getElementById('btn-desfazer').style.display = 'inline-block';
             }
 
-            // Atualiza UI e Asfalto
             atualizarTelaERota();
         });
 
-        camadaVidro.addEventListener('pointercancel', () => desenhando = false);
-        camadaVidro.addEventListener('pointerout', () => desenhando = false);
+        camadaVidro.addEventListener('pointercancel', () => { desenhando = false; clearTimeout(pressTimer); });
+        camadaVidro.addEventListener('pointerout', () => { desenhando = false; clearTimeout(pressTimer); });
 
-
-        // ====== LÓGICA DO BOTÃO DESFAZER ======
+        // ====== BOTÃO DESFAZER ======
         function desfazerUltimoRisco() {
             if (historicoDeRoteamento.length > 1) {
-                // Remove a última ação errada da máquina do tempo
                 historicoDeRoteamento.pop(); 
-                
-                // Restaura a sequência para o estado anterior exato
                 sequenciaSelecionada = [...historicoDeRoteamento[historicoDeRoteamento.length - 1]];
                 
-                // Pinta todos os marcadores com a cor original primeiro
-                marcadores.forEach(m => m.setStyle({ fillColor: m.corOriginal, color: '#fff', weight: 2 }));
+                // Limpa todos os marcadores normais e vagas
+                marcadores.forEach(m => {
+                    if(!m.isGrouped) { // Se não for um ponto agrupado
+                        m.setStyle({ fillColor: m.corOriginal, color: '#fff', weight: 2 });
+                    }
+                });
                 
-                // Pinta de verde só os que continuam na seleção validada
+                // Repinta os que continuam selecionados
                 marcadores.forEach(m => {
                     if (sequenciaSelecionada.includes(m.spxId)) {
                         m.setStyle({ fillColor: '#39FF14', color: '#000', weight: 3 });
                     }
                 });
 
-                // Esconde o botão se voltou à estaca zero
                 if (historicoDeRoteamento.length <= 1) {
                     document.getElementById('btn-desfazer').style.display = 'none';
                 }
 
-                // Dispara o recálculo do visual e do asfalto
                 atualizarTelaERota();
             }
         }
 
-
-        // ====== ATUALIZAÇÃO VISUAL E DE ASFALTO (OSRM) ======
+        // ====== TRANSFORMA EM ASFALTO ======
         async function atualizarTelaERota() {
             if (sequenciaSelecionada.length === 0) {
                 document.getElementById('ordem-selecionada').innerText = "Nenhuma parada capturada.";
-                document.getElementById('status-texto').innerText = "Ordem capturada pelo laço:";
+                document.getElementById('status-texto').innerText = "Ordem capturada:";
                 rotaReal.setLatLngs([]);
             } 
             else if (sequenciaSelecionada.length === 1) {
-                document.getElementById('ordem-selecionada').innerHTML = "<b>" + sequenciaSelecionada[0] + "</b> (Continue riscando para ligar ao próximo)";
-                document.getElementById('status-texto').innerText = "Ordem capturada pelo laço:";
+                document.getElementById('ordem-selecionada').innerHTML = "<b>" + sequenciaSelecionada[0] + "</b> (Toque no próximo)";
+                document.getElementById('status-texto').innerText = "Ordem capturada:";
                 rotaReal.setLatLngs([]);
             } 
             else {
                 document.getElementById('status-texto').innerText = "⏳ Convertendo traço em asfalto...";
                 
                 try {
-                    // Pega as coordenadas na ordem exata da seleção
                     let coordsURL = sequenciaSelecionada.map(id => {
                         let m = marcadores.find(x => x.spxId === id);
                         return m.spxLatLng.lng + ',' + m.spxLatLng.lat;
@@ -298,13 +348,13 @@
 
                     if (data.routes && data.routes[0]) {
                         let latLngsReais = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
-                        rotaReal.setLatLngs(latLngsReais); // Desenha asfalto azul
+                        rotaReal.setLatLngs(latLngsReais); 
                         
                         document.getElementById('status-texto').innerText = "✅ Rota Manual Confirmada:";
                         document.getElementById('ordem-selecionada').innerText = sequenciaSelecionada.join(" ➔ ");
                     }
                 } catch (err) {
-                    document.getElementById('status-texto').innerText = "⚠️ Sem internet para calcular asfalto. Ordem salva:";
+                    document.getElementById('status-texto').innerText = "⚠️ Sem internet. Ordem salva:";
                     document.getElementById('ordem-selecionada').innerText = sequenciaSelecionada.join(" ➔ ");
                 }
             }
