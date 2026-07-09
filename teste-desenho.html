@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Teste - Rota Manual (Com Asfalto)</title>
+    <title>Teste - Rota Manual (Multi-toques + Desfazer)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -28,10 +28,17 @@
         /* A CAMADA DE VIDRO PARA O DEDO NO CELULAR */
         #camada-desenho { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2000; display: none; cursor: crosshair; touch-action: none; }
         
-        #painel-resultado { background: #000; padding: 15px; border-top: 2px solid #39FF14; text-align: center; min-height: 80px; max-height: 150px; overflow-y: auto;}
-        #ordem-selecionada { font-size: 18px; color: #39FF14; font-weight: bold; letter-spacing: 2px; word-wrap: break-word; line-height: 1.5;}
-        .stop-label { background: rgba(0,0,0,0.8); color: #fff; border: 1px solid #777; font-weight: bold; padding: 2px 4px; border-radius: 3px; font-size: 12px; }
+        #painel-resultado { background: #000; padding: 15px; border-top: 2px solid #39FF14; display: flex; flex-direction: column; min-height: 80px; max-height: 150px; overflow-y: auto;}
         
+        .header-resultado { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        #status-texto { font-size: 12px; color: #aaa; }
+        
+        #btn-desfazer { display: none; background: #ff4444; color: #fff; border: none; padding: 6px 12px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 12px; }
+        #btn-desfazer:active { background: #cc0000; }
+
+        #ordem-selecionada { font-size: 18px; color: #39FF14; font-weight: bold; letter-spacing: 2px; word-wrap: break-word; line-height: 1.5; text-align: center;}
+        
+        .stop-label { background: rgba(0,0,0,0.8); color: #fff; border: 1px solid #777; font-weight: bold; padding: 2px 4px; border-radius: 3px; font-size: 12px; }
         .leaflet-tile-container { filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%); }
     </style>
 </head>
@@ -55,7 +62,10 @@
     </div>
 
     <div id="painel-resultado">
-        <div style="font-size:12px; color:#aaa; margin-bottom: 5px;" id="status-texto">Ordem capturada pelo laço:</div>
+        <div class="header-resultado">
+            <div id="status-texto">Ordem capturada pelo laço:</div>
+            <button id="btn-desfazer" onclick="desfazerUltimoRisco()">↩️ DESFAZER</button>
+        </div>
         <div id="ordem-selecionada">Nenhuma parada selecionada.</div>
     </div>
 
@@ -67,12 +77,14 @@
         let modoDesenho = false;
         let desenhando = false;
         
-        // Linha amarela do dedo (Rascunho)
+        // Linhas de navegação
         let linhaDedo = L.polyline([], { color: '#FFCC00', weight: 5, opacity: 0.8, dashArray: '10, 10' }).addTo(map);
-        // Linha azul (Asfalto Real)
         let rotaReal = L.polyline([], { color: '#007AFF', weight: 6, opacity: 0.9 }).addTo(map);
         
+        // Memória da rota
         let sequenciaSelecionada = [];
+        let historicoDeRoteamento = [[]]; // Guarda cada etapa para permitir o "Desfazer"
+        
         const camadaVidro = document.getElementById('camada-desenho');
 
         // ====== LEITURA DA PLANILHA ======
@@ -141,7 +153,7 @@
 
                     map.fitBounds(boundsCoords, { padding: [30, 30] });
 
-                    document.getElementById('instrucao').innerText = "Risque a tela ligando os pontos. Ao soltar, calculamos a rua.";
+                    document.getElementById('instrucao').innerText = "Risque a tela para ligar os pontos. Faça por partes se preferir.";
                     document.getElementById('btn-toggle').style.display = 'inline-block';
 
                 } catch (err) {
@@ -153,7 +165,7 @@
         });
 
 
-        // ====== LÓGICA DE DETECÇÃO COM CAMADA DE VIDRO (CELULAR PERFECT) ======
+        // ====== LÓGICA DE DETECÇÃO DE DESENHO (MÚLTIPLOS TOQUES) ======
         function toggleModoDesenho() {
             const btn = document.getElementById('btn-toggle');
             modoDesenho = !modoDesenho;
@@ -161,15 +173,14 @@
             if (modoDesenho) {
                 btn.innerHTML = "❌ DESATIVAR MODO DESENHO";
                 btn.classList.add('ativo');
-                camadaVidro.style.display = 'block'; // Ativa o vidro protetor para o dedo
+                camadaVidro.style.display = 'block'; 
             } else {
                 btn.innerHTML = "✏️ ATIVAR MODO DESENHO";
                 btn.classList.remove('ativo');
-                camadaVidro.style.display = 'none'; // Desativa o vidro
+                camadaVidro.style.display = 'none'; 
             }
         }
 
-        // Função para converter posição da tela para coordenada no mapa
         function getLatLngFromEvent(e) {
             const rect = camadaVidro.getBoundingClientRect();
             const x = (e.clientX || e.touches[0].clientX) - rect.left;
@@ -177,29 +188,26 @@
             return map.containerPointToLatLng([x, y]);
         }
 
+        // 1. Ao encostar o dedo
         camadaVidro.addEventListener('pointerdown', function(e) {
             desenhando = true;
-            linhaDedo.setLatLngs([]);
-            rotaReal.setLatLngs([]);
-            sequenciaSelecionada = [];
-            document.getElementById('ordem-selecionada').innerText = "Riscando...";
-            document.getElementById('status-texto').innerText = "Capturando pontos pelo laço...";
-            
-            marcadores.forEach(m => m.setStyle({ fillColor: m.corOriginal, color: '#fff', weight: 2 }));
+            linhaDedo.setLatLngs([]); // Limpa só a linha amarela, MANTÉM a sequência!
             linhaDedo.addLatLng(getLatLngFromEvent(e));
         });
 
+        // 2. Ao arrastar o dedo
         camadaVidro.addEventListener('pointermove', function(e) {
             if (!desenhando) return;
 
             let latlng = getLatLngFromEvent(e);
             linhaDedo.addLatLng(latlng);
 
+            // Captura magnética de novos pontos
             marcadores.forEach(m => {
                 if (!sequenciaSelecionada.includes(m.spxId)) {
                     let distanciaMetros = map.distance(latlng, m.spxLatLng);
                     if (distanciaMetros < 60) {
-                        sequenciaSelecionada.push(m.spxId);
+                        sequenciaSelecionada.push(m.spxId); // Adiciona na memória contínua
                         m.setStyle({ fillColor: '#39FF14', color: '#000', weight: 3 }); 
                         document.getElementById('ordem-selecionada').innerText = sequenciaSelecionada.join(" ➔ ");
                     }
@@ -207,49 +215,98 @@
             });
         });
 
+        // 3. Ao soltar o dedo
         camadaVidro.addEventListener('pointerup', async function(e) {
             desenhando = false;
+            linhaDedo.setLatLngs([]); // O rascunho some
             
-            if (sequenciaSelecionada.length === 0) {
-                document.getElementById('ordem-selecionada').innerText = "Nenhuma parada capturada. Tente novamente.";
-            } else if (sequenciaSelecionada.length === 1) {
-                document.getElementById('ordem-selecionada').innerHTML = "<b>" + sequenciaSelecionada[0] + "</b> (Selecione mais de um para criar rota)";
-            } else {
-                document.getElementById('status-texto').innerText = "⏳ Convertendo traço em asfalto...";
-                await calcularRotaReal();
+            // Verifica se a sequência aumentou neste último risco
+            let ultimaSalva = historicoDeRoteamento[historicoDeRoteamento.length - 1];
+            if (sequenciaSelecionada.length > ultimaSalva.length) {
+                // Se pegou pontos novos, guarda o estado no histórico para poder Desfazer
+                historicoDeRoteamento.push([...sequenciaSelecionada]);
             }
+
+            // Exibe botão Desfazer se tiver o que desfazer
+            if (historicoDeRoteamento.length > 1) {
+                document.getElementById('btn-desfazer').style.display = 'inline-block';
+            }
+
+            // Atualiza UI e Asfalto
+            atualizarTelaERota();
         });
 
         camadaVidro.addEventListener('pointercancel', () => desenhando = false);
         camadaVidro.addEventListener('pointerout', () => desenhando = false);
 
-        // ====== TRANSFORMA O LAÇO EM ROTA REAL (OSRM) ======
-        async function calcularRotaReal() {
-            try {
-                // Coleta as coordenadas exatas da sequência selecionada
-                let coordsURL = sequenciaSelecionada.map(id => {
-                    let m = marcadores.find(x => x.spxId === id);
-                    return m.spxLatLng.lng + ',' + m.spxLatLng.lat;
-                }).join(';');
 
-                // Consulta a rota real nas ruas
-                let url = `https://router.project-osrm.org/route/v1/driving/${coordsURL}?overview=full&geometries=geojson`;
-                let res = await fetch(url);
-                let data = await res.json();
+        // ====== LÓGICA DO BOTÃO DESFAZER ======
+        function desfazerUltimoRisco() {
+            if (historicoDeRoteamento.length > 1) {
+                // Remove a última ação errada da máquina do tempo
+                historicoDeRoteamento.pop(); 
+                
+                // Restaura a sequência para o estado anterior exato
+                sequenciaSelecionada = [...historicoDeRoteamento[historicoDeRoteamento.length - 1]];
+                
+                // Pinta todos os marcadores com a cor original primeiro
+                marcadores.forEach(m => m.setStyle({ fillColor: m.corOriginal, color: '#fff', weight: 2 }));
+                
+                // Pinta de verde só os que continuam na seleção validada
+                marcadores.forEach(m => {
+                    if (sequenciaSelecionada.includes(m.spxId)) {
+                        m.setStyle({ fillColor: '#39FF14', color: '#000', weight: 3 });
+                    }
+                });
 
-                if (data.routes && data.routes[0]) {
-                    // Limpa o rascunho amarelo e plota a rota azul definitiva
-                    linhaDedo.setLatLngs([]); 
-                    let latLngsReais = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
-                    rotaReal.setLatLngs(latLngsReais);
-                    
-                    document.getElementById('status-texto').innerText = "✅ Rota Manual Confirmada:";
-                } else {
-                    document.getElementById('status-texto').innerText = "⚠️ Erro ao calcular asfalto. Mostrando apenas ordem:";
+                // Esconde o botão se voltou à estaca zero
+                if (historicoDeRoteamento.length <= 1) {
+                    document.getElementById('btn-desfazer').style.display = 'none';
                 }
-            } catch (err) {
-                console.log(err);
-                document.getElementById('status-texto').innerText = "⚠️ Sem internet para calcular asfalto. Ordem salva:";
+
+                // Dispara o recálculo do visual e do asfalto
+                atualizarTelaERota();
+            }
+        }
+
+
+        // ====== ATUALIZAÇÃO VISUAL E DE ASFALTO (OSRM) ======
+        async function atualizarTelaERota() {
+            if (sequenciaSelecionada.length === 0) {
+                document.getElementById('ordem-selecionada').innerText = "Nenhuma parada capturada.";
+                document.getElementById('status-texto').innerText = "Ordem capturada pelo laço:";
+                rotaReal.setLatLngs([]);
+            } 
+            else if (sequenciaSelecionada.length === 1) {
+                document.getElementById('ordem-selecionada').innerHTML = "<b>" + sequenciaSelecionada[0] + "</b> (Continue riscando para ligar ao próximo)";
+                document.getElementById('status-texto').innerText = "Ordem capturada pelo laço:";
+                rotaReal.setLatLngs([]);
+            } 
+            else {
+                document.getElementById('status-texto').innerText = "⏳ Convertendo traço em asfalto...";
+                
+                try {
+                    // Pega as coordenadas na ordem exata da seleção
+                    let coordsURL = sequenciaSelecionada.map(id => {
+                        let m = marcadores.find(x => x.spxId === id);
+                        return m.spxLatLng.lng + ',' + m.spxLatLng.lat;
+                    }).join(';');
+
+                    let url = `https://router.project-osrm.org/route/v1/driving/${coordsURL}?overview=full&geometries=geojson`;
+                    let res = await fetch(url);
+                    let data = await res.json();
+
+                    if (data.routes && data.routes[0]) {
+                        let latLngsReais = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+                        rotaReal.setLatLngs(latLngsReais); // Desenha asfalto azul
+                        
+                        document.getElementById('status-texto').innerText = "✅ Rota Manual Confirmada:";
+                        document.getElementById('ordem-selecionada').innerText = sequenciaSelecionada.join(" ➔ ");
+                    }
+                } catch (err) {
+                    document.getElementById('status-texto').innerText = "⚠️ Sem internet para calcular asfalto. Ordem salva:";
+                    document.getElementById('ordem-selecionada').innerText = sequenciaSelecionada.join(" ➔ ");
+                }
             }
         }
     </script>
