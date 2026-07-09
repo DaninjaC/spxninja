@@ -40,7 +40,7 @@
 
         /* Interface de Navegação */
         #tela-navegacao { display: none; flex-direction: column; height: 100vh; width: 100%; position: relative;}
-        #painel-topo { background: #003399; padding: 15px; text-align: center; z-index: 1001; max-height: 35vh; overflow-y: auto; border-bottom: 2px solid #000; position: relative;}
+        #painel-topo { background: #003399; padding: 15px; text-align: center; z-index: 1001; max-height: 40vh; overflow-y: auto; border-bottom: 2px solid #000; position: relative;}
         .modo-confirmacao { background: #FFCC00 !important; }
         #stop-badge { background: #000; color: #39FF14; padding: 5px 20px; border-radius: 20px; font-weight: bold; font-size: 18px; margin-bottom: 10px; display: inline-block; border: 2px solid #39FF14; }
         .endereco-item { font-size: 16px; color: #39FF14; font-weight: bold; text-transform: uppercase; margin-bottom: 10px; text-align: left; line-height: 1.4;}
@@ -90,7 +90,7 @@
         .rel-destaque { color: #FFCC00 !important; }
         .rel-full { grid-column: span 2; }
         
-        /* Botões do Menu Lateral (Forçar Baixa) */
+        /* Botões do Menu Lateral */
         .btn-menu-acao { flex: 1; padding: 10px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 13px; }
         .btn-menu-check { background: #28a745; color: #fff; }
         .btn-menu-fail { background: #dc3545; color: #fff; }
@@ -640,7 +640,7 @@
 
         // ====== 4. GPS E NAVEGAÇÃO ======
         function iniciarGPSPosDoca() {
-            initAudio(); requestWakeLock(); // Trava a tela ativa (Evita que o celular apague)
+            initAudio(); requestWakeLock(); // Trava a tela ativa
             document.getElementById('modal-doca').style.display = 'none';
             document.getElementById('tela-navegacao').style.display = 'flex';
             horaInicioExpediente = new Date();
@@ -737,10 +737,27 @@
                 labelBadge = `${idAlvo} (A Pé)`;
                 isComercial = v.sugados.some(m => planilhaStopsData.find(p=>p.stop===m.spxId).comercial);
                 totalVol = v.sugados.reduce((acc, m) => acc + planilhaStopsData.find(p=>p.stop===m.spxId).pacotes, 0);
+                
+                // MUDANÇA: Criar os mini-cards completos para a Vaga
                 txtEnderecos = v.sugados.map(m => {
                     let p = planilhaStopsData.find(x=>x.stop===m.spxId);
-                    return `<div style="font-size:13px; color:#007AFF; margin-bottom:4px;">🚶 STOP ${p.stop} ➔ ${p.ruaPadrao}</div>`;
+                    let volColor = getCorVolume(p.pacotes);
+                    let volPill = `<span style="background:${volColor.bg}; color:${volColor.color}; padding:2px 6px; border-radius:10px; font-size:12px; margin-left:5px;">${p.pacotes} vol</span>`;
+                    
+                    // Formata os endereços pegando o padrão verde e a caixinha amarela para números
+                    let endsFormatados = p.enderecos.map(end => {
+                        return `<div class="endereco-item" style="font-size: 14px; margin-bottom: 3px;">${end.toUpperCase().replace(/(\d+)/, '<span class="num-box">$1</span>')}</div>`;
+                    }).join('');
+
+                    return `
+                    <div style="background: rgba(0,0,0,0.4); border-left: 4px solid #39FF14; padding: 8px; margin-bottom: 8px; border-radius: 5px; text-align: left;">
+                        <div style="font-size: 15px; color: #fff; font-weight: bold; margin-bottom: 5px;">
+                            🚶 STOP ${p.stop} ${volPill}
+                        </div>
+                        ${endsFormatados}
+                    </div>`;
                 }).join('');
+
             } else {
                 let p = planilhaStopsData.find(x => x.stop === idAlvo);
                 tLat = p.lat; tLon = p.lon;
@@ -781,11 +798,11 @@
 
             // Gatilho de Aproximação (30 metros)
             if (dFinal < 30) {
-                aguardandoConfirmacao = true; releaseWakeLock(); // Pausa o WakeLock ao chegar para economizar bateria enquanto o cara tá na rua a pé
+                aguardandoConfirmacao = true; releaseWakeLock(); // Pausa o WakeLock ao chegar
                 document.getElementById('painel-rodape').style.display = 'none';
                 document.getElementById('seta-flutuante').style.display = 'none';
                 document.getElementById('painel-topo').classList.add('modo-confirmacao');
-                document.getElementById('painel-acoes').style.display = 'flex'; // Exibe Botões de Baixa
+                document.getElementById('painel-acoes').style.display = 'flex'; 
                 
                 let containerCheck = document.getElementById('combo-checklist-container');
                 containerCheck.innerHTML = '';
@@ -867,7 +884,7 @@
                 historicoParadas.push({ stop: p.stop, hora: agora, ms: tempoGasto, extra: p.extra, status: status });
             }
 
-            aguardandoConfirmacao = false; requestWakeLock(); // Reativa WakeLock após apertar Concluído para dirigir ao próximo alvo
+            aguardandoConfirmacao = false; requestWakeLock(); // Reativa WakeLock após apertar Concluído
             document.getElementById('painel-rodape').style.display = 'block';
             document.getElementById('seta-flutuante').style.display = 'block';
             document.getElementById('painel-topo').classList.remove('modo-confirmacao');
@@ -969,7 +986,7 @@
         function fecharMenuStops() { document.getElementById('modal-menu-stops').style.display = 'none'; }
 
         function forcarBaixaMenuManual(e, index, status) {
-            e.stopPropagation(); // Evita que clique no botão dispare o pularParaParadaManual
+            e.stopPropagation(); 
             
             let idAlvo = sequenciaSelecionada[index];
             let agora = new Date();
@@ -989,9 +1006,8 @@
                 historicoParadas.push({ stop: p.stop, hora: agora, ms: tempoGasto, extra: p.extra, status: status });
             }
 
-            abrirMenuStops(); // Atualiza as cores e icones do menu na hora
+            abrirMenuStops(); 
 
-            // Se forçou baixa da parada que estava ativa no mapa, pula o GPS
             if (index === idxDestino) {
                 aguardandoConfirmacao = false; 
                 requestWakeLock();
@@ -1007,7 +1023,6 @@
                 if (idxDestino < sequenciaSelecionada.length) recalcularRotaGpsTaticaProximoAlvo();
                 else avaliarConclusaoExpedienteTotal();
             } else {
-                // Checa se o cara forçou baixa em tudo pelo menu (fim do expediente)
                 let tudoFinalizado = sequenciaSelecionada.every(id => {
                     if (id.startsWith("Vaga")) {
                          let v = vagasCriadas.find(x => x.marker.spxId === id);
