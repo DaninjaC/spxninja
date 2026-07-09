@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Teste - Rota Manual (Combo a Pé)</title>
+    <title>Teste - Rota Manual (Vagas Inteligentes)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -25,7 +25,6 @@
         #map-container { flex: 1; position: relative; width: 100%; height: 100%; }
         #map { width: 100%; height: 100%; background: #000; }
         
-        /* A CAMADA DE VIDRO PARA O DEDO NO CELULAR */
         #camada-desenho { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2000; display: none; cursor: crosshair; touch-action: none; }
         
         #painel-resultado { background: #000; padding: 15px; border-top: 2px solid #39FF14; display: flex; flex-direction: column; min-height: 80px; max-height: 150px; overflow-y: auto;}
@@ -33,7 +32,10 @@
         .header-resultado { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
         #status-texto { font-size: 12px; color: #aaa; }
         
-        #btn-desfazer { display: none; background: #ff4444; color: #fff; border: none; padding: 6px 12px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 12px; }
+        .botoes-acao { display: flex; gap: 8px; }
+        .btn-action { color: #fff; border: none; padding: 6px 12px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 12px; }
+        #btn-desfazer-vaga { display: none; background: #007AFF; }
+        #btn-desfazer { background: #ff4444; }
 
         #ordem-selecionada { font-size: 16px; color: #39FF14; font-weight: bold; letter-spacing: 1px; word-wrap: break-word; line-height: 1.5; text-align: center;}
         
@@ -47,7 +49,7 @@
 
     <div id="painel-topo">
         <h2>Teste de Rota Manual</h2>
-        <p id="instrucao">Carregue a planilha. Dica: <b>Segure o dedo</b> no mapa para criar uma Vaga.</p>
+        <p id="instrucao">Carregue a planilha. Dica: <b>Segure o dedo 1s</b> na tela para criar uma vaga direto na rua.</p>
         
         <label class="btn-file" id="btn-carregar">
             📦 CARREGAR PLANILHA SHOPEE
@@ -65,7 +67,10 @@
     <div id="painel-resultado">
         <div class="header-resultado">
             <div id="status-texto">Ordem capturada:</div>
-            <button id="btn-desfazer" onclick="desfazerUltimoRisco()">↩️ DESFAZER</button>
+            <div class="botoes-acao">
+                <button id="btn-desfazer-vaga" class="btn-action" onclick="desfazerUltimaVaga()">🚙 DESFAZER VAGA</button>
+                <button id="btn-desfazer" class="btn-action" onclick="desfazerUltimoRisco()">✏️ DESFAZER RISCO</button>
+            </div>
         </div>
         <div id="ordem-selecionada">Nenhuma parada selecionada.</div>
     </div>
@@ -77,7 +82,7 @@
         let marcadores = [];
         let modoDesenho = false;
         let desenhando = false;
-        let pressTimer; // Timer para o toque longo (criar vaga)
+        let pressTimer; 
         let vagaCount = 0;
         
         let linhaDedo = L.polyline([], { color: '#FFCC00', weight: 5, opacity: 0.8, dashArray: '10, 10' }).addTo(map);
@@ -85,6 +90,7 @@
         
         let sequenciaSelecionada = [];
         let historicoDeRoteamento = [[]]; 
+        let vagasCriadas = []; // Histórico das vagas para permitir o "Desfazer Vaga"
         
         const camadaVidro = document.getElementById('camada-desenho');
 
@@ -147,7 +153,7 @@
                         marker.spxId = p.id;
                         marker.spxLatLng = L.latLng(p.lat, p.lon);
                         marker.corOriginal = cor;
-                        marker.isGrouped = false; // Flag para saber se virou Combo a Pé
+                        marker.isGrouped = false; 
                         
                         marcadores.push(marker);
                         boundsCoords.push([p.lat, p.lon]);
@@ -155,7 +161,7 @@
 
                     map.fitBounds(boundsCoords, { padding: [30, 30] });
 
-                    document.getElementById('instrucao').innerText = "Toque nos pinos ou segure o dedo 1 segundo para criar uma Vaga (Combo a pé).";
+                    document.getElementById('instrucao').innerText = "Toque nos pinos ou segure 1s na tela para criar uma Vaga numerada na rua.";
                     document.getElementById('btn-toggle').style.display = 'inline-block';
 
                 } catch (err) {
@@ -173,7 +179,7 @@
 
             if (modoDesenho) {
                 btn.innerHTML = "❌ DESATIVAR MODO DESENHO";
-                btn.classList.add('ativo');
+                btn.classList.add('active');
                 camadaVidro.style.display = 'block'; 
             } else {
                 btn.innerHTML = "✏️ ATIVAR MODO DESENHO";
@@ -189,49 +195,109 @@
             return map.containerPointToLatLng([x, y]);
         }
 
-        // ====== CRIAR VAGA DE ESTACIONAMENTO ======
-        function criarVaga(latlng) {
-            vagaCount++;
-            let vId = "V" + vagaCount;
+        // ====== CRIAR VAGA TRAVADA NA RUA (OSRM SNAP) ======
+        function projetarECriarVaga(latlng) {
+            document.getElementById('status-texto').innerText = "⏳ Alinhando vaga com a rua mais próxima...";
             
-            // Plota o pino da vaga em Azul Escuro
-            let markerVaga = L.circleMarker(latlng, { 
-                radius: 10, color: '#fff', fillColor: '#007AFF', fillOpacity: 1, weight: 3 
-            })
-            .bindTooltip("VAGA", { permanent: true, direction: 'top', className: 'vaga-label', offset: [0, -5] })
-            .addTo(map);
-
-            markerVaga.spxId = vId;
-            markerVaga.spxLatLng = latlng;
-            markerVaga.corOriginal = '#007AFF';
-            markerVaga.isGrouped = false; 
-            
-            marcadores.push(markerVaga);
-
-            // Suga os pacotes num raio de 70 metros
-            marcadores.forEach(m => {
-                // Se não for a própria vaga, não estiver selecionado e não estiver agrupado ainda
-                if (m !== markerVaga && !m.isGrouped && !sequenciaSelecionada.includes(m.spxId)) {
-                    let dist = map.distance(latlng, m.spxLatLng);
-                    if (dist <= 70) {
-                        m.isGrouped = true; // Bloqueia esse pino, ele virou "A pé"
-                        m.setStyle({ fillColor: '#007AFF', color: '#333', weight: 1, dashArray: '2, 2' });
-                        // Desenha uma cordinha azul ligando o pacote à Vaga
-                        L.polyline([latlng, m.spxLatLng], {color: '#007AFF', weight: 2, dashArray: '4, 4', opacity: 0.6}).addTo(map);
+            // Consulta o motor de rotas para achar o asfalto mais perto do clique
+            fetch(`https://router.project-osrm.org/nearest/v1/driving/${latlng.lng},${latlng.lat}`)
+                .then(res => res.json())
+                .then(data => {
+                    let snappedLatLng = latlng;
+                    
+                    if (data.code === 'Ok' && data.waypoints && data.waypoints.length > 0) {
+                        let loc = data.waypoints[0].location;
+                        snappedLatLng = L.latLng(loc[1], loc[0]); // Posição real da rua
                     }
-                }
-            });
 
-            if(navigator.vibrate) navigator.vibrate([100, 50, 100]); // Vibra para confirmar
+                    vagaCount++;
+                    let vId = "Vaga " + vagaCount;
+                    
+                    let markerVaga = L.circleMarker(snappedLatLng, { 
+                        radius: 10, color: '#fff', fillColor: '#007AFF', fillOpacity: 1, weight: 3 
+                    })
+                    .bindTooltip(vId, { permanent: true, direction: 'top', className: 'vaga-label', offset: [0, -5] })
+                    .addTo(map);
+
+                    markerVaga.spxId = vId;
+                    markerVaga.spxLatLng = snappedLatLng;
+                    markerVaga.corOriginal = '#007AFF';
+                    markerVaga.isGrouped = false; 
+                    
+                    marcadores.push(markerVaga);
+
+                    let novaVagaObj = {
+                        marker: markerVaga,
+                        linhasConectoras: [],
+                        clientesSugados: []
+                    };
+
+                    // Agrupa pacotes num raio de 70 metros
+                    marcadores.forEach(m => {
+                        // Não suga outras vagas e nem pontos já comprometidos
+                        if (m !== markerVaga && !m.isGrouped && !sequenciaSelecionada.includes(m.spxId) && !m.spxId.startsWith("Vaga")) {
+                            let dist = map.distance(snappedLatLng, m.spxLatLng);
+                            if (dist <= 70) {
+                                m.isGrouped = true; 
+                                m.setStyle({ fillColor: '#007AFF', color: '#333', weight: 1, dashArray: '2, 2' });
+                                
+                                let linha = L.polyline([snappedLatLng, m.spxLatLng], {color: '#007AFF', weight: 2, dashArray: '4, 4', opacity: 0.6}).addTo(map);
+                                
+                                novaVagaObj.linhasConectoras.push(linha);
+                                novaVagaObj.clientesSugados.push(m);
+                            }
+                        }
+                    });
+
+                    vagasCriadas.push(novaVagaObj);
+                    document.getElementById('btn-desfazer-vaga').style.display = 'inline-block';
+                    document.getElementById('status-texto').innerText = "✅ " + vId + " fixada no asfalto com sucesso!";
+
+                    if(navigator.vibrate) navigator.vibrate([100, 50, 100]);
+                    atualizarTelaERota();
+                })
+                .catch(err => {
+                    console.error(err);
+                    document.getElementById('status-texto').innerText = "⚠️ Erro ao validar rua. Vaga não criada.";
+                });
         }
 
-        // Função de captura super rigorosa (Apenas 10 metros ou exatidão)
+        // ====== REMOVER ÚLTIMA VAGA ======
+        function desfazerUltimaVaga() {
+            if (vagasCriadas.length > 0) {
+                let ultimaVaga = vagasCriadas.pop();
+                
+                // Remove o pino azul do mapa e do array
+                map.removeLayer(ultimaVaga.marker);
+                marcadores = marcadores.filter(m => m !== ultimaVaga.marker);
+                
+                // Se a vaga já estava inclusa na rota, limpa ela
+                sequenciaSelecionada = sequenciaSelecionada.filter(id => id !== ultimaVaga.marker.spxId);
+                
+                // Apaga as cordinhas tracejadas
+                ultimaVaga.linhasConectoras.forEach(l => map.removeLayer(l));
+                
+                // Devolve os clientes para o estado original livre
+                ultimaVaga.clientesSugados.forEach(m => {
+                    m.isGrouped = false;
+                    m.setStyle({ fillColor: m.corOriginal, color: '#fff', weight: 2, dashArray: '' });
+                });
+                
+                vagaCount--;
+                if (vagasCriadas.length === 0) {
+                    document.getElementById('btn-desfazer-vaga').style.display = 'none';
+                }
+
+                document.getElementById('status-texto').innerText = "↩️ Última Vaga desfeita com sucesso.";
+                atualizarTelaERota();
+            }
+        }
+
+        // Função de captura super precisa (Raio Cirúrgico de 10m)
         function verificarCaptura(latlng) {
             marcadores.forEach(m => {
-                // Só captura se NÃO estiver agrupado numa vaga
                 if (!sequenciaSelecionada.includes(m.spxId) && !m.isGrouped) {
                     let distanciaMetros = map.distance(latlng, m.spxLatLng);
-                    
                     if (distanciaMetros < 10) {
                         sequenciaSelecionada.push(m.spxId); 
                         m.setStyle({ fillColor: '#39FF14', color: '#000', weight: 3 }); 
@@ -241,40 +307,35 @@
             });
         }
 
-        // ====== EVENTOS DE TOQUE ======
+        // ====== EVENTOS DO TOQUE ======
         camadaVidro.addEventListener('pointerdown', function(e) {
             desenhando = true;
             linhaDedo.setLatLngs([]); 
             
             let latlng = getLatLngFromEvent(e);
             linhaDedo.addLatLng(latlng);
-            
             verificarCaptura(latlng);
 
-            // Inicia o timer do toque longo para criar a Vaga (800 milissegundos)
+            // Temporizador de 1 segundo para virar Toque Longo e criar a Vaga
             pressTimer = setTimeout(() => {
-                desenhando = false; // Cancela o risco
+                desenhando = false; 
                 linhaDedo.setLatLngs([]);
-                criarVaga(latlng);
-            }, 800);
+                projetarECriarVaga(latlng);
+            }, 1000);
         });
 
         camadaVidro.addEventListener('pointermove', function(e) {
             if (!desenhando) return;
-
-            // Se o dedo se mover, cancela a criação da Vaga
-            clearTimeout(pressTimer); 
+            clearTimeout(pressTimer); // Se arrastou o dedo, cancela a criação de vaga
 
             let latlng = getLatLngFromEvent(e);
             linhaDedo.addLatLng(latlng);
-
             verificarCaptura(latlng);
         });
 
         camadaVidro.addEventListener('pointerup', async function(e) {
-            clearTimeout(pressTimer); // Limpa o timer para não criar vaga acidental
-            
-            if(!desenhando) return; // Se criou a vaga, ignora o pointerup
+            clearTimeout(pressTimer); 
+            if(!desenhando) return; 
             desenhando = false;
             linhaDedo.setLatLngs([]); 
             
@@ -282,46 +343,34 @@
             if (sequenciaSelecionada.length > ultimaSalva.length) {
                 historicoDeRoteamento.push([...sequenciaSelecionada]);
             }
-
-            if (historicoDeRoteamento.length > 1) {
-                document.getElementById('btn-desfazer').style.display = 'inline-block';
-            }
-
             atualizarTelaERota();
         });
 
         camadaVidro.addEventListener('pointercancel', () => { desenhando = false; clearTimeout(pressTimer); });
         camadaVidro.addEventListener('pointerout', () => { desenhando = false; clearTimeout(pressTimer); });
 
-        // ====== BOTÃO DESFAZER ======
+        // ====== BOTÃO DESFAZER RISCO ======
         function desfazerUltimoRisco() {
             if (historicoDeRoteamento.length > 1) {
                 historicoDeRoteamento.pop(); 
                 sequenciaSelecionada = [...historicoDeRoteamento[historicoDeRoteamento.length - 1]];
                 
-                // Limpa todos os marcadores normais e vagas
                 marcadores.forEach(m => {
-                    if(!m.isGrouped) { // Se não for um ponto agrupado
+                    if(!m.isGrouped) { 
                         m.setStyle({ fillColor: m.corOriginal, color: '#fff', weight: 2 });
                     }
                 });
                 
-                // Repinta os que continuam selecionados
                 marcadores.forEach(m => {
                     if (sequenciaSelecionada.includes(m.spxId)) {
                         m.setStyle({ fillColor: '#39FF14', color: '#000', weight: 3 });
                     }
                 });
-
-                if (historicoDeRoteamento.length <= 1) {
-                    document.getElementById('btn-desfazer').style.display = 'none';
-                }
-
                 atualizarTelaERota();
             }
         }
 
-        // ====== TRANSFORMA EM ASFALTO ======
+        // ====== CONVERSÃO DE LINHA EM ASFALTO ======
         async function atualizarTelaERota() {
             if (sequenciaSelecionada.length === 0) {
                 document.getElementById('ordem-selecionada').innerText = "Nenhuma parada capturada.";
@@ -354,7 +403,7 @@
                         document.getElementById('ordem-selecionada').innerText = sequenciaSelecionada.join(" ➔ ");
                     }
                 } catch (err) {
-                    document.getElementById('status-texto').innerText = "⚠️ Sem internet. Ordem salva:";
+                    document.getElementById('status-texto').innerText = "⚠️ Sem internet. Ordem de paradas salva:";
                     document.getElementById('ordem-selecionada').innerText = sequenciaSelecionada.join(" ➔ ");
                 }
             }
