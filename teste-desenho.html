@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SPX Ninja - Rota Manual (Padrão Oficial)</title>
+    <title>SPX Ninja - Rota Manual Definitiva</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -12,16 +12,13 @@
     <style>
         body { background-color: #000; color: #fff; font-family: sans-serif; margin: 0; padding: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; touch-action: none; }
         
-        /* Modais e Telas Fullscreen */
         .modal-fullscreen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 3000; display: none; flex-direction: column; padding: 20px; box-sizing: border-box; overflow-y: auto; text-align: center;}
         .modal-fullscreen h2 { color: #39FF14; margin-top: 10px; margin-bottom: 20px; font-size: 24px;}
         
-        /* Botões padronizados */
         .btn-modo { width: 100%; padding: 20px 15px; border: none; border-radius: 12px; font-weight: bold; font-size: 18px; cursor: pointer; color: #000; margin-bottom: 10px;}
         .btn-otimizada { background: #39FF14; }
         .btn-action { color: #fff; border: none; padding: 8px 14px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 13px; }
         
-        /* Containers de Informações e Layout */
         .info-container { background: #111; border: 1px solid #333; border-radius: 10px; padding: 20px; text-align: left; margin-bottom: 25px; line-height: 1.6; font-size: 15px; color: #ccc;}
         .info-container strong { color: #39FF14; }
 
@@ -33,12 +30,10 @@
         .bag-item small { color: #aaa; display: block; margin-top: 3px; font-size: 12px;}
         .bag-vol { border-radius: 12px; font-weight: bold; font-size: 13px; padding: 3px 8px; text-align: center; }
         
-        /* Tags */
         .tag-comercial { background: #9d00ff; color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; margin-right: 5px; display: inline-block; }
         .tag-extra { background: #FF8C00; color: #000; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; margin-right: 5px; display: inline-block; }
         .tag-vaga-combo { background: #007AFF; color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; display: inline-block; margin-top: 4px;}
 
-        /* Interface de Navegação */
         #tela-navegacao { display: none; flex-direction: column; height: 100vh; width: 100%; position: relative;}
         #painel-topo { background: #003399; padding: 15px; text-align: center; z-index: 1001; max-height: 40vh; overflow-y: auto; border-bottom: 2px solid #000; position: relative;}
         .modo-confirmacao { background: #FFCC00 !important; }
@@ -90,12 +85,10 @@
         .rel-destaque { color: #FFCC00 !important; }
         .rel-full { grid-column: span 2; }
         
-        /* Botões do Menu Lateral */
         .btn-menu-acao { flex: 1; padding: 10px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 13px; }
         .btn-menu-check { background: #28a745; color: #fff; }
         .btn-menu-fail { background: #dc3545; color: #fff; }
 
-        /* Accordion Inicial */
         .faq-container { width: 90%; max-width: 400px; margin-top: 30px; margin-bottom: 40px; text-align: left; }
         .faq-titulo { font-size: 16px; color: #39FF14; text-transform: uppercase; font-weight: bold; margin-bottom: 15px; text-align: center; border-bottom: 1px dashed #333; padding-bottom: 10px; }
         .faq-item { background: #111; border: 1px solid #333; border-radius: 8px; margin-bottom: 8px; overflow: hidden; }
@@ -218,7 +211,6 @@
 
         <button class="btn-modo btn-otimizada" style="margin-top: 30px;" onclick="limparERecarregar()">CARREGAR NOVA PLANILHA</button>
     </div>
-
     <!-- SCRIPT DO MOTOR (DESENHO + GPS) -->
     <script>
         let planilhaStopsData = []; 
@@ -609,11 +601,13 @@
                 html += `<div class="bag-container"><h3>BAG ${bagNum} (Lotes ${i+1} a ${i+lote.length})</h3>`;
                 lote.forEach(item => {
                     if (item.isVaga) {
+                        // MUDANÇA: Exibe os pacotes em cada Stop de apé na Doca
+                        let sugadosFormatados = item.subItems.map(s => `Stop ${s.stop} (${s.pacotes} vol)`).join(', ');
                         html += `
                         <div class="bag-item" style="border-left: 4px solid #007AFF; padding-left: 8px;">
                             <div>
                                 <strong><span style="color:#FFCC00;">#${globalIndex}</span> ➔ ${item.id} <span class="tag-vaga-combo">COMBO A PÉ</span></strong>
-                                <small style="color:#007AFF;">Agrupados: ${item.subItems.map(s => 'Stop ' + s.stop).join(', ')}</small>
+                                <small style="color:#007AFF;">Agrupados: ${sugadosFormatados}</small>
                             </div>
                             <div class="bag-vol" style="background:#007AFF; color:#fff;">${item.totalVol} vol</div>
                         </div>`;
@@ -650,7 +644,8 @@
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(mapGps);
                 camadaFundoGps.addTo(mapGps);
                 
-                trilhaMestreGps = L.polyline([], { color: '#8844aa', weight: 5, opacity: 0.7, dashArray: '8, 8' }).addTo(mapGps);
+                // MUDANÇA: Trilha Mestre sólida e grossa (roxa), apagando o tracejado
+                trilhaMestreGps = L.polyline([], { color: '#8844aa', weight: 6, opacity: 0.9 }).addTo(mapGps);
                 rotaRealGps = L.polyline([], { color: '#007AFF', weight: 6, opacity: 0.9 }).addTo(mapGps);
             }
 
@@ -672,24 +667,35 @@
                 }
             });
 
-            desenharTrilhaMestreFixaCompleta();
             baixarRadaresDaRegiao(planilhaStopsData);
             
             idxDestino = 0;
+            // MUDANÇA: Calcula a trilha roxa a partir do destino 0
+            atualizarTrilhaMestreRestante();
             ativarRastreamentoGeolocalizacaoAtiva();
         }
 
-        async function desenharTrilhaMestreFixaCompleta() {
+        // MUDANÇA: Função atualizada para desenhar SOMENTE da parada atual pra frente
+        async function atualizarTrilhaMestreRestante() {
+            if (idxDestino >= sequenciaSelecionada.length - 1) {
+                trilhaMestreGps.setLatLngs([]); // Limpa se for a última parada, não tem "próximo"
+                return;
+            }
             try {
-                let urlCoords = sequenciaSelecionada.map(id => {
+                // Pega a lista do destino atual em diante
+                let trechoRestante = sequenciaSelecionada.slice(idxDestino);
+                let urlCoords = trechoRestante.map(id => {
                     let latlng;
                     if(id.startsWith("Vaga")) latlng = vagasCriadas.find(x => x.marker.spxId === id).marker.getLatLng();
                     else { let p = planilhaStopsData.find(x => x.stop === id); latlng = L.latLng(p.lat, p.lon); }
                     return latlng.lng + ',' + latlng.lat;
                 }).join(';');
+                
                 let res = await fetch(`https://router.project-osrm.org/route/v1/driving/${urlCoords}?overview=full&geometries=geojson`);
                 let data = await res.json();
-                if (data.routes?.length > 0) trilhaMestreGps.setLatLngs(data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]));
+                if (data.routes?.length > 0) {
+                    trilhaMestreGps.setLatLngs(data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]));
+                }
             } catch(e){}
         }
 
@@ -738,13 +744,11 @@
                 isComercial = v.sugados.some(m => planilhaStopsData.find(p=>p.stop===m.spxId).comercial);
                 totalVol = v.sugados.reduce((acc, m) => acc + planilhaStopsData.find(p=>p.stop===m.spxId).pacotes, 0);
                 
-                // MUDANÇA: Criar os mini-cards completos para a Vaga
                 txtEnderecos = v.sugados.map(m => {
                     let p = planilhaStopsData.find(x=>x.stop===m.spxId);
                     let volColor = getCorVolume(p.pacotes);
                     let volPill = `<span style="background:${volColor.bg}; color:${volColor.color}; padding:2px 6px; border-radius:10px; font-size:12px; margin-left:5px;">${p.pacotes} vol</span>`;
                     
-                    // Formata os endereços pegando o padrão verde e a caixinha amarela para números
                     let endsFormatados = p.enderecos.map(end => {
                         return `<div class="endereco-item" style="font-size: 14px; margin-bottom: 3px;">${end.toUpperCase().replace(/(\d+)/, '<span class="num-box">$1</span>')}</div>`;
                     }).join('');
@@ -796,7 +800,6 @@
             document.getElementById('rodape-rua').innerText = "PREVISÃO DE CHEGADA";
             document.getElementById('rodape-dist').innerText = Math.ceil((dFinal/5.5)/60) + " min";
 
-            // Gatilho de Aproximação (30 metros)
             if (dFinal < 30) {
                 aguardandoConfirmacao = true; releaseWakeLock(); // Pausa o WakeLock ao chegar
                 document.getElementById('painel-rodape').style.display = 'none';
@@ -884,7 +887,7 @@
                 historicoParadas.push({ stop: p.stop, hora: agora, ms: tempoGasto, extra: p.extra, status: status });
             }
 
-            aguardandoConfirmacao = false; requestWakeLock(); // Reativa WakeLock após apertar Concluído
+            aguardandoConfirmacao = false; requestWakeLock(); // Reativa WakeLock
             document.getElementById('painel-rodape').style.display = 'block';
             document.getElementById('seta-flutuante').style.display = 'block';
             document.getElementById('painel-topo').classList.remove('modo-confirmacao');
@@ -894,7 +897,11 @@
             idxDestino++;
             passosNavegacao = [];
             
-            if (idxDestino < sequenciaSelecionada.length) recalcularRotaGpsTaticaProximoAlvo();
+            if (idxDestino < sequenciaSelecionada.length) {
+                recalcularRotaGpsTaticaProximoAlvo();
+                // MUDANÇA: Recalcula a linha roxa daqui pra frente
+                atualizarTrilhaMestreRestante();
+            }
             else avaliarConclusaoExpedienteTotal();
         }
 
@@ -927,14 +934,18 @@
             let html = '';
             sequenciaSelecionada.forEach((id, index) => {
                 let isAtivo = (index === idxDestino);
-                // Zebra de 10 em 10 (Separando por Bags visualmente)
                 let corZebrada = Math.floor(index / 10) % 2 === 0 ? '#1a1a1a' : '#0a0a0a';
                 let corFundo = isAtivo ? '#003399' : corZebrada;
                 let borda = isAtivo ? 'border: 2px solid #39FF14;' : 'border: 1px solid #222;';
 
                 if (id.startsWith("Vaga")) {
                     let v = vagasCriadas.find(x => x.marker.spxId === id);
-                    let sugadosText = v.sugados.map(m => m.spxId).join(', ');
+                    
+                    // MUDANÇA: Exibe os pacotes em cada Stop de apé também no menu lateral
+                    let sugadosText = v.sugados.map(m => {
+                        let p = planilhaStopsData.find(x=>x.stop === m.spxId);
+                        return `Stop ${m.spxId} (${p.pacotes} vol)`;
+                    }).join(', ');
                     
                     let pExemplo = planilhaStopsData.find(x => x.stop === v.sugados[0].spxId);
                     let statusIcon = pExemplo.status === 'concluido' ? '✅' : (pExemplo.status === 'pendente' ? '❌' : (isAtivo ? '📍' : '🚙'));
@@ -953,7 +964,7 @@
                     html += `
                     <div style="background:${corFundo}; ${borda} border-radius:10px; padding:15px; margin-bottom:10px; text-align:left; color:${corTexto}; cursor:pointer;" onclick="pularParaParadaManual(${index})">
                         <div style="font-size:16px; font-weight:bold; color:${isAtivo ? '#fff' : '#007AFF'};">${statusIcon} <span style="color:#FFCC00;">#${index+1}</span> ➔ ${id}</div>
-                        <div style="font-size:12px; opacity:0.8; margin-top:3px;">Combo a pé contendo Stops: ${sugadosText}</div>
+                        <div style="font-size:12px; opacity:0.8; margin-top:3px;">Combo a pé contendo: ${sugadosText}</div>
                         ${botoesAcao}
                     </div>`;
                 } else {
@@ -1020,7 +1031,11 @@
                 idxDestino++;
                 passosNavegacao = [];
                 
-                if (idxDestino < sequenciaSelecionada.length) recalcularRotaGpsTaticaProximoAlvo();
+                if (idxDestino < sequenciaSelecionada.length) {
+                    recalcularRotaGpsTaticaProximoAlvo();
+                    // MUDANÇA: Atualiza a linha roxa também ao forçar baixa do atual
+                    atualizarTrilhaMestreRestante();
+                }
                 else avaliarConclusaoExpedienteTotal();
             } else {
                 let tudoFinalizado = sequenciaSelecionada.every(id => {
@@ -1042,6 +1057,9 @@
             document.getElementById('painel-topo').classList.remove('modo-confirmacao');
             document.getElementById('combo-checklist-container').style.display = 'none';
             recalcularRotaGpsTaticaProximoAlvo();
+            
+            // MUDANÇA: Quando você pula de parada, o mapa também recalcula a trilha roxa a partir daquele ponto
+            atualizarTrilhaMestreRestante();
         }
 
         function limparERecarregar() { location.reload(); }
