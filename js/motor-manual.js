@@ -2,21 +2,17 @@
 /* motor-manual.js - Roteirização por Toque  */
 /* ========================================= */
 
-// --- VARIÁVEIS DO MODO MANUAL ---
 let marcadoresDesenho = [];
 let sequenciaSelecionada = []; 
 let historicoDeRoteamento = [[]]; 
-let vagasCriadas = []; 
-let vagaCount = 0;
 
 let mapDesenho;
 let linhaDedoDesenho, rotaRealDesenho;
 let modoDesenho = false, desenhando = false;
 let startX = 0, startY = 0, mudouDeLugar = false, houveCapturaNesteCiclo = false;
 
-// Função principal chamada pelo main.js
 function iniciarMapeamentoManual() {
-    isRotaManual = true; // Avisa o sistema que a fonte de dados do GPS será o Manual
+    isRotaManual = true; 
     esconderTodasTelas();
     mostrarTela('modal-desenho-manual');
     montarMapaDesenho();
@@ -32,7 +28,11 @@ function montarMapaDesenho() {
     }
 
     marcadoresDesenho.forEach(m => mapDesenho.removeLayer(m));
-    marcadoresDesenho = []; sequenciaSelecionada = []; historicoDeRoteamento = [[]]; vagasCriadas = []; vagaCount = 0;
+    marcadoresDesenho = []; sequenciaSelecionada = []; historicoDeRoteamento = [[]]; 
+    
+    // Zeramos as vagas globais para um novo mapeamento limpo
+    vagasCriadas = []; 
+    vagaCount = 0;
 
     let bounds = [];
     planilhaStopsData.forEach(p => {
@@ -198,7 +198,6 @@ function finalizarMapeamentoManual() {
     if (sequenciaSelecionada.length === 0) { alert("Selecione ao menos 1 parada no desenho!"); return; }
     if (modoDesenho) toggleModoDesenho();
     
-    // A rotaSpx vira um espelho da sequência manual para compatibilidade
     rotaSpx = [...sequenciaSelecionada]; 
 
     esconderTodasTelas();
