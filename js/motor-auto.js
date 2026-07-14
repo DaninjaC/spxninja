@@ -2,29 +2,27 @@
 /* motor-auto.js - Roteirização Automática   */
 /* ========================================= */
 
-// --- VARIÁVEIS DO MODO AUTOMÁTICO ---
 let rotaOriginalData = [];
 let rotaOtimizadaData = [];
 let mapPadrao = null, mapOtimizado = null;
 let layerPadrao = L.layerGroup(), layerOtimizado = L.layerGroup();
 let globalKmPadrao = 0, globalKmOtimizada = 0;
-let isRotaManual = false; // Flag para avisar a Doca/GPS qual modo estamos usando
+let isRotaManual = false; 
 
-// Função principal chamada pelo main.js
 function roteirizarModoAutomatico() {
     isRotaManual = false;
     mostrarTela('loading-msg');
     
-    // Separa os pacotes oficiais dos extras
     let paradasOficiais = planilhaStopsData.filter(p => !p.extra);
     let pacotesMisteriosos = planilhaStopsData.filter(p => p.extra);
 
-    rotaOriginalData = [...paradasOficiais];
+    // CORREÇÃO: A rota padrão joga os pacotes sem numeração pro final da viagem (como o app original faz).
+    rotaOriginalData = [...paradasOficiais, ...pacotesMisteriosos];
 
-    // Gera a rota otimizada (Efeito Zíper / Varal)
-    rotaOtimizadaData = gerarRotaPorFluxo(rotaOriginalData);
+    // Rota Otimizada agrupa por rua (Efeito Varal)
+    rotaOtimizadaData = gerarRotaPorFluxo(paradasOficiais);
 
-    // Encaixa os pacotes Extras no vizinho mais próximo
+    // Rota Otimizada encaixa os pacotes extras inteligentemente no vizinho mais próximo
     let counterExtra = 1;
     pacotesMisteriosos.forEach(mist => {
         let menorDist = Infinity;
@@ -48,7 +46,6 @@ function roteirizarModoAutomatico() {
     mostrarTela('modal-auditoria');
     iniciarMapasAuditoria();
     
-    // Animação de Plotagem e Cálculo de Custo
     setTimeout(async () => {
         mapPadrao.invalidateSize();
         mapOtimizado.invalidateSize();
@@ -59,8 +56,8 @@ function roteirizarModoAutomatico() {
         globalKmPadrao = rPadrao.km;
         globalKmOtimizada = rOtim.km;
 
-        document.getElementById('km-padrao').innerHTML = `Custo: <b>${globalKmPadrao.toFixed(2)} km</b>`;
-        document.getElementById('km-otimizada').innerHTML = `Custo: <b>${globalKmOtimizada.toFixed(2)} km</b>`;
+        document.getElementById('km-padrao').innerHTML = `Custo: <b>${globalKmPadrao.toFixed(2)} km</b><br><span style="font-size:11px; color:#ccc;">(${rPadrao.quebras} manobras | ${rPadrao.revisitadas} zig-zags)</span>`;
+        document.getElementById('km-otimizada').innerHTML = `Custo: <b>${globalKmOtimizada.toFixed(2)} km</b><br><span style="font-size:11px; color:#ccc;">(${rOtim.quebras} manobras | ${rOtim.revisitadas} zig-zags)</span>`;
     }, 200);
 }
 
@@ -81,9 +78,13 @@ async function plotarVisaoPassaro(camada, mapaLocal, rota, corLinha) {
     camada.clearLayers();
     let boundsCoords = [];
     let distanciaTotalReal = 0;
+    
+    // Novas métricas de auditoria Ninja
     let quebrasDeRua = 0;
+    let ruasVisitadas = new Set();
+    let ruasRevisitadasPenalty = 0;
 
-    if (rota.length === 0) return { km: 0, quebras: 0 };
+    if (rota.length === 0) return { km: 0, quebras: 0, revisitadas: 0 };
     let latlngs = [];
 
     for (let i = 0; i < rota.length; i++) {
@@ -101,10 +102,24 @@ async function plotarVisaoPassaro(camada, mapaLocal, rota, corLinha) {
         if (i > 0) {
             const anterior = rota[i-1];
             const dReta = dist(anterior.lat, anterior.lon, p.lat, p.lon);
+            
+            // CORREÇÃO: Lógica de Punição de Trânsito
             if (anterior.ruaPadrao !== p.ruaPadrao && anterior.ruaPadrao !== "DESCONHECIDO" && p.ruaPadrao !== "DESCONHECIDO") {
                 quebrasDeRua++;
+                ruasVisitadas.add(anterior.ruaPadrao);
+                
+                // Se a transportadora mandou o motorista voltar para uma rua que ele já tinha entregado antes (Zig-Zag)
+                if (ruasVisitadas.has(p.ruaPadrao)) {
+                    ruasRevisitadasPenalty++;
+                }
             }
-            distanciaTotalReal += (dReta <= 70) ? dReta : dReta * 1.5;
+
+            // Bônus Combo a Pé (se < 70m, só soma a caminhada sem multa de carro)
+            if (dReta <= 70) {
+                distanciaTotalReal += dReta; 
+            } else {
+                distanciaTotalReal += dReta * 1.8; // Multa por uso de carro (curvas, balão, acelerar/frear)
+            }
         }
     }
 
@@ -113,8 +128,10 @@ async function plotarVisaoPassaro(camada, mapaLocal, rota, corLinha) {
         mapaLocal.fitBounds(L.polyline(boundsCoords).getBounds(), { padding: [30, 30] });
     }
 
-    let kmComMultaDeManobra = (distanciaTotalReal + (quebrasDeRua * 350)) / 1000;
-    return { km: kmComMultaDeManobra, quebras: quebrasDeRua };
+    // O Custo Final: Distância + 350m por cada esquina virada + 1KM de punição por cada vez que voltar na mesma rua.
+    let kmComMulta = (distanciaTotalReal + (quebrasDeRua * 350) + (ruasRevisitadasPenalty * 1000)) / 1000;
+    
+    return { km: kmComMulta, quebras: quebrasDeRua, revisitadas: ruasRevisitadasPenalty };
 }
 
 function gerarRotaPorFluxo(rotaBase) {
@@ -172,7 +189,6 @@ function gerarRotaPorFluxo(rotaBase) {
     return rotaFinal;
 }
 
-// Botões de Escolha na Tela de Auditoria
 function escolherRotaPadrao() {
     rotaSpx = [...rotaOriginalData];
     esconderTodasTelas();
@@ -187,10 +203,8 @@ function escolherRotaOtimizada() {
 
 function avancarParaGPSPadrao() {
     esconderTodasTelas();
-    mostrarTela('tela-navegacao'); // Faltava mandar a tela do GPS aparecer
-    if (typeof iniciarInterfaceGPS === "function") {
-        iniciarInterfaceGPS(); // O nome correto da função que liga o motor do mapa
-    }
+    mostrarTela('tela-navegacao');
+    if (typeof iniciarInterfaceGPS === "function") iniciarInterfaceGPS();
 }
 
 function avancarParaDocaOtimizada() {
