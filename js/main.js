@@ -145,3 +145,54 @@ async function baixarRadaresDaRegiao(rota) { if (!rota || rota.length === 0) ret
 // --- TRANSIÇÃO DE MÓDULOS ---
 function iniciarModoAutomatico() { esconderTodasTelas(); if (typeof roteirizarModoAutomatico === "function") roteirizarModoAutomatico(); else alert("O motor automático ainda não foi carregado."); }
 function iniciarModoManual() { esconderTodasTelas(); if (typeof iniciarMapeamentoManual === "function") iniciarMapeamentoManual(); else alert("O motor manual ainda não foi carregado."); }
+
+// --- FORMULÁRIO DE CONTATO (COM ENVIO REAL) ---
+function enviarContato(event) {
+    event.preventDefault(); // Impede a página de piscar/recarregar
+    
+    // 1. ⬅️ COLOQUE SEU E-MAIL REAL AQUI EMBAIXO
+    let seuEmailPessoal = "daninja@gmail.com"; 
+    
+    let nome = document.getElementById('contato-nome').value;
+    let email = document.getElementById('contato-email').value;
+    let mensagem = document.getElementById('contato-mensagem').value;
+    let btnSubmit = event.target.querySelector('button[type="submit"]');
+
+    // Feedback visual para o motorista não clicar duas vezes
+    let textoOriginal = btnSubmit.innerText;
+    btnSubmit.innerText = "⏳ ENVIANDO...";
+    btnSubmit.disabled = true;
+
+    // 2. Chama o "Carteiro" gratuito (FormSubmit) via código (AJAX)
+    fetch(`https://formsubmit.co/ajax/${seuEmailPessoal}`, {
+        method: "POST",
+        headers: { 
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+            Nome: nome,
+            Email_Motorista: email,
+            Mensagem: mensagem,
+            _subject: "Nova Mensagem do App SPX Ninja!" // Assunto do E-mail
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        // Deu tudo certo!
+        alert(`Obrigado, ${nome}! Sua mensagem foi enviada com sucesso para a nossa equipe.`);
+        document.getElementById('form-contato').reset(); // Limpa o formulário
+        event.target.parentElement.parentElement.classList.remove('active'); // Fecha a sanfona
+    })
+    .catch(error => {
+        // Se a internet cair ou o serviço falhar
+        alert("Ocorreu um erro ao enviar sua mensagem. Verifique sua conexão e tente novamente.");
+    })
+    .finally(() => {
+        // Devolve o botão ao estado normal
+        btnSubmit.innerText = textoOriginal;
+        btnSubmit.disabled = false;
+    });
+}
+
+
