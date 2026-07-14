@@ -96,11 +96,46 @@ function continuarRotaSalva() {
     }
 }
 
-// --- GERENCIAMENTO DE TELAS ---
+// --- GERENCIAMENTO E TRANSIÇÕES DE TELAS ---
 function esconderTodasTelas() {
-    const telas = ['controles-iniciais', 'modal-escolha-modo', 'modal-auditoria', 'modal-info-padrao', 'modal-info-otimizada', 'modal-desenho-manual', 'modal-doca', 'tela-navegacao', 'modal-menu-stops', 'modal-relatorio'];
+    const telas = [
+        'controles-iniciais', 'modal-escolha-modo', 'modal-auditoria', 
+        'modal-info-padrao', 'modal-info-otimizada', 'modal-desenho-manual', 
+        'modal-doca', 'modal-guia-gps', 'tela-navegacao', 
+        'modal-menu-stops', 'modal-relatorio'
+    ];
     telas.forEach(id => { let el = document.getElementById(id); if(el) el.style.display = 'none'; });
 }
+
+function prepararIdaParaGPS() {
+    esconderTodasTelas();
+    // Verifica se o motorista marcou a caixinha no passado
+    if (localStorage.getItem('spx_ninja_hide_guide') === 'true') {
+        avancarParaMapaReal(true); // Pula direto pro mapa
+    } else {
+        mostrarTela('modal-guia-gps', 'block'); // Mostra a nova tela
+    }
+}
+
+function avancarParaMapaReal(isSilent = false) {
+    // Se o clique veio do botão "BORA PRA RUA" e não do pulo silencioso
+    if (!isSilent) {
+        let chk = document.getElementById('chk-nao-mostrar-gps');
+        // Se ele clicou na caixinha, salva o segredo no cofre do navegador
+        if (chk && chk.checked) {
+            localStorage.setItem('spx_ninja_hide_guide', 'true');
+        }
+    }
+    
+    esconderTodasTelas();
+    mostrarTela('tela-navegacao');
+    
+    // Dispara a ignição do motor GPS
+    if (typeof iniciarInterfaceGPS === "function") {
+        iniciarInterfaceGPS();
+    }
+}
+
 function mostrarTela(id, displayType = 'flex') {
     let el = document.getElementById(id);
     if(el) el.style.display = displayType;
