@@ -34,35 +34,32 @@
         
         <div id="loading-msg" style="display:none;">⏳ Processando Pacotes...<br><small>Lendo coordenadas da base.</small></div>
 
-        <!-- RESUMO GERAL DO APLICATIVO -->
-        <div class="faq-container" id="faq-box">
-            <div class="faq-titulo">SOBRE O SPX NINJA</div>
+<!-- RESUMO GERAL DO APLICATIVO -->
+        <div class="faq-container" id="faq-box" style="margin-top: 30px;">
             
+            <!-- MENU 1: SOBRE O APP -->
             <div class="faq-item">
-                <div class="faq-header" onclick="this.parentElement.classList.toggle('active')">🎯 Qual a missão do app? <span class="faq-icon">+</span></div>
-                <div class="faq-body">Chegar em casa mais cedo e com mais dinheiro no bolso. O aplicativo pega a sua planilha bruta e cria uma estratégia visual avançada para eliminar o zig-zag, reduzir as manobras e poupar o seu asfalto e combustível.</div>
-            </div>
-            
-            <div class="faq-item">
-                <div class="faq-header" onclick="this.parentElement.classList.toggle('active')">📦 Fim da bagunça no carro <span class="faq-icon">+</span></div>
-                <div class="faq-body">Chega de perder tempo caçando pacotes. O Ninja fatia a sua carga em 'Bags' de 10 itens e usa um Mapa de Calor (cores) para te mostrar o volume de cada cliente. Além disso, ele identifica entregas Comerciais e pacotes Extras.</div>
-            </div>
-            
-            <div class="faq-item">
-                <div class="faq-header" onclick="this.parentElement.classList.toggle('active')">🧠 Inteligência de Roteirização <span class="faq-icon">+</span></div>
-                <div class="faq-body">O sistema não liga apenas pontos. Ele agrupa pacotes da mesma via (Modo Varal), segue o sentido correto da rua (Efeito Zíper) e agrupa casas vizinhas para você estacionar uma vez e entregar tudo caminhando (Combo a Pé).</div>
-            </div>
-            
-            <div class="faq-item">
-                <div class="faq-header" onclick="this.parentElement.classList.toggle('active')">🧭 Um GPS limpo e focado <span class="faq-icon">+</span></div>
-                <div class="faq-body">Uma tela feita para não te distrair. O mapa exibe seu trajeto em 3 camadas (o que passou, o alvo atual em azul e o próximo destino em roxo), possui alerta de radares e avança automaticamente para o próximo cliente após a baixa.</div>
+                <div class="faq-header" onclick="this.parentElement.classList.toggle('active')">🥷 Sobre o SPX Ninja <span class="faq-icon">+</span></div>
+                <div class="faq-body" style="padding-bottom: 20px; line-height: 1.5; font-size: 14px; color: #ccc;">
+                    <p style="margin-top: 5px;"><strong>🎯 Qual a missão do app?</strong><br>
+                    Chegar em casa mais cedo e com mais dinheiro no bolso. O aplicativo pega a sua planilha bruta e cria uma estratégia visual avançada para eliminar o zig-zag, reduzir as manobras e poupar o seu asfalto e combustível.</p>
+                    
+                    <p style="margin-top: 15px;"><strong>📦 Fim da bagunça no carro</strong><br>
+                    Chega de perder tempo caçando pacotes. O Ninja fatia a sua carga em 'Bags' de 10 itens e usa um Mapa de Calor (cores) para te mostrar o volume de cada cliente. Além disso, ele identifica entregas Comerciais e pacotes Extras.</p>
+                    
+                    <p style="margin-top: 15px;"><strong>🧠 Inteligência de Roteirização</strong><br>
+                    O sistema não liga apenas pontos. Ele agrupa pacotes da mesma via (Modo Varal), segue o sentido correto da rua (Efeito Zíper) e agrupa casas vizinhas para você estacionar uma vez e entregar tudo caminhando (Combo a Pé).</p>
+                    
+                    <p style="margin-top: 15px;"><strong>🧭 Um GPS limpo e focado</strong><br>
+                    Uma tela feita para não te distrair. O mapa exibe seu trajeto em 3 camadas (o que passou, o alvo atual em azul e o próximo destino em roxo), possui alerta de radares e avança automaticamente para o próximo cliente após a baixa.</p>
+                </div>
             </div>
 
-            <!-- Tópico 5 com Formulário de Contato -->
+            <!-- MENU 2: FORMULÁRIO DE CONTATO -->
             <div class="faq-item">
                 <div class="faq-header" onclick="this.parentElement.classList.toggle('active')">💬 Dúvidas e Sugestões <span class="faq-icon">+</span></div>
                 <div class="faq-body" style="padding-bottom: 20px;">
-                    <p style="margin-top: 10px; margin-bottom: 15px;">Encontrou um bug ou tem uma ideia para melhorar o Ninja? Mande pra gente!</p>
+                    <p style="margin-top: 10px; margin-bottom: 15px; font-size: 14px; color: #ccc;">Encontrou um bug ou tem uma ideia para melhorar o Ninja? Mande pra gente!</p>
                     <form id="form-contato" onsubmit="enviarContato(event)" style="display: flex; flex-direction: column; gap: 10px;">
                         <input type="text" id="contato-nome" placeholder="Seu Nome" required style="padding: 12px; border-radius: 6px; border: 1px solid #444; background: #111; color: #fff; font-family: sans-serif; font-size: 14px;">
                         <input type="email" id="contato-email" placeholder="Seu E-mail" required style="padding: 12px; border-radius: 6px; border: 1px solid #444; background: #111; color: #fff; font-family: sans-serif; font-size: 14px;">
@@ -71,8 +68,8 @@
                     </form>
                 </div>
             </div>
+            
         </div>
-    </div>
 
     <!-- ========================================== -->
     <!-- 2. TELA DE ESCOLHA DE MODO                 -->
