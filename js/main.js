@@ -14,7 +14,6 @@ let wakeLock = null;
 let globalKmPadrao = 0;
 let globalKmOtimizada = 0;
 
-// NOVIDADE: As variáveis de vagas agora moram aqui no Regente!
 let vagasCriadas = []; 
 let vagaCount = 0;
 
@@ -106,7 +105,6 @@ function esconderTodasTelas() {
     telas.forEach(id => { let el = document.getElementById(id); if(el) el.style.display = 'none'; });
 }
 
-// Lógica de Entrada no Modo Manual
 function iniciarModoManual() { 
     esconderTodasTelas(); 
     if (localStorage.getItem('spx_ninja_hide_manual_guide') === 'true') {
@@ -133,7 +131,6 @@ function avancarParaDesenhoManual(isSilent = false) {
     }
 }
 
-// Lógica de Transição: Fim do Desenho -> Guia Doca Manual -> Doca
 function prepararGuiaDocaManual() {
     esconderTodasTelas();
     if (localStorage.getItem('spx_ninja_hide_doca_manual') === 'true') {
@@ -155,7 +152,6 @@ function avancarParaDocaManualReal() {
     }
 }
 
-// Lógica de Entrada no GPS
 function prepararIdaParaGPS() {
     esconderTodasTelas();
     if (localStorage.getItem('spx_ninja_hide_guide') === 'true') {
@@ -181,7 +177,6 @@ function avancarParaMapaReal(isSilent = false) {
     }
 }
 
-// Botão de Entrada no Automático
 function iniciarModoAutomatico() { 
     esconderTodasTelas(); 
     if (typeof roteirizarModoAutomatico === "function") roteirizarModoAutomatico(); 
@@ -195,7 +190,6 @@ function mostrarTela(id, displayType = 'flex') {
 function toggleFaq(element) { element.classList.toggle('active'); }
 function limparERecarregar() { localStorage.removeItem('spx_ninja_estado'); location.reload(); }
 
-// --- UTILITÁRIOS MATEMÁTICOS E DE TEXTO ---
 function dist(la1, lo1, la2, lo2) {
     const R = 6371000; const dLat = (la2-la1) * Math.PI/180; const dLon = (lo2-lo1) * Math.PI/180;
     const a = Math.sin(dLat/2)**2 + Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)*Math.sin(dLon/2)**2;
@@ -222,18 +216,15 @@ function formatarEnderecos(listaEnderecos) {
     return listaEnderecos.map(end => `<div class="endereco-item">${end.toUpperCase().replace(/(\d+)/g, '<span class="num-box">$1</span>')}</div>`).join('');
 }
 
-// --- HARDWARE E APIS ---
 async function requestWakeLock() { try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch (err) {} }
 function releaseWakeLock() { if (wakeLock !== null) { wakeLock.release(); wakeLock = null; } }
 function initAudio() { try { window.AudioContext = window.AudioContext || window.webkitAudioContext; if (!audioCtx) audioCtx = new AudioContext(); if (audioCtx.state === 'suspended') audioCtx.resume(); } catch(e) {} }
 function playBipeRadar() { if (!audioCtx) return; try { let osc = audioCtx.createOscillator(); let gain = audioCtx.createGain(); osc.connect(gain); gain.connect(audioCtx.destination); osc.type = 'square'; osc.frequency.value = 880; gain.gain.setValueAtTime(0.2, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3); osc.start(audioCtx.currentTime); osc.stop(audioCtx.currentTime + 0.3); } catch(e) {} }
 async function baixarRadaresDaRegiao(rota) { if (!rota || rota.length === 0) return; try { let lats = rota.map(p => p.lat), lons = rota.map(p => p.lon); let minLat = Math.min(...lats) - 0.015, maxLat = Math.max(...lats) + 0.015, minLon = Math.min(...lons) - 0.015, maxLon = Math.max(...lons) + 0.015; let query = `[out:json][timeout:15];node["highway"="speed_camera"](${minLat},${minLon},${maxLat},${maxLon});out;`; let res = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`); let data = await res.json(); if (data && data.elements) listaRadares = data.elements.map(e => ({ lat: e.lat, lon: e.lon, speed: e.tags.maxspeed || "" })); } catch(e) {} }
 
-// --- FORMULÁRIO DE CONTATO (COM ENVIO REAL E SEM CAPTCHA) ---
 async function enviarContato(event) {
     event.preventDefault(); 
     
-    // O seu código secreto ativado!
     let seuEmailPessoal = "22415a1827e214478c05b0e774d99d72"; 
     
     let nome = document.getElementById('contato-nome').value;
@@ -256,7 +247,7 @@ async function enviarContato(event) {
                 Nome: nome,
                 Email_Motorista: email,
                 Mensagem: mensagem,
-                _subject: "Nova Mensagem do App SPX Ninja!", 
+                _subject: "Nova Mensagem do App Rota Ninja!", // AQUI FOI ALTERADO!
                 _captcha: "false" 
             })
         });
