@@ -194,21 +194,18 @@
             <div style="background: rgba(0, 122, 255, 0.1); border-left: 4px solid #007AFF; padding: 12px; border-radius: 6px; margin-bottom: 12px;">
                 <strong style="color: #007AFF;">🗺️ Navegar e Riscar</strong><br>
                 <span style="color: #ddd;">Encontre o pacote inicial e dê Zoom nele. Para ligar os pontos, clique em <b>✏️ ATIVAR DESENHO</b> e arraste o dedo seguindo a mão da rua (os pinos ficarão verdes). Precisa mexer o mapa? Clique no botão novamente para desativar o desenho, mova a tela e ative de novo!</span>
-                <!-- IMAGEM 1: EXEMPLO DE RISCO -->
                 <img src="assets/explrisco.jpeg" alt="Exemplo de Risco" style="width: 100%; border-radius: 6px; margin-top: 12px; border: 1px solid rgba(0, 122, 255, 0.3);" onerror="this.style.display='none'">
             </div>
 
             <div style="background: rgba(157, 0, 255, 0.1); border-left: 4px solid #9d00ff; padding: 12px; border-radius: 6px; margin-bottom: 12px;">
                 <strong style="color: #c466ff;">🚶‍♂️ Combos a Pé (Vagas)</strong><br>
                 <span style="color: #ddd;">Viu um monte de pacotes vizinhos? Com o desenho ativado, <b>segure o dedo numa rua vazia</b> para criar uma Vaga (círculo azul). Depois, basta riscar ligando os clientes até ela! Isso reduz o arranca-e-para do carro.</span>
-                <!-- IMAGEM 2: EXEMPLO DE VAGA -->
                 <img src="assets/explvaga.jpeg" alt="Exemplo de Vaga" style="width: 100%; border-radius: 6px; margin-top: 12px; border: 1px solid rgba(157, 0, 255, 0.3);" onerror="this.style.display='none'">
             </div>
             
             <div style="background: rgba(255, 68, 68, 0.1); border-left: 4px solid #ff4444; padding: 12px; border-radius: 6px; margin-bottom: 12px;">
                 <strong style="color: #ff4444;">↩️ Desfazendo Erros</strong><br>
                 <span style="color: #ddd;">No painel inferior, ao lado da ordem capturada, você encontra botões rápidos para <b>UNDO RISCO</b> (apagar o último traço) ou <b>UNDO VAGA</b> (apagar o estacionamento criado).</span>
-                <!-- IMAGEM 3: EXEMPLO DE LEGENDA -->
                 <img src="assets/exmpllegenda.jpeg" alt="Exemplo de Legenda" style="width: 100%; border-radius: 6px; margin-top: 12px; border: 1px solid rgba(255, 68, 68, 0.3);" onerror="this.style.display='none'">
             </div>
 
@@ -228,7 +225,6 @@
             <p id="instrucao-desenho">Arraste para ligar os pinos. Toque na rua vazia para criar Vaga.</p>
             <div style="display:flex; gap:10px; justify-content:center; margin-bottom:5px;">
                 <button id="btn-toggle-vidro" class="btn-action" style="background:#FF8C00; color:#000;" onclick="toggleModoDesenho()">✏️ ATIVAR DESENHO</button>
-                <!-- BOTÃO ALTERADO PARA CHAMAR A TELA NOVA ANTES DE PROCESSAR -->
                 <button class="btn-action" style="background:#39FF14; color:#000;" onclick="prepararGuiaDocaManual()">AVANÇAR ➔</button>
             </div>
         </div>
@@ -357,6 +353,8 @@
                 <div id="seta-dist">0 m</div>
             </div>
             <div id="mapa-gps" class="mapa-janela"></div>
+            <!-- O NOVO BOTÃO DA CÂMERA INTELIGENTE AQUI! -->
+            <button id="btn-trava-camera" onclick="alternarModoCamera()">📍 FOCAR ROTA</button>
         </div>
         <div id="painel-rodape">
             <div id="rodape-rua">AGUARDANDO SINAL GPS...</div>
@@ -395,12 +393,12 @@
         }
     </script>
 
-    <script src="js/main.js?v=5"></script>
-    <script src="js/leitor.js?v=5"></script>
-    <script src="js/motor-auto.js?v=5"></script>
-    <script src="js/motor-manual.js?v=5"></script>
-    <script src="js/motor-doca.js?v=5"></script>
-    <script src="js/motor-gps.js?v=5"></script>
+    <script src="js/main.js?v=6"></script>
+    <script src="js/leitor.js?v=6"></script>
+    <script src="js/motor-auto.js?v=6"></script>
+    <script src="js/motor-manual.js?v=6"></script>
+    <script src="js/motor-doca.js?v=6"></script>
+    <script src="js/motor-gps.js?v=6"></script>
 
 </body>
 </html>
