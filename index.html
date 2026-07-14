@@ -34,8 +34,7 @@
         
         <div id="loading-msg" style="display:none;">⏳ Processando Pacotes...<br><small>Lendo coordenadas da base.</small></div>
 
-
-<!-- RESUMO GERAL DO APLICATIVO -->
+        <!-- RESUMO GERAL DO APLICATIVO -->
         <div class="faq-container" id="faq-box" style="margin-top: 30px;">
             
             <!-- MENU 1: SOBRE O APP -->
@@ -71,8 +70,7 @@
             </div>
             
         </div>
-        
-    </div> <!-- AQUI ESTÁ A DIV SALVADORA QUE FALTAVA! -->
+    </div>
 
     <!-- ========================================== -->
     <!-- 2. TELA DE ESCOLHA DE MODO                 -->
@@ -108,7 +106,7 @@
     </div>
 
     <!-- ========================================== -->
-    <!-- 3. MODO AUTOMÁTICO (TELAS DO ROBÔ)         -->
+    <!-- 3. MODO AUTOMÁTICO E PADRÃO (TELAS INICIAIS)-->
     <!-- ========================================== -->
     <div id="modal-auditoria" class="modal-fullscreen">
         <h2>ESCOLHA A ROTA (TESTE DE CAMPO)</h2>
@@ -130,7 +128,7 @@
         </div>
     </div>
 
-<div id="modal-info-padrao" class="modal-fullscreen">
+    <div id="modal-info-padrao" class="modal-fullscreen">
         <h2>▶️ MODO: ROTA PADRÃO</h2>
         
         <div class="info-container" style="text-align: left; padding: 15px; font-size: 14px; line-height: 1.5;">
@@ -152,16 +150,15 @@
             </div>
         </div>
         
-        <button class="btn-modo btn-padrao" style="margin-top: 15px;" onclick="avancarParaGPSPadrao()">INICIAR VIAGEM 🚀</button>
+        <!-- REDIRECIONADO PARA O NOVO GUIA -->
+        <button class="btn-modo btn-padrao" style="margin-top: 15px;" onclick="prepararIdaParaGPS()">INICIAR VIAGEM 🚀</button>
     </div>
 
-<div id="modal-info-otimizada" class="modal-fullscreen">
+    <div id="modal-info-otimizada" class="modal-fullscreen">
         <h2>🚀 GUIA DE SEPARAÇÃO NINJA</h2>
         
-        <!-- Imagem do mapa do carro -->
         <img src="assets/docaninja.jpeg" alt="Guia Dokan" class="guia-img" onerror="this.style.display='none'" style="margin-bottom: 15px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.5);">
         
-        <!-- BOTÃO MOVIDO PARA CIMA -->
         <button class="btn-modo btn-otimizada" style="margin-bottom: 20px;" onclick="avancarParaDocaOtimizada()">IR PARA SEPARAÇÃO (BAGS) 📦</button>
         
         <div class="info-container" style="text-align: left; padding: 10px 15px; font-size: 14px; line-height: 1.5;">
@@ -180,7 +177,6 @@
                 <strong style="color: #39FF14;">🚗 Tetris no Carro</strong><br>
                 <span style="color: #ddd;">Use a imagem acima como mapa: A <b>Bag 1</b> (suas 10 primeiras entregas) vai no banco do passageiro. O meio da rota vai atrás, e o porta-malas fica só para o final. Menos tempo caçando, mais tempo entregando!</span>
             </div>
-
         </div>
     </div>
 
@@ -213,14 +209,61 @@
     </div>
 
     <!-- ========================================== -->
-    <!-- 5. COMPARTILHADOS (DOCA, GPS E RELATÓRIO)  -->
+    <!-- 5. COMPARTILHADOS (DOCA E GUIA GPS)        -->
     <!-- ========================================== -->
     <div id="modal-doca" class="modal-fullscreen">
         <h2>📦 MODO DOCA - SEPARAÇÃO</h2>
         <div id="lista-bags"></div>
-        <button class="btn-modo btn-otimizada" style="margin-top:10px; margin-bottom:40px;" onclick="iniciarGPSPosDoca()">INICIAR VIAGEM 🚀</button>
+        <!-- REDIRECIONADO PARA O NOVO GUIA -->
+        <button class="btn-modo btn-otimizada" style="margin-top:10px; margin-bottom:40px;" onclick="prepararIdaParaGPS()">INICIAR VIAGEM 🚀</button>
     </div>
 
+    <!-- TELA NOVA: ONBOARDING DO GPS -->
+    <div id="modal-guia-gps" class="modal-fullscreen">
+        <h2>🧭 COMO USAR O GPS NINJA</h2>
+        
+        <!-- Controles no Topo -->
+        <div style="background: #1a1a1a; padding: 15px; border-radius: 8px; margin-bottom: 20px; text-align: center; border: 1px solid #333;">
+            <button class="btn-modo btn-otimizada" onclick="avancarParaMapaReal()" style="margin-bottom: 10px;">BORA PRA RUA! 🗺️</button>
+            <label style="color: #aaa; font-size: 14px; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer;">
+                <input type="checkbox" id="chk-nao-mostrar-gps" style="width: 18px; height: 18px;">
+                Não mostrar esta tela novamente
+            </label>
+        </div>
+
+        <div class="info-container" style="text-align: left; padding: 0 5px; font-size: 14px; line-height: 1.5; padding-bottom: 30px;">
+            
+            <div style="background: rgba(0, 122, 255, 0.1); border-left: 4px solid #007AFF; padding: 12px; border-radius: 6px; margin-bottom: 12px;">
+                <strong style="color: #007AFF;">🗺️ As Linhas do Mapa</strong><br>
+                <span style="color: #ddd;">
+                    • <b>Tracejado Preto:</b> A visão geral da sua rota inteira.<br>
+                    • <b>Linha Azul:</b> O caminho até o cliente atual.<br>
+                    • <b>Linha Roxa:</b> Uma prévia do seu próximo destino.<br>
+                    Fique de olho na <b>Seta Flutuante</b> no topo da tela para ver se a próxima manobra é Esquerda, Direita ou Retorno!
+                </span>
+            </div>
+
+            <div style="background: rgba(255, 204, 0, 0.1); border-left: 4px solid #FFCC00; padding: 12px; border-radius: 6px; margin-bottom: 12px;">
+                <strong style="color: #FFCC00;">📱 O Painel Superior</strong><br>
+                <span style="color: #ddd;">Lá em cima ficam os dados do alvo atual. Você verá o número da Parada, o volume total, e a rua com os <b>números das casas em destaque</b>. Precisa pular um cliente ou forçar uma baixa manual? Clique no ícone de prancheta (📋) para abrir o Menu completo.</span>
+            </div>
+
+            <div style="background: rgba(57, 255, 20, 0.1); border-left: 4px solid #39FF14; padding: 12px; border-radius: 6px; margin-bottom: 12px;">
+                <strong style="color: #39FF14;">🎯 Chegada e Baixa Automática</strong><br>
+                <span style="color: #ddd;">A tela do GPS é limpa de propósito. Os botões de <b>CONCLUÍDO</b> e <b>FALHA</b> só vão aparecer quando você estiver a menos de 30 metros da casa. Clicou em um deles? O aplicativo salva seu progresso e pula pro próximo alvo sozinho!</span>
+            </div>
+            
+            <div style="background: rgba(157, 0, 255, 0.1); border-left: 4px solid #9d00ff; padding: 12px; border-radius: 6px;">
+                <strong style="color: #c466ff;">🚶‍♂️ Combos a Pé (Vagas)</strong><br>
+                <span style="color: #ddd;">Se você criou uma "Vaga" no modo manual, o GPS te guiará até aquele ponto central na rua. Ao chegar, o sistema mostrará um <b>Checklist</b> de todos os pacotes para você sacar do carro e entregar caminhando de uma vez só.</span>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- 6. NAVEGAÇÃO E RELATÓRIO                   -->
+    <!-- ========================================== -->
     <div id="modal-menu-stops" class="modal-fullscreen" style="z-index: 4000;">
         <div class="header-menu-stops">
             <h2 style="margin: 0;">📋 LISTA DE PARADAS</h2>
@@ -270,7 +313,7 @@
     </div>
 
     <!-- ========================================== -->
-    <!-- 6. NOSSOS SCRIPTS FATIADOS                 -->
+    <!-- 7. NOSSOS SCRIPTS FATIADOS                 -->
     <!-- ========================================== -->
     <script>
         if ('serviceWorker' in navigator) {
@@ -280,12 +323,12 @@
         }
     </script>
 
-    <script src="js/main.js?v=2"></script>
-    <script src="js/leitor.js?v=2"></script>
-    <script src="js/motor-auto.js?v=2"></script>
-    <script src="js/motor-manual.js?v=2"></script>
-    <script src="js/motor-doca.js?v=2"></script>
-    <script src="js/motor-gps.js?v=2"></script>
+    <script src="js/main.js?v=3"></script>
+    <script src="js/leitor.js?v=3"></script>
+    <script src="js/motor-auto.js?v=3"></script>
+    <script src="js/motor-manual.js?v=3"></script>
+    <script src="js/motor-doca.js?v=3"></script>
+    <script src="js/motor-gps.js?v=3"></script>
 
 </body>
 </html>
