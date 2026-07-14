@@ -130,12 +130,29 @@
         </div>
     </div>
 
-    <div id="modal-info-padrao" class="modal-fullscreen">
+<div id="modal-info-padrao" class="modal-fullscreen">
         <h2>▶️ MODO: ROTA PADRÃO</h2>
-        <div class="info-container">
-            <p>Você escolheu seguir a <strong>sequência original</strong> da transportadora.</p>
+        
+        <div class="info-container" style="text-align: left; padding: 15px; font-size: 14px; line-height: 1.5;">
+            <p style="text-align: center; margin-top: 0; margin-bottom: 20px; color: #ccc;">Você optou por seguir a <strong>numeração original</strong> gerada pelo sistema da transportadora.</p>
+            
+            <div style="background: rgba(255, 68, 68, 0.1); border-left: 4px solid #ff4444; padding: 12px; border-radius: 6px; margin-bottom: 12px;">
+                <strong style="color: #ff4444;">🧭 Navegação Fiel</strong><br>
+                <span style="color: #ddd;">O GPS vai seguir estritamente a ordem numérica da sua planilha (Stop 1, 2, 3...).</span>
+            </div>
+            
+            <div style="background: rgba(255, 204, 0, 0.1); border-left: 4px solid #FFCC00; padding: 12px; border-radius: 6px; margin-bottom: 12px;">
+                <strong style="color: #FFCC00;">⚠️ Atenção ao Trajeto</strong><br>
+                <span style="color: #ddd;">Como a rota não passou pelo filtro Ninja, fique atento a possíveis cruzamentos de via e zig-zags.</span>
+            </div>
+            
+            <div style="background: rgba(57, 255, 20, 0.1); border-left: 4px solid #39FF14; padding: 12px; border-radius: 6px;">
+                <strong style="color: #39FF14;">🎨 Ferramentas Ativas</strong><br>
+                <span style="color: #ddd;">O Mapa de Calor e os Alertas de paradas Comerciais e pacotes Extras continuam funcionando normalmente!</span>
+            </div>
         </div>
-        <button class="btn-modo btn-padrao" onclick="avancarParaGPSPadrao()">INICIAR VIAGEM 🚀</button>
+        
+        <button class="btn-modo btn-padrao" style="margin-top: 15px;" onclick="avancarParaGPSPadrao()">INICIAR VIAGEM 🚀</button>
     </div>
 
     <div id="modal-info-otimizada" class="modal-fullscreen">
