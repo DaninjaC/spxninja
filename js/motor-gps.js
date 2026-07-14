@@ -49,7 +49,7 @@ function getAlvoData(index) {
 function iniciarInterfaceGPS() {
     initAudio(); requestWakeLock();
     
-    if (!horaInicioExpediente) horaInicioExpediente = new Date(); // Proteção para continuacao
+    if (!horaInicioExpediente) horaInicioExpediente = new Date();
 
     if (!mapGps) {
         mapGps = L.map('mapa-gps', { zoomControl: false, attributionControl: false }).setView([-23.615, -46.575], 16);
@@ -76,12 +76,13 @@ function iniciarInterfaceGPS() {
             if (alvo.isVaga) vagasCriadas.find(x => x.marker.spxId === alvo.id).gpsMarker = marker;
             else planilhaStopsData.find(x => x.stop === alvo.id).gpsMarker = marker;
             
+            // Correção Vital: Busca as coordenadas corretas na base para não quebrar a tela de GPS na restauração
             if (alvo.isVaga) {
                 let v = vagasCriadas.find(x => x.marker.spxId === alvo.id);
                 if(v.sugados) v.sugados.forEach(m => {
-                    // Resgate seguro para a memória 
-                    let mLat = m.getLatLng ? m.getLatLng() : [0,0];
-                    L.circleMarker(mLat, { radius: 5, color: '#007AFF', fillColor: '#111', fillOpacity: 0.6, weight: 1, dashArray: '2,2' }).addTo(camadaFundoGps)
+                    let pData = planilhaStopsData.find(x => x.stop === m.spxId);
+                    let mLat = pData ? [pData.lat, pData.lon] : (m.getLatLng ? m.getLatLng() : [0,0]);
+                    L.circleMarker(mLat, { radius: 5, color: '#007AFF', fillColor: '#111', fillOpacity: 0.6, weight: 1, dashArray: '2,2' }).addTo(camadaFundoGps);
                 });
             }
         } else {
@@ -89,14 +90,12 @@ function iniciarInterfaceGPS() {
         }
     }
 
-    // Se estivermos continuando a rota salva, resgata o índice, se não, começa no zero.
     idxDestino = typeof window.destinoSalvo !== 'undefined' ? window.destinoSalvo : 0;
     
     desenharTrilhaMestreFixaCompleta();
     atualizarProximaPernaRoxa();
     ativarRastreamentoGeolocalizacaoAtiva();
     
-    // Força o salvamento inicial para garantir a criação do botão
     if (typeof salvarEstadoRota === "function") salvarEstadoRota();
 }
 
@@ -240,7 +239,6 @@ function processarLogicaGuiamentoNavegacao() {
         if (navigator.vibrate) navigator.vibrate([200, 100, 200]); return;
     }
 
-    // Lógica das Setas de Direção
     if (passosNavegacao.length > 0) {
         const pAtual = passosNavegacao[idxPasso]; if (!pAtual) return;
         const dC = dist(minhaLat, minhaLon, pAtual.lat, pAtual.lon);
