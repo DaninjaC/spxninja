@@ -14,7 +14,7 @@ input[type="file"] { display: none; }
 .faq-header { padding: 15px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-weight: bold; font-size: 14px; color: #fff; background: #1a1a1a; user-select: none; }
 .faq-header:hover { background: #222; }
 .faq-body { padding: 0 15px; max-height: 0; overflow: hidden; transition: max-height 0.3s ease, padding 0.3s ease; font-size: 13px; color: #ccc; background: #000; line-height: 1.4; }
-.faq-item.active .faq-body { padding: 15px; max-height: 200px; border-top: 1px solid #333; }
+.faq-item.active .faq-body { padding: 15px; max-height: 450px; border-top: 1px solid #333; }
 .faq-item.active .faq-icon { transform: rotate(45deg); color: #39FF14; }
 .faq-icon { font-size: 20px; transition: transform 0.3s ease; color: #888; font-weight: normal; }
 
