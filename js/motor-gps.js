@@ -1,29 +1,45 @@
 /* ========================================= */
-/* motor-gps.js - Navegação com Rotação      */
+/* motor-gps.js - GPS Dinâmico (OSRM + Rotação)*/
 /* ========================================= */
 
 let mapaGPS = null;
 let markerCarro = null;
-let polylineAzul = null;  // Caminho até o alvo atual
-let polylineRoxa = null;  // Prévia do próximo alvo
-let polylinePreta = null; // Visão geral restante
+let polylineAzul = null;
+let polylineRoxa = null;
+let polylinePreta = null;
 let watchIdGPS = null;
 
-// --- VARIÁVEIS DA NOVA CÂMERA INTELIGENTE ---
+// Variáveis da Câmera e OSRM
 let ultimaLatCamera = null;
 let ultimaLonCamera = null;
 let anguloAtual = 0;
-window.isCameraTravada = true; // Sempre inicia focada e travada
+window.isCameraTravada = true; 
 
-// Função matemática para calcular o azimute (ângulo) entre 2 pontos
+let cacheOSRMCoords = null;
+let alvoCacheIndex = -1;
+let estaBuscandoOSRM = false;
+
 function calcularBearing(lat1, lon1, lat2, lon2) {
     const toRad = Math.PI / 180;
     const toDeg = 180 / Math.PI;
     const dLon = (lon2 - lon1) * toRad;
     const y = Math.sin(dLon) * Math.cos(lat2 * toRad);
     const x = Math.cos(lat1 * toRad) * Math.sin(lat2 * toRad) - Math.sin(lat1 * toRad) * Math.cos(lat2 * toRad) * Math.cos(dLon);
-    const bearing = Math.atan2(y, x) * toDeg;
-    return (bearing + 360) % 360;
+    return ((Math.atan2(y, x) * toDeg) + 360) % 360;
+}
+
+// Bate no servidor de mapas de asfalto
+async function buscarRotaOSRM(lat1, lon1, lat2, lon2) {
+    try {
+        let url = `https://router.project-osrm.org/route/v1/driving/${lon1},${lat1};${lon2},${lat2}?overview=full&geometries=geojson`;
+        let resp = await fetch(url);
+        let data = await resp.json();
+        if (data.routes && data.routes.length > 0) {
+            // OSRM devolve [Lon, Lat], o Leaflet usa [Lat, Lon]
+            return data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+        }
+    } catch(e) { console.warn("Erro ao buscar contorno de rua", e); }
+    return [[lat1, lon1], [lat2, lon2]]; // Se falhar, volta pra reta
 }
 
 function iniciarInterfaceGPS() {
@@ -31,16 +47,16 @@ function iniciarInterfaceGPS() {
         mapaGPS = L.map('mapa-gps', { zoomControl: false, attributionControl: false }).setView([-23.5505, -46.6333], 15);
         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(mapaGPS);
         
+        // Ponto Azul Estável
         let iconeCarro = L.divIcon({
             className: 'icone-carro-gps',
-            html: '🏎️', // Símbolo de posição
+            html: '<div style="font-size:24px; text-align:center; filter: drop-shadow(0 0 8px #007AFF);">🔵</div>', 
             iconSize: [30, 30],
             iconAnchor: [15, 15]
         });
         markerCarro = L.marker([-23.5505, -46.6333], {icon: iconeCarro, zIndexOffset: 1000}).addTo(mapaGPS);
     }
     
-    // Garante que o motor de rota comece de onde parou
     if (typeof window.destinoSalvo === 'undefined') window.destinoSalvo = 0;
 
     if (navigator.geolocation) {
@@ -50,7 +66,7 @@ function iniciarInterfaceGPS() {
             timeout: 5000
         });
     } else {
-        alert("GPS não suportado neste navegador.");
+        alert("GPS não suportado.");
     }
 
     atualizarPainelTopo();
@@ -61,32 +77,26 @@ function atualizarGPS(pos) {
     let lat = pos.coords.latitude;
     let lon = pos.coords.longitude;
     
-    // 1. Move o pino do carro no mapa
     markerCarro.setLatLng([lat, lon]);
 
-    // 2. LÓGICA DE ROTAÇÃO E CÂMERA (A MÁGICA)
     let containerMapa = document.getElementById('mapa-gps');
-    
+
     if (window.isCameraTravada) {
-        // Centraliza o mapa na tela do celular
         mapaGPS.setView([lat, lon], 18, {animate: true, duration: 0.5});
         
-        // Se já andamos pelo menos um pouco, calcula para onde o "bico" do carro aponta
         if (ultimaLatCamera !== null && ultimaLonCamera !== null) {
             let distMovida = dist(ultimaLatCamera, ultimaLonCamera, lat, lon);
             
-            // Só engatilha cálculo de ângulo se o carro realmente andou (evita tremedeira parado no farol)
-            if (distMovida > 3) {
+            // FILTRO DE RUÍDO: Só roda se o carro andou de verdade (6 metros), mata o "Bêbado"
+            if (distMovida > 6) {
                 let novoAngulo = calcularBearing(ultimaLatCamera, ultimaLonCamera, lat, lon);
-                
                 let diferenca = Math.abs(novoAngulo - anguloAtual);
-                if (diferenca > 180) diferenca = 360 - diferenca; // Correção da virada 360 -> 0
+                if (diferenca > 180) diferenca = 360 - diferenca;
                 
-                // ZONA MORTA: Só gira a tela de fato se a curva for brusca (>= 45 graus) ou se for o primeiríssimo movimento
-                if (diferenca >= 45 || anguloAtual === 0) {
+                // Zona Morta: Só ajusta a câmera se mudar mais de 10 graus
+                if (diferenca > 10) {
                     anguloAtual = novoAngulo;
                 }
-                // Atualiza a memória de movimento
                 ultimaLatCamera = lat;
                 ultimaLonCamera = lon;
             }
@@ -95,31 +105,32 @@ function atualizarGPS(pos) {
             ultimaLonCamera = lon;
         }
 
-        // Aplica o giro suave na caixa inteira via CSS (transform: rotate)
-        // Usamos sinal negativo para manter o bico do carro apontado para o "norte" da tela do celular
-        if(containerMapa) {
-            containerMapa.style.transform = `rotate(${-anguloAtual}deg)`;
-        }
-        mapaGPS.dragging.disable(); // Impede o "bug do dedo invertido"
-
+        if(containerMapa) containerMapa.style.transform = `rotate(${-anguloAtual}deg)`;
+        mapaGPS.dragging.disable(); 
     } else {
-        // MODO LIVRE (Motorista destravou a tela para ver o mapa geral)
-        if(containerMapa) {
-            containerMapa.style.transform = `rotate(0deg)`; // Volta pro Norte real
-        }
-        mapaGPS.dragging.enable(); // Libera o dedo
+        if(containerMapa) containerMapa.style.transform = `rotate(0deg)`; 
+        mapaGPS.dragging.enable(); 
     }
 
-    // 3. Atualiza os botões e linhas do Alvo
     if (window.destinoSalvo < rotaSpx.length) {
         let alvo = rotaSpx[window.destinoSalvo];
         let d = dist(lat, lon, alvo.lat, alvo.lon);
         
         document.getElementById('rodape-dist').innerText = d > 1000 ? (d/1000).toFixed(1) + " km" : Math.round(d) + " m";
         
-        desenharLinhasNavegacao(lat, lon);
+        // Chamada Inteligente do OSRM (Só bate no servidor 1x por alvo)
+        if (alvoCacheIndex !== window.destinoSalvo && !estaBuscandoOSRM) {
+            estaBuscandoOSRM = true;
+            buscarRotaOSRM(lat, lon, alvo.lat, alvo.lon).then(coords => {
+                cacheOSRMCoords = coords;
+                alvoCacheIndex = window.destinoSalvo;
+                estaBuscandoOSRM = false;
+                desenharLinhasNavegacao(lat, lon); // Redesenha a linha nova do asfalto
+            });
+        } else {
+            desenharLinhasNavegacao(lat, lon);
+        }
 
-        // Radar Inteligente: Geofence de baixa automática de 30 metros
         let painelAcoes = document.getElementById('painel-acoes');
         if (d < 30) {
             painelAcoes.style.display = 'flex';
@@ -129,16 +140,17 @@ function atualizarGPS(pos) {
     }
 }
 
-// Controle do Botão de Visão Geral (Que faremos no HTML)
 window.alternarModoCamera = function() {
     window.isCameraTravada = !window.isCameraTravada;
+    let btn = document.getElementById('btn-trava-camera');
+    
     if (window.isCameraTravada) {
         mapaGPS.setView(markerCarro.getLatLng(), 18);
-        document.getElementById('btn-trava-camera').innerText = "📍 FOCAR ROTA";
-        document.getElementById('btn-trava-camera').style.background = "#007AFF";
+        btn.innerText = "📍 FOCAR ROTA";
+        btn.style.background = "#007AFF";
     } else {
-        document.getElementById('btn-trava-camera').innerText = "🗺️ MODO LIVRE";
-        document.getElementById('btn-trava-camera').style.background = "#FF8C00";
+        btn.innerText = "🗺️ MODO LIVRE";
+        btn.style.background = "#FF8C00";
     }
 }
 
@@ -157,7 +169,13 @@ function desenharLinhasNavegacao(carLat, carLon) {
     if (polylineRoxa) mapaGPS.removeLayer(polylineRoxa);
 
     let alvoAtual = rotaSpx[window.destinoSalvo];
-    polylineAzul = L.polyline([[carLat, carLon], [alvoAtual.lat, alvoAtual.lon]], {color: '#007AFF', weight: 6}).addTo(mapaGPS);
+    
+    // Liga o carro à linha do OSRM
+    let coordsAzul = cacheOSRMCoords && cacheOSRMCoords.length > 0 
+                     ? [[carLat, carLon], ...cacheOSRMCoords] 
+                     : [[carLat, carLon], [alvoAtual.lat, alvoAtual.lon]];
+
+    polylineAzul = L.polyline(coordsAzul, {color: '#007AFF', weight: 6}).addTo(mapaGPS);
 
     if (window.destinoSalvo + 1 < rotaSpx.length) {
         let proxAlvo = rotaSpx[window.destinoSalvo + 1];
@@ -176,7 +194,14 @@ function atualizarPainelTopo() {
         document.getElementById('rodape-rua').innerText = "ESTACIONE (COMBO A PÉ)";
         montarChecklistVaga(alvo);
     } else {
-        conteudoRua = typeof extrairRuaPadrao === 'function' ? extrairRuaPadrao(alvo.Endereco) : alvo.Endereco;
+        // BLINDAGEM CONTRA O "DESCONHECIDO"
+        let enderecoBruto = alvo.Endereço || alvo.Endereco || alvo.endereco || alvo.Rua || alvo.rua || alvo.Logradouro || "";
+        conteudoRua = typeof extrairRuaPadrao === 'function' && enderecoBruto !== "" ? extrairRuaPadrao(enderecoBruto) : enderecoBruto;
+        
+        if (!conteudoRua || conteudoRua === "DESCONHECIDO" || conteudoRua.trim() === "") {
+            conteudoRua = "Siga a Linha Azul 📍";
+        }
+
         document.getElementById('rodape-rua').innerText = conteudoRua;
         document.getElementById('combo-checklist-container').innerHTML = ''; 
     }
@@ -190,7 +215,10 @@ function montarChecklistVaga(alvo) {
         let pctEnd = "Pacote " + (i+1);
         if(typeof planilhaStopsData !== 'undefined') {
             let p = planilhaStopsData.find(x => x.spxId === sId);
-            if(p && typeof extrairRuaPadrao === 'function') pctEnd = extrairRuaPadrao(p.Endereco);
+            if(p) {
+                let endP = p.Endereço || p.Endereco || p.endereco || p.Rua || "";
+                if(typeof extrairRuaPadrao === 'function' && endP !== "") pctEnd = extrairRuaPadrao(endP);
+            }
         }
         html += `<div style="font-size:12px; border-bottom:1px solid #333; padding:3px 0;">${pctEnd}</div>`;
     });
@@ -215,7 +243,7 @@ function finalizarParadaAtual(status) {
         atualizarPainelTopo();
         desenharRotaRestante();
         
-        // Zera o cálculo da câmera para não dar solavanco de giro no próximo cliente
+        // Zera tudo para a câmera e o OSRM rodarem do zero na próxima parada
         ultimaLatCamera = null;
         ultimaLonCamera = null;
     }
@@ -248,7 +276,11 @@ function renderizarListaStops() {
     let html = '';
     rotaSpx.forEach((alvo, idx) => {
         let cor = (idx < window.destinoSalvo) ? 'green' : (idx === window.destinoSalvo ? '#007AFF' : '#333');
-        let textoEnd = alvo.isVaga ? '🚙 Estacionamento (Vaga)' : (typeof extrairRuaPadrao === 'function' ? extrairRuaPadrao(alvo.Endereco) : alvo.Endereco);
+        
+        let enderecoBruto = alvo.Endereço || alvo.Endereco || alvo.endereco || alvo.Rua || alvo.rua || alvo.Logradouro || "";
+        let textoEnd = alvo.isVaga ? '🚙 Estacionamento (Vaga)' : (typeof extrairRuaPadrao === 'function' && enderecoBruto !== "" ? extrairRuaPadrao(enderecoBruto) : enderecoBruto);
+        if (!textoEnd || textoEnd === "DESCONHECIDO" || textoEnd.trim() === "") textoEnd = "Siga a Linha Azul 📍";
+
         html += `<div style="padding: 15px; margin: 10px; background: ${cor}; border-radius: 8px;" onclick="forcarPuloPara(${idx})">
             <strong>Stop ${idx + 1}</strong><br>${textoEnd}
         </div>`;
@@ -264,7 +296,6 @@ function forcarPuloPara(idx) {
     atualizarPainelTopo();
     desenharRotaRestante();
     
-    // Zera o cálculo de câmera no pulo manual
     ultimaLatCamera = null;
     ultimaLonCamera = null;
 }
