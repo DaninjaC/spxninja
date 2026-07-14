@@ -334,8 +334,6 @@ function abrirMenuStops() {
             `;
         }
 
-        // --- RESGATE DA LÓGICA DE TAGS E VOLUMES RICA ---
-        
         // 1. Pílula de Calor (Volume Total) flutuando à direita
         let volColor = getCorVolume(alvo.totalVol);
         let volPill = `<span style="float:right; font-size:13px; background:${volColor.bg}; color:${volColor.color}; padding:2px 8px; border-radius:10px; font-weight:bold;">${alvo.totalVol} vol</span>`;
@@ -367,23 +365,6 @@ function abrirMenuStops() {
                 ${volPill}
             </div>
             <div style="font-size:13px; opacity:0.9; margin-top:3px; line-height: 1.5;">${descInfo}</div>
-            ${botoesAcao}
-        </div>`;
-    }
-    document.getElementById('conteudo-lista-stops').innerHTML = html;
-    mostrarTela('modal-menu-stops', 'block');
-}
-
-        let descInfo = alvo.isVaga 
-            ? `Combo a pé contendo: ${alvo.pacotes.map(p => 'Stop ' + p.stop + ' (' + p.pacotes + ' vol)').join(', ')}`
-            : alvo.obj.ruaPadrao;
-
-        let labelPrincipal = alvo.isVaga ? alvo.id : (alvo.obj.extra ? "PACOTE EXTRA" : "Stop " + alvo.id);
-
-        html += `
-        <div style="background:${corFundo}; ${borda} border-radius:10px; padding:15px; margin-bottom:10px; text-align:left; color:${corTexto}; cursor:pointer;" onclick="pularParaStop(${i})">
-            <div style="font-size:16px; font-weight:bold; color:${isAtivo ? '#fff' : (alvo.isVaga ? '#007AFF' : '#fff')};">${statusIcon} <span style="color:#FFCC00;">#${i+1}</span> ➔ ${labelPrincipal}</div>
-            <div style="font-size:12px; opacity:0.8; margin-top:3px;">${descInfo}</div>
             ${botoesAcao}
         </div>`;
     }
@@ -464,7 +445,6 @@ function avaliarConclusaoExpedienteTotal() {
     document.getElementById('rel-raiox').innerText = `${rotaSpx.length} Paradas | ${totalVols} Vol`;
     document.getElementById('rel-rapida').innerText = txtRapida;
 
-    // Lógica para esconder KM Poupado no Modo Manual
     if (isRotaManual) {
         document.querySelectorAll('.auto-metric').forEach(el => el.style.display = 'none');
     } else {
