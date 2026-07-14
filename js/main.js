@@ -147,7 +147,7 @@ function iniciarModoAutomatico() { esconderTodasTelas(); if (typeof roteirizarMo
 function iniciarModoManual() { esconderTodasTelas(); if (typeof iniciarMapeamentoManual === "function") iniciarMapeamentoManual(); else alert("O motor manual ainda não foi carregado."); }
 
 // --- FORMULÁRIO DE CONTATO (COM ENVIO REAL E SEM CAPTCHA) ---
-function enviarContato(event) {
+async function enviarContato(event) {
     event.preventDefault(); 
     
     // O seu código secreto ativado!
@@ -162,34 +162,42 @@ function enviarContato(event) {
     btnSubmit.innerText = "⏳ ENVIANDO...";
     btnSubmit.disabled = true;
 
-    fetch(`https://formsubmit.co/ajax/${seuEmailPessoal}`, {
-        method: "POST",
-        headers: { 
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-        },
-        body: JSON.stringify({
-            Nome: nome,
-            Email_Motorista: email,
-            Mensagem: mensagem,
-            _subject: "Nova Mensagem do App SPX Ninja!", 
-            _captcha: "false" // ⬅️ A MÁGICA QUE DESLIGA O TESTE DO ROBÔ
-        })
-    })
-    .then(response => {
-        if (!response.ok) throw new Error("Falha na comunicação com o carteiro.");
-        return response.json();
-    })
-    .then(data => {
-        alert(`Obrigado, ${nome}! Sua mensagem foi enviada com sucesso para a nossa equipe.`);
-        document.getElementById('form-contato').reset(); 
-        event.target.parentElement.parentElement.classList.remove('active'); 
-    })
-    .catch(error => {
-        alert("Ocorreu um erro ao enviar sua mensagem. Verifique sua conexão e tente novamente.");
-    })
-    .finally(() => {
+    try {
+        let response = await fetch(`https://formsubmit.co/ajax/${seuEmailPessoal}`, {
+            method: "POST",
+            headers: { 
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({
+                Nome: nome,
+                Email_Motorista: email,
+                Mensagem: mensagem,
+                _subject: "Nova Mensagem do App SPX Ninja!", 
+                _captcha: "false" 
+            })
+        });
+
+        if (!response.ok) throw new Error("Falha na comunicação com o servidor.");
+
+        // 1º: Limpamos a tela ANTES do alerta para não congelar o celular
         btnSubmit.innerText = textoOriginal;
         btnSubmit.disabled = false;
-    });
+        document.getElementById('form-contato').reset(); 
+        event.target.parentElement.parentElement.classList.remove('active'); 
+
+        // 2º: Disparamos o alerta com um leve atraso para a tela ter tempo de atualizar
+        setTimeout(() => {
+            alert(`Obrigado, ${nome}! Sua mensagem foi enviada com sucesso para a nossa equipe.`);
+        }, 150);
+
+    } catch (error) {
+        // Se der erro, destrava o botão antes de avisar
+        btnSubmit.innerText = textoOriginal;
+        btnSubmit.disabled = false;
+        
+        setTimeout(() => {
+            alert("Ocorreu um erro ao enviar sua mensagem. Verifique sua conexão e tente novamente.");
+        }, 150);
+    }
 }
