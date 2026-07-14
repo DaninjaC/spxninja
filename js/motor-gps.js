@@ -13,7 +13,6 @@ let passosNavegacao = [], distAnteriorCurva = Infinity;
 let latAntGps = null, lonAntGps = null, headingCarro = null;
 let aguardandoConfirmacao = false;
 
-// Função Mágica: Traduz o Alvo Atual não importando de qual modo viemos
 function getAlvoData(index) {
     if (isRotaManual) {
         let idAlvo = rotaSpx[index];
@@ -49,7 +48,8 @@ function getAlvoData(index) {
 
 function iniciarInterfaceGPS() {
     initAudio(); requestWakeLock();
-    horaInicioExpediente = new Date();
+    
+    if (!horaInicioExpediente) horaInicioExpediente = new Date(); // Proteção para continuacao
 
     if (!mapGps) {
         mapGps = L.map('mapa-gps', { zoomControl: false, attributionControl: false }).setView([-23.615, -46.575], 16);
@@ -63,7 +63,6 @@ function iniciarInterfaceGPS() {
 
     camadaFundoGps.clearLayers();
     
-    // Plota os pinos traduzidos
     for (let i = 0; i < rotaSpx.length; i++) {
         let alvo = getAlvoData(i);
         let fillColor = alvo.status === 'concluido' ? '#888' : (alvo.status === 'pendente' ? '#ff0000' : alvo.markerStyle.fillColor);
@@ -73,24 +72,32 @@ function iniciarInterfaceGPS() {
             fillColor: fillColor, fillOpacity: 1, weight: alvo.markerStyle.weight 
         }).bindTooltip(alvo.isVaga ? alvo.id : (alvo.obj.extra ? "Extra" : "Stop " + alvo.id), { permanent: true, direction: 'top', className: 'stop-label' }).addTo(camadaFundoGps);
 
-        // Guarda o marcador físico para podermos pintar de cinza/vermelho depois
         if(isRotaManual) {
             if (alvo.isVaga) vagasCriadas.find(x => x.marker.spxId === alvo.id).gpsMarker = marker;
             else planilhaStopsData.find(x => x.stop === alvo.id).gpsMarker = marker;
             
             if (alvo.isVaga) {
                 let v = vagasCriadas.find(x => x.marker.spxId === alvo.id);
-                v.sugados.forEach(m => L.circleMarker(m.getLatLng(), { radius: 5, color: '#007AFF', fillColor: '#111', fillOpacity: 0.6, weight: 1, dashArray: '2,2' }).addTo(camadaFundoGps));
+                if(v.sugados) v.sugados.forEach(m => {
+                    // Resgate seguro para a memória 
+                    let mLat = m.getLatLng ? m.getLatLng() : [0,0];
+                    L.circleMarker(mLat, { radius: 5, color: '#007AFF', fillColor: '#111', fillOpacity: 0.6, weight: 1, dashArray: '2,2' }).addTo(camadaFundoGps)
+                });
             }
         } else {
             rotaSpx[i].gpsMarker = marker;
         }
     }
 
-    idxDestino = 0;
+    // Se estivermos continuando a rota salva, resgata o índice, se não, começa no zero.
+    idxDestino = typeof window.destinoSalvo !== 'undefined' ? window.destinoSalvo : 0;
+    
     desenharTrilhaMestreFixaCompleta();
     atualizarProximaPernaRoxa();
     ativarRastreamentoGeolocalizacaoAtiva();
+    
+    // Força o salvamento inicial para garantir a criação do botão
+    if (typeof salvarEstadoRota === "function") salvarEstadoRota();
 }
 
 async function desenharTrilhaMestreFixaCompleta() {
@@ -293,7 +300,9 @@ function finalizarParadaAtual(status) {
         p.status = status;
         historicoParadas.push({ stop: p.stop, hora: agora, ms: Math.round(tempoGasto / alvo.pacotes.length), extra: p.extra, status: status });
     });
+    
     atualizarCorPinoGPS(idxDestino, status);
+    if (typeof salvarEstadoRota === "function") salvarEstadoRota(); // SALVA O PROGRESSO
 
     aguardandoConfirmacao = false; requestWakeLock();
     document.getElementById('painel-rodape').style.display = 'block';
@@ -334,16 +343,13 @@ function abrirMenuStops() {
             `;
         }
 
-        // 1. Pílula de Calor (Volume Total) flutuando à direita
         let volColor = getCorVolume(alvo.totalVol);
         let volPill = `<span style="float:right; font-size:13px; background:${volColor.bg}; color:${volColor.color}; padding:2px 8px; border-radius:10px; font-weight:bold;">${alvo.totalVol} vol</span>`;
         
-        // 2. Tags Inteligentes (Comercial / Extra)
         let tagsHtml = '';
         if (alvo.comercial) tagsHtml += `<span class="tag-comercial" style="float:none; display:inline-block; margin-bottom:5px;">🏢 COMERCIAL</span> `;
         if (!alvo.isVaga && alvo.obj.extra) tagsHtml += `<span class="tag-extra" style="float:none; display:inline-block; margin-bottom:5px;">❓ EXTRA</span> `;
 
-        // 3. Descritivo (Mostra a rua ou o detalhamento dos pacotes na Vaga)
         let descInfo = '';
         if (alvo.isVaga) {
             let sugadosText = alvo.pacotes.map(p => {
@@ -357,7 +363,6 @@ function abrirMenuStops() {
 
         let labelPrincipal = alvo.isVaga ? alvo.id : (alvo.obj.extra ? "PACOTE EXTRA" : "Stop " + alvo.id);
 
-        // 4. Montagem do Card na Lista
         html += `
         <div style="background:${corFundo}; ${borda} border-radius:10px; padding:15px; margin-bottom:10px; text-align:left; color:${corTexto}; cursor:pointer;" onclick="pularParaStop(${i})">
             <div style="font-size:16px; font-weight:bold; color:${isAtivo ? '#fff' : (alvo.isVaga ? '#007AFF' : '#fff')}; margin-bottom: 5px;">
@@ -384,7 +389,9 @@ function forcarBaixaMenu(e, index, status) {
         p.status = status;
         historicoParadas.push({ stop: p.stop, hora: agora, ms: Math.round(tempoGasto / alvo.pacotes.length), extra: p.extra, status: status });
     });
+    
     atualizarCorPinoGPS(index, status);
+    if (typeof salvarEstadoRota === "function") salvarEstadoRota(); // SALVA O PROGRESSO
     abrirMenuStops(); 
 
     if (index === idxDestino) {
