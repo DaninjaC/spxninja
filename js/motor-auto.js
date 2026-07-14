@@ -187,7 +187,10 @@ function escolherRotaOtimizada() {
 
 function avancarParaGPSPadrao() {
     esconderTodasTelas();
-    if (typeof iniciarInterfaceNavegacao === "function") iniciarInterfaceNavegacao();
+    mostrarTela('tela-navegacao'); // Faltava mandar a tela do GPS aparecer
+    if (typeof iniciarInterfaceGPS === "function") {
+        iniciarInterfaceGPS(); // O nome correto da função que liga o motor do mapa
+    }
 }
 
 function avancarParaDocaOtimizada() {
