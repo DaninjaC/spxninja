@@ -3,6 +3,12 @@
 /* ========================================= */
 
 document.getElementById('fileInput').addEventListener('change', async function(e) {
+    // 1. Limpeza Imediata da Memória: Esconde botão e apaga rota velha
+    let btnCont = document.getElementById('btn-continuar');
+    if (btnCont) btnCont.style.display = 'none';
+    localStorage.removeItem('spx_ninja_estado');
+
+    // 2. Mudança Visual
     document.getElementById('btnLabel').style.display = 'none';
     document.getElementById('faq-box').style.display = 'none';
     document.getElementById('loading-msg').style.display = 'block';
@@ -56,7 +62,6 @@ document.getElementById('fileInput').addEventListener('change', async function(e
 
             const stopsUnicos = new Set();
 
-            // Monta a variável global (planilhaStopsData) limpa
             planilhaStopsData = paradasOficiaisRaw.filter(i => {
                     let s = i.stopLimpo;
                     if (stopsUnicos.has(s)) return false; 
@@ -80,7 +85,6 @@ document.getElementById('fileInput').addEventListener('change', async function(e
                 })
                 .filter(i => !isNaN(i.lat) && !isNaN(i.lon));
 
-            // Insere os extras no final da lista para serem tratados depois pelos motores
             let cExtra = 1;
             pacotesMisteriososRaw.forEach(e => {
                 if (isNaN(e.lat) || isNaN(e.lon)) return;
@@ -94,7 +98,6 @@ document.getElementById('fileInput').addEventListener('change', async function(e
 
             if (planilhaStopsData.length === 0) throw new Error("Sem coordenadas válidas.");
 
-            // Se leu com sucesso, oculta a tela de início e mostra a escolha de estratégia
             esconderTodasTelas();
             mostrarTela('modal-escolha-modo');
 
