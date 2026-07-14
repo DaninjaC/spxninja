@@ -6,8 +6,6 @@ let rotaOriginalData = [];
 let rotaOtimizadaData = [];
 let mapPadrao = null, mapOtimizado = null;
 let layerPadrao = L.layerGroup(), layerOtimizado = L.layerGroup();
-let globalKmPadrao = 0, globalKmOtimizada = 0;
-let isRotaManual = false; 
 
 function roteirizarModoAutomatico() {
     isRotaManual = false;
@@ -16,13 +14,10 @@ function roteirizarModoAutomatico() {
     let paradasOficiais = planilhaStopsData.filter(p => !p.extra);
     let pacotesMisteriosos = planilhaStopsData.filter(p => p.extra);
 
-    // CORREÇÃO: A rota padrão joga os pacotes sem numeração pro final da viagem (como o app original faz).
     rotaOriginalData = [...paradasOficiais, ...pacotesMisteriosos];
 
-    // Rota Otimizada agrupa por rua (Efeito Varal)
     rotaOtimizadaData = gerarRotaPorFluxo(paradasOficiais);
 
-    // Rota Otimizada encaixa os pacotes extras inteligentemente no vizinho mais próximo
     let counterExtra = 1;
     pacotesMisteriosos.forEach(mist => {
         let menorDist = Infinity;
@@ -79,7 +74,6 @@ async function plotarVisaoPassaro(camada, mapaLocal, rota, corLinha) {
     let boundsCoords = [];
     let distanciaTotalReal = 0;
     
-    // Novas métricas de auditoria Ninja
     let quebrasDeRua = 0;
     let ruasVisitadas = new Set();
     let ruasRevisitadasPenalty = 0;
@@ -103,22 +97,19 @@ async function plotarVisaoPassaro(camada, mapaLocal, rota, corLinha) {
             const anterior = rota[i-1];
             const dReta = dist(anterior.lat, anterior.lon, p.lat, p.lon);
             
-            // CORREÇÃO: Lógica de Punição de Trânsito
             if (anterior.ruaPadrao !== p.ruaPadrao && anterior.ruaPadrao !== "DESCONHECIDO" && p.ruaPadrao !== "DESCONHECIDO") {
                 quebrasDeRua++;
                 ruasVisitadas.add(anterior.ruaPadrao);
                 
-                // Se a transportadora mandou o motorista voltar para uma rua que ele já tinha entregado antes (Zig-Zag)
                 if (ruasVisitadas.has(p.ruaPadrao)) {
                     ruasRevisitadasPenalty++;
                 }
             }
 
-            // Bônus Combo a Pé (se < 70m, só soma a caminhada sem multa de carro)
             if (dReta <= 70) {
                 distanciaTotalReal += dReta; 
             } else {
-                distanciaTotalReal += dReta * 1.8; // Multa por uso de carro (curvas, balão, acelerar/frear)
+                distanciaTotalReal += dReta * 1.8; 
             }
         }
     }
@@ -128,9 +119,7 @@ async function plotarVisaoPassaro(camada, mapaLocal, rota, corLinha) {
         mapaLocal.fitBounds(L.polyline(boundsCoords).getBounds(), { padding: [30, 30] });
     }
 
-    // O Custo Final: Distância + 350m por cada esquina virada + 1KM de punição por cada vez que voltar na mesma rua.
     let kmComMulta = (distanciaTotalReal + (quebrasDeRua * 350) + (ruasRevisitadasPenalty * 1000)) / 1000;
-    
     return { km: kmComMulta, quebras: quebrasDeRua, revisitadas: ruasRevisitadasPenalty };
 }
 
