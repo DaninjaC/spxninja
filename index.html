@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SPX Ninja - App</title>
+    <!-- NOME ALTERADO NA ABA DO NAVEGADOR -->
+    <title>Rota Ninja - App</title>
     
     <!-- PWA Manifest -->
     <link rel="manifest" href="manifest.json">
@@ -23,10 +24,12 @@
     <!-- 1. TELA INICIAL (CARREGAMENTO)             -->
     <!-- ========================================== -->
     <div id="controles-iniciais">
-        <img src="assets/ninjaspx.png" alt="SPX Ninja Logo" class="logo-ninja-img" onerror="this.style.display='none'">
+        <!-- NOME ALTERADO NO ATRIBUTO DA IMAGEM -->
+        <img src="assets/ninjaspx.png" alt="Rota Ninja Logo" class="logo-ninja-img" onerror="this.style.display='none'">
         
         <label class="btn-ini" id="btnLabel">
-            📦 CARREGAR PLANILHA SHOPEE
+            <!-- NOME SHOPEE REMOVIDO DAQUI -->
+            📦 CARREGAR PLANILHA
             <input type="file" id="fileInput" accept=".xlsx, .xls, .csv">
         </label>
         
@@ -38,7 +41,8 @@
         <div class="faq-container" id="faq-box" style="margin-top: 30px;">
             
             <div class="faq-item">
-                <div class="faq-header" onclick="this.parentElement.classList.toggle('active')">🥷 Sobre o SPX Ninja <span class="faq-icon">+</span></div>
+                <!-- NOME ALTERADO AQUI -->
+                <div class="faq-header" onclick="this.parentElement.classList.toggle('active')">🥷 Sobre o Rota Ninja <span class="faq-icon">+</span></div>
                 <div class="faq-body" style="line-height: 1.5; font-size: 14px; color: #ccc;">
                     <p style="margin-top: 5px;"><strong>🎯 Qual a missão do app?</strong><br>
                     Chegar em casa mais cedo e com mais dinheiro no bolso. O aplicativo pega a sua planilha bruta e cria uma estratégia visual avançada para eliminar o zig-zag, reduzir as manobras e poupar o seu asfalto e combustível.</p>
@@ -110,14 +114,16 @@
         <div class="grid-mapas">
             <div class="col-mapa">
                 <button class="btn-modo btn-padrao" onclick="escolherRotaPadrao()">
-                    ▶️ ROTA PADRÃO SHOPEE<br><span id="km-padrao" style="font-weight:normal; font-size:14px;">Calculando Custo...</span>
+                    <!-- NOME SHOPEE REMOVIDO DAQUI -->
+                    ▶️ ROTA PADRÃO<br><span id="km-padrao" style="font-weight:normal; font-size:14px;">Calculando Custo...</span>
                 </button>
                 <div class="legenda"><span style="background: #ff4444; border-bottom: 2px dashed #ff4444; height: 1px;"></span> Sequência Padrão</div>
                 <div id="mapa-padrao" class="mapa-container"></div>
             </div>
             <div class="col-mapa">
                 <button class="btn-modo btn-otimizada" onclick="escolherRotaOtimizada()">
-                    🚀 OTIMIZADA SPX NINJA<br><span id="km-otimizada" style="font-weight:normal; font-size:14px;">Calculando Custo...</span>
+                    <!-- NOME ALTERADO AQUI -->
+                    🚀 OTIMIZADA ROTA NINJA<br><span id="km-otimizada" style="font-weight:normal; font-size:14px;">Calculando Custo...</span>
                 </button>
                 <div class="legenda"><span style="background: #39FF14; border-bottom: 2px dashed #39FF14; height: 1px;"></span> Zíper Contínuo</div>
                 <div id="mapa-otimizado" class="mapa-container"></div>
@@ -176,11 +182,9 @@
         </div>
     </div>
 
-    <!-- TELA: ONBOARDING DO MODO MANUAL -->
     <div id="modal-guia-manual" class="modal-fullscreen">
         <h2>✏️ GUIA DO MODO MANUAL</h2>
         
-        <!-- Controles no Topo -->
         <div style="background: #1a1a1a; padding: 15px; border-radius: 8px; margin-bottom: 20px; text-align: center; border: 1px solid #333;">
             <button class="btn-modo btn-padrao" onclick="avancarParaDesenhoManual()" style="background:#FF8C00; color:#000; margin-bottom: 10px;">BORA DESENHAR! 🗺️</button>
             <label style="color: #aaa; font-size: 14px; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer;">
@@ -194,21 +198,18 @@
             <div style="background: rgba(0, 122, 255, 0.1); border-left: 4px solid #007AFF; padding: 12px; border-radius: 6px; margin-bottom: 12px;">
                 <strong style="color: #007AFF;">🗺️ Navegar e Riscar</strong><br>
                 <span style="color: #ddd;">Encontre o pacote inicial e dê Zoom nele. Para ligar os pontos, clique em <b>✏️ ATIVAR DESENHO</b> e arraste o dedo seguindo a mão da rua (os pinos ficarão verdes). Precisa mexer o mapa? Clique no botão novamente para desativar o desenho, mova a tela e ative de novo!</span>
-                <!-- IMAGEM 1: EXEMPLO DE RISCO -->
                 <img src="assets/explrisco.jpeg" alt="Exemplo de Risco" style="width: 100%; border-radius: 6px; margin-top: 12px; border: 1px solid rgba(0, 122, 255, 0.3);" onerror="this.style.display='none'">
             </div>
 
             <div style="background: rgba(157, 0, 255, 0.1); border-left: 4px solid #9d00ff; padding: 12px; border-radius: 6px; margin-bottom: 12px;">
                 <strong style="color: #c466ff;">🚶‍♂️ Combos a Pé (Vagas)</strong><br>
                 <span style="color: #ddd;">Viu um monte de pacotes vizinhos? Com o desenho ativado, <b>segure o dedo numa rua vazia</b> para criar uma Vaga (círculo azul). Depois, basta riscar ligando os clientes até ela! Isso reduz o arranca-e-para do carro.</span>
-                <!-- IMAGEM 2: EXEMPLO DE VAGA -->
                 <img src="assets/explvaga.jpeg" alt="Exemplo de Vaga" style="width: 100%; border-radius: 6px; margin-top: 12px; border: 1px solid rgba(157, 0, 255, 0.3);" onerror="this.style.display='none'">
             </div>
             
             <div style="background: rgba(255, 68, 68, 0.1); border-left: 4px solid #ff4444; padding: 12px; border-radius: 6px; margin-bottom: 12px;">
                 <strong style="color: #ff4444;">↩️ Desfazendo Erros</strong><br>
                 <span style="color: #ddd;">No painel inferior, ao lado da ordem capturada, você encontra botões rápidos para <b>UNDO RISCO</b> (apagar o último traço) ou <b>UNDO VAGA</b> (apagar o estacionamento criado).</span>
-                <!-- IMAGEM 3: EXEMPLO DE LEGENDA -->
                 <img src="assets/exmpllegenda.jpeg" alt="Exemplo de Legenda" style="width: 100%; border-radius: 6px; margin-top: 12px; border: 1px solid rgba(255, 68, 68, 0.3);" onerror="this.style.display='none'">
             </div>
 
@@ -228,7 +229,6 @@
             <p id="instrucao-desenho">Arraste para ligar os pinos. Toque na rua vazia para criar Vaga.</p>
             <div style="display:flex; gap:10px; justify-content:center; margin-bottom:5px;">
                 <button id="btn-toggle-vidro" class="btn-action" style="background:#FF8C00; color:#000;" onclick="toggleModoDesenho()">✏️ ATIVAR DESENHO</button>
-                <!-- BOTÃO ALTERADO PARA CHAMAR A TELA NOVA ANTES DE PROCESSAR -->
                 <button class="btn-action" style="background:#39FF14; color:#000;" onclick="prepararGuiaDocaManual()">AVANÇAR ➔</button>
             </div>
         </div>
@@ -252,7 +252,6 @@
     <!-- 5. COMPARTILHADOS (DOCA E GUIA GPS)        -->
     <!-- ========================================== -->
     
-    <!-- TELA NOVA: ONBOARDING DA DOCA (MODO MANUAL) -->
     <div id="modal-guia-doca-manual" class="modal-fullscreen">
         <h2>🚀 GUIA DE SEPARAÇÃO NINJA</h2>
         
@@ -291,7 +290,6 @@
         <button class="btn-modo btn-otimizada" style="margin-top:10px; margin-bottom:40px;" onclick="prepararIdaParaGPS()">INICIAR VIAGEM 🚀</button>
     </div>
 
-    <!-- TELA: ONBOARDING DO GPS -->
     <div id="modal-guia-gps" class="modal-fullscreen">
         <h2>🧭 COMO USAR O GPS NINJA</h2>
         
@@ -395,12 +393,13 @@
         }
     </script>
 
-    <script src="js/main.js?v=5"></script>
-    <script src="js/leitor.js?v=5"></script>
-    <script src="js/motor-auto.js?v=5"></script>
-    <script src="js/motor-manual.js?v=5"></script>
-    <script src="js/motor-doca.js?v=5"></script>
-    <script src="js/motor-gps.js?v=5"></script>
+    <!-- OS SCRIPTS AGORA ESTÃO NA VERSÃO 7 PARA FORÇAR A LIMPEZA DE CACHE -->
+    <script src="js/main.js?v=7"></script>
+    <script src="js/leitor.js?v=7"></script>
+    <script src="js/motor-auto.js?v=7"></script>
+    <script src="js/motor-manual.js?v=7"></script>
+    <script src="js/motor-doca.js?v=7"></script>
+    <script src="js/motor-gps.js?v=7"></script>
 
 </body>
 </html>
