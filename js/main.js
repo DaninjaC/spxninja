@@ -1,4 +1,4 @@
-/* ========================================= */
+=/* ========================================= */
 /* main.js - Variáveis Globais e Utilitários */
 /* ========================================= */
 
@@ -76,7 +76,6 @@ function continuarRotaSalva() {
     planilhaStopsData = estado.planilha;
     rotaSpx = estado.rotaSpx;
 
-    // Restaura as Vagas na memória global
     if (isRotaManual && estado.vagas) {
         vagasCriadas = estado.vagas.map(v => {
             return {
@@ -101,13 +100,13 @@ function esconderTodasTelas() {
     const telas = [
         'controles-iniciais', 'modal-escolha-modo', 'modal-auditoria', 
         'modal-info-padrao', 'modal-info-otimizada', 'modal-guia-manual', 'modal-desenho-manual', 
-        'modal-doca', 'modal-guia-gps', 'tela-navegacao', 
+        'modal-guia-doca-manual', 'modal-doca', 'modal-guia-gps', 'tela-navegacao', 
         'modal-menu-stops', 'modal-relatorio'
     ];
     telas.forEach(id => { let el = document.getElementById(id); if(el) el.style.display = 'none'; });
 }
 
-// Lógica de Entrada no Modo Manual (Com Onboarding)
+// Lógica de Entrada no Modo Manual
 function iniciarModoManual() { 
     esconderTodasTelas(); 
     if (localStorage.getItem('spx_ninja_hide_manual_guide') === 'true') {
@@ -134,7 +133,29 @@ function avancarParaDesenhoManual(isSilent = false) {
     }
 }
 
-// Lógica de Entrada no GPS (Com Onboarding)
+// Lógica de Transição: Fim do Desenho -> Guia Doca Manual -> Doca
+function prepararGuiaDocaManual() {
+    esconderTodasTelas();
+    if (localStorage.getItem('spx_ninja_hide_doca_manual') === 'true') {
+        if (typeof finalizarMapeamentoManual === "function") {
+            finalizarMapeamentoManual(); 
+        }
+    } else {
+        mostrarTela('modal-guia-doca-manual', 'block');
+    }
+}
+
+function avancarParaDocaManualReal() {
+    let chk = document.getElementById('chk-nao-mostrar-doca-manual');
+    if (chk && chk.checked) {
+        localStorage.setItem('spx_ninja_hide_doca_manual', 'true');
+    }
+    if (typeof finalizarMapeamentoManual === "function") {
+        finalizarMapeamentoManual();
+    }
+}
+
+// Lógica de Entrada no GPS
 function prepararIdaParaGPS() {
     esconderTodasTelas();
     if (localStorage.getItem('spx_ninja_hide_guide') === 'true') {
@@ -160,7 +181,7 @@ function avancarParaMapaReal(isSilent = false) {
     }
 }
 
-// Botão de Entrada no Automático (S/ Onboarding pq ele já tem a tela de auditoria)
+// Botão de Entrada no Automático
 function iniciarModoAutomatico() { 
     esconderTodasTelas(); 
     if (typeof roteirizarModoAutomatico === "function") roteirizarModoAutomatico(); 
