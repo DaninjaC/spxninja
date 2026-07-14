@@ -56,7 +56,7 @@ function iniciarInterfaceGPS() {
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(mapGps);
         camadaFundoGps.addTo(mapGps);
         
-        trilhaMestreGps = L.polyline([], { color: '#888888', weight: 4, opacity: 0.6, dashArray: '6, 6' }).addTo(mapGps);
+        trilhaMestreGps = L.polyline([], { color: '#000000', weight: 4, opacity: 0.6, dashArray: '6, 6' }).addTo(mapGps);
         proximaPernaGps = L.polyline([], { color: '#9d00ff', weight: 6, opacity: 0.9 }).addTo(mapGps);
         rotaRealGps = L.polyline([], { color: '#007AFF', weight: 6, opacity: 0.9 }).addTo(mapGps);
     }
