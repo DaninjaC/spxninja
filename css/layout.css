@@ -1,0 +1,94 @@
+/* ========================================= */
+/* layout.css - Estrutura de Telas e Painéis */
+/* ========================================= */
+
+/* --- 1. Tela Inicial e FAQ --- */
+#controles-iniciais { padding: 20px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; height: 100vh; overflow-y: auto; }
+.logo-ninja-img { display: block; margin: 30px auto; width: 280px; max-width: 85%; height: auto; }
+.btn-ini { background: #39FF14; color: #000; padding: 20px; border-radius: 12px; font-weight: bold; font-size: 20px; cursor: pointer; text-align: center; width: 90%; max-width: 400px; }
+input[type="file"] { display: none; }
+
+.faq-container { width: 90%; max-width: 400px; margin-top: 30px; margin-bottom: 40px; text-align: left; }
+.faq-titulo { font-size: 16px; color: #39FF14; text-transform: uppercase; font-weight: bold; margin-bottom: 15px; text-align: center; border-bottom: 1px dashed #333; padding-bottom: 10px; }
+.faq-item { background: #111; border: 1px solid #333; border-radius: 8px; margin-bottom: 8px; overflow: hidden; }
+.faq-header { padding: 15px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-weight: bold; font-size: 14px; color: #fff; background: #1a1a1a; user-select: none; }
+.faq-header:hover { background: #222; }
+.faq-body { padding: 0 15px; max-height: 0; overflow: hidden; transition: max-height 0.3s ease, padding 0.3s ease; font-size: 13px; color: #ccc; background: #000; line-height: 1.4; }
+.faq-item.active .faq-body { padding: 15px; max-height: 200px; border-top: 1px solid #333; }
+.faq-item.active .faq-icon { transform: rotate(45deg); color: #39FF14; }
+.faq-icon { font-size: 20px; transition: transform 0.3s ease; color: #888; font-weight: normal; }
+
+/* --- 2. Telas de Auditoria (Modo Auto) --- */
+.grid-mapas { display: flex; flex-direction: column; gap: 20px; width: 100%; padding-bottom: 30px; }
+.col-mapa { background: #111; padding: 15px; border-radius: 10px; border: 1px solid #333; }
+.mapa-container { height: 320px; width: 100%; background: #000; border-radius: 8px; margin-top: 10px; border: 1px solid #444; }
+.legenda { font-size: 13px; color: #ddd; margin-top: 8px; text-align: left; font-weight: bold; padding-bottom: 5px; }
+.legenda span { display: inline-block; width: 25px; height: 4px; margin-right: 5px; vertical-align: middle; }
+.guia-img { width: 100%; height: auto; max-width: 500px; margin: 0 auto 20px auto; border-radius: 12px; border: 2px solid #333; display: block; object-fit: contain; }
+
+/* --- 3. Modo Desenho Manual --- */
+#painel-topo-desenho { background:#222; padding:15px; border-bottom:1px solid #444; z-index:3500; }
+#instrucao-desenho { margin:5px 0 10px 0; font-size:12px; color:#aaa; }
+#map-container-desenho { flex:1; position:relative; width:100%; height:50vh; }
+#camada-desenho { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2000; display: none; cursor: crosshair; touch-action: none; }
+#painel-resultado-desenho { background:#000; padding:12px; border-top:2px solid #39FF14; min-height:80px; max-height:140px; overflow-y:auto; }
+.header-resultado { display:flex; justify-content:space-between; align-items:center; margin-bottom:5px; }
+#status-texto-desenho { font-size:12px; color:#aaa; }
+.botoes-acao-desenho { display:flex; gap:5px; }
+.btn-undo-azul { background:#007AFF; padding:4px 8px; font-size:11px; display:none; }
+.btn-undo-vermelho { background:#ff4444; padding:4px 8px; font-size:11px; }
+#ordem-selecionada-desenho { font-size:15px; color:#39FF14; font-weight:bold; line-height:1.4; }
+
+/* --- 4. Modo Doca (Separação por Bags) --- */
+.bag-container { background: #111; border: 1px solid #39FF14; border-radius: 10px; margin-bottom: 15px; padding: 15px; text-align: left; }
+.bag-container h3 { margin: 0 0 10px 0; color: #39FF14; border-bottom: 1px solid #333; padding-bottom: 5px; }
+.bag-item { padding: 8px 0; border-bottom: 1px dashed #333; display: flex; justify-content: space-between; align-items: center; }
+.bag-item:last-child { border-bottom: none; }
+.bag-item strong { font-size: 16px; color: #fff; }
+.bag-item small { color: #aaa; display: block; margin-top: 3px; font-size: 12px; }
+.bag-vol { border-radius: 12px; font-weight: bold; font-size: 13px; padding: 3px 8px; text-align: center; }
+
+/* --- 5. Menu Lateral de Paradas --- */
+.header-menu-stops { display:flex; justify-content:space-between; align-items:center; margin-bottom: 15px; }
+.btn-fechar-menu { background:#dc3545; color:white; border:none; padding:10px 15px; border-radius:8px; font-weight:bold; cursor: pointer; }
+.btn-menu-acao { flex: 1; padding: 10px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 13px; }
+.btn-menu-check { background: #28a745; color: #fff; }
+.btn-menu-fail { background: #dc3545; color: #fff; }
+
+/* --- 6. Navegação e GPS Principal --- */
+#tela-navegacao { display: none; flex-direction: column; height: 100vh; width: 100%; position: relative; }
+#painel-topo { background: #003399; padding: 15px; text-align: center; z-index: 1001; max-height: 40vh; overflow-y: auto; border-bottom: 2px solid #000; position: relative; }
+.modo-confirmacao { background: #FFCC00 !important; }
+#stop-badge { background: #000; color: #39FF14; padding: 5px 20px; border-radius: 20px; font-weight: bold; font-size: 18px; margin-bottom: 10px; display: inline-block; border: 2px solid #39FF14; }
+.endereco-item { font-size: 16px; color: #39FF14; font-weight: bold; text-transform: uppercase; margin-bottom: 10px; text-align: left; line-height: 1.4; }
+
+#btn-menu-stops { position: absolute; top: 15px; right: 15px; width: 45px; height: 45px; background: #000; border: 2px solid #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 1005; box-shadow: 0 4px 8px rgba(0,0,0,0.4); }
+#btn-menu-stops span { font-size: 22px; }
+
+#map-wrapper { flex: 1; position: relative; width: 100%; }
+.mapa-janela { width: 100%; height: 100%; background: #000; }
+
+#seta-flutuante { position: absolute; top: 15px; left: 15px; z-index: 1000; background: #1877F2; border-radius: 15px; padding: 15px; text-align: center; color: white; border: 3px solid #fff; min-width: 100px; display: none; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+#seta-icon { font-size: 50px; background: rgba(255,255,255,0.2); border-radius: 10px; padding: 5px; display: inline-block; line-height: 1; margin-bottom: 5px; }
+#seta-dist { font-size: 24px; font-weight: bold; }
+
+#painel-rodape { background: #111; padding: 15px; text-align: center; z-index: 1001; border-top: 2px solid #333; }
+#rodape-rua { color: #FFCC00; font-weight: bold; font-size: 16px; text-transform: uppercase; margin-bottom: 5px; }
+#rodape-dist { font-size: 32px; font-weight: bold; color: #fff; }
+
+#painel-acoes { display: none; gap: 10px; padding: 15px; background: #000; justify-content: center; z-index: 1002; flex-direction: column; }
+#radar-alert { display: none; position: absolute; top: 20px; left: 50%; transform: translateX(-50%); z-index: 2005; background: #dc3545; color: #fff; padding: 12px 25px; border-radius: 30px; font-weight: bold; font-size: 22px; border: 3px solid #fff; box-shadow: 0 6px 15px rgba(0,0,0,0.6); align-items: center; gap: 10px; text-transform: uppercase; }
+
+/* Checklist Vaga Combo a Pé (GPS HUD) */
+#combo-checklist-container { display: none; text-align: left; background: #111; border: 1px solid #007AFF; padding: 15px; border-radius: 10px; margin-bottom: 10px; max-height: 160px; overflow-y: auto; }
+.combo-check-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed #222; }
+.combo-check-item:last-child { border-bottom: none; }
+.combo-check-item input { width: 22px; height: 22px; cursor: pointer; }
+
+/* --- 7. Relatório Final de Métricas --- */
+.relatorio-card { background: #111; border: 2px solid #39FF14; border-radius: 12px; padding: 20px; margin-top: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+.rel-dado { display: flex; flex-direction: column; justify-content: center; align-items: center; background: #1a1a1a; padding: 12px; border-radius: 8px; border: 1px solid #333; }
+.rel-dado span { font-size: 11px; color: #aaa; text-transform: uppercase; text-align: center; margin-bottom: 5px; font-weight: bold; }
+.rel-dado strong { font-size: 22px; color: #fff; text-align: center; }
+.rel-destaque { color: #FFCC00 !important; }
+.rel-full { grid-column: span 2; }
