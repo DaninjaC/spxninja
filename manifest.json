@@ -2,7 +2,7 @@
   "name": "Rota Ninja",
   "short_name": "Rota Ninja",
   "description": "Aplicativo de roteirização e otimização de entregas.",
-  "start_url": "/",
+"start_url": "index.html",
   "display": "standalone",
   "background_color": "#000000",
   "theme_color": "#000000",
