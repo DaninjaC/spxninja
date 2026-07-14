@@ -176,7 +176,7 @@
         </div>
     </div>
 
-   <!-- TELA NOVA: ONBOARDING DO MODO MANUAL -->
+    <!-- TELA: ONBOARDING DO MODO MANUAL -->
     <div id="modal-guia-manual" class="modal-fullscreen">
         <h2>✏️ GUIA DO MODO MANUAL</h2>
         
@@ -228,7 +228,8 @@
             <p id="instrucao-desenho">Arraste para ligar os pinos. Toque na rua vazia para criar Vaga.</p>
             <div style="display:flex; gap:10px; justify-content:center; margin-bottom:5px;">
                 <button id="btn-toggle-vidro" class="btn-action" style="background:#FF8C00; color:#000;" onclick="toggleModoDesenho()">✏️ ATIVAR DESENHO</button>
-                <button class="btn-action" style="background:#39FF14; color:#000;" onclick="finalizarMapeamentoManual()">AVANÇAR ➔</button>
+                <!-- BOTÃO ALTERADO PARA CHAMAR A TELA NOVA ANTES DE PROCESSAR -->
+                <button class="btn-action" style="background:#39FF14; color:#000;" onclick="prepararGuiaDocaManual()">AVANÇAR ➔</button>
             </div>
         </div>
         <div id="map-container-desenho">
@@ -250,13 +251,47 @@
     <!-- ========================================== -->
     <!-- 5. COMPARTILHADOS (DOCA E GUIA GPS)        -->
     <!-- ========================================== -->
+    
+    <!-- TELA NOVA: ONBOARDING DA DOCA (MODO MANUAL) -->
+    <div id="modal-guia-doca-manual" class="modal-fullscreen">
+        <h2>🚀 GUIA DE SEPARAÇÃO NINJA</h2>
+        
+        <div style="background: #1a1a1a; padding: 15px; border-radius: 8px; margin-bottom: 20px; text-align: center; border: 1px solid #333;">
+            <button class="btn-modo btn-otimizada" onclick="avancarParaDocaManualReal()" style="margin-bottom: 10px;">IR PARA SEPARAÇÃO (BAGS) 📦</button>
+            <label style="color: #aaa; font-size: 14px; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer;">
+                <input type="checkbox" id="chk-nao-mostrar-doca-manual" style="width: 18px; height: 18px;">
+                Não mostrar esta tela novamente
+            </label>
+        </div>
+
+        <img src="assets/docaninja.jpeg" alt="Guia Dokan" class="guia-img" onerror="this.style.display='none'" style="margin-bottom: 15px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.5);">
+        
+        <div class="info-container" style="text-align: left; padding: 10px 15px; font-size: 14px; line-height: 1.5;">
+            
+            <div style="background: rgba(157, 0, 255, 0.1); border-left: 4px solid #9d00ff; padding: 12px; border-radius: 6px; margin-bottom: 12px;">
+                <strong style="color: #c466ff;">🔀 A Sua Nova Ordem</strong><br>
+                <span style="color: #ddd;">Você recriou seu trajeto! Os números originais (Stop 1, 2, 3...) estarão <b>embaralhados</b>, pois agora a fila segue o desenho inteligente que você acabou de fazer.</span>
+            </div>
+            
+            <div style="background: rgba(255, 140, 0, 0.1); border-left: 4px solid #FF8C00; padding: 12px; border-radius: 6px; margin-bottom: 12px;">
+                <strong style="color: #FFCC00;">🎒 Sistema de Bags (Lotes)</strong><br>
+                <span style="color: #ddd;">Para você não se perder nos números embaralhados, fatiamos sua carga em lotes exatos de <b>10 pacotes</b>. Na próxima tela, você verá exatamente quem entra em qual Bag.</span>
+            </div>
+            
+            <div style="background: rgba(57, 255, 20, 0.1); border-left: 4px solid #39FF14; padding: 12px; border-radius: 6px;">
+                <strong style="color: #39FF14;">🚗 Tetris no Carro</strong><br>
+                <span style="color: #ddd;">Use a imagem acima como mapa: A <b>Bag 1</b> (suas 10 primeiras entregas) vai no banco do passageiro. O meio da rota vai atrás, e o porta-malas fica só para o final. Menos tempo caçando, mais tempo entregando!</span>
+            </div>
+        </div>
+    </div>
+
     <div id="modal-doca" class="modal-fullscreen">
         <h2>📦 MODO DOCA - SEPARAÇÃO</h2>
         <div id="lista-bags"></div>
         <button class="btn-modo btn-otimizada" style="margin-top:10px; margin-bottom:40px;" onclick="prepararIdaParaGPS()">INICIAR VIAGEM 🚀</button>
     </div>
 
-    <!-- TELA NOVA: ONBOARDING DO GPS -->
+    <!-- TELA: ONBOARDING DO GPS -->
     <div id="modal-guia-gps" class="modal-fullscreen">
         <h2>🧭 COMO USAR O GPS NINJA</h2>
         
@@ -360,12 +395,12 @@
         }
     </script>
 
-    <script src="js/main.js?v=4"></script>
-    <script src="js/leitor.js?v=4"></script>
-    <script src="js/motor-auto.js?v=4"></script>
-    <script src="js/motor-manual.js?v=4"></script>
-    <script src="js/motor-doca.js?v=4"></script>
-    <script src="js/motor-gps.js?v=4"></script>
+    <script src="js/main.js?v=5"></script>
+    <script src="js/leitor.js?v=5"></script>
+    <script src="js/motor-auto.js?v=5"></script>
+    <script src="js/motor-manual.js?v=5"></script>
+    <script src="js/motor-doca.js?v=5"></script>
+    <script src="js/motor-gps.js?v=5"></script>
 
 </body>
 </html>
