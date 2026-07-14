@@ -1,301 +1,463 @@
 /* ========================================= */
-/* motor-gps.js - GPS Dinâmico (OSRM + Rotação)*/
+/* motor-gps.js - Navegação de Rua Avançada  */
 /* ========================================= */
 
-let mapaGPS = null;
-let markerCarro = null;
-let polylineAzul = null;
-let polylineRoxa = null;
-let polylinePreta = null;
-let watchIdGPS = null;
+let mapGps;
+let trilhaMestreGps, rotaRealGps, proximaPernaGps;
+let markerUserGps, markerDestGps;
+let camadaFundoGps = L.layerGroup();
 
-// Variáveis da Câmera e OSRM
-let ultimaLatCamera = null;
-let ultimaLonCamera = null;
-let anguloAtual = 0;
-window.isCameraTravada = true; 
+let idxDestino = 0, idxPasso = 0;
+let minhaLat, minhaLon, ultimaLatReq, ultimaLonReq;
+let passosNavegacao = [], distAnteriorCurva = Infinity;
+let latAntGps = null, lonAntGps = null, headingCarro = null;
+let aguardandoConfirmacao = false;
 
-let cacheOSRMCoords = null;
-let alvoCacheIndex = -1;
-let estaBuscandoOSRM = false;
-
-function calcularBearing(lat1, lon1, lat2, lon2) {
-    const toRad = Math.PI / 180;
-    const toDeg = 180 / Math.PI;
-    const dLon = (lon2 - lon1) * toRad;
-    const y = Math.sin(dLon) * Math.cos(lat2 * toRad);
-    const x = Math.cos(lat1 * toRad) * Math.sin(lat2 * toRad) - Math.sin(lat1 * toRad) * Math.cos(lat2 * toRad) * Math.cos(dLon);
-    return ((Math.atan2(y, x) * toDeg) + 360) % 360;
-}
-
-// Bate no servidor de mapas de asfalto
-async function buscarRotaOSRM(lat1, lon1, lat2, lon2) {
-    try {
-        let url = `https://router.project-osrm.org/route/v1/driving/${lon1},${lat1};${lon2},${lat2}?overview=full&geometries=geojson`;
-        let resp = await fetch(url);
-        let data = await resp.json();
-        if (data.routes && data.routes.length > 0) {
-            // OSRM devolve [Lon, Lat], o Leaflet usa [Lat, Lon]
-            return data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+function getAlvoData(index) {
+    if (isRotaManual) {
+        let idAlvo = rotaSpx[index];
+        if (idAlvo.startsWith("Vaga")) {
+            let v = vagasCriadas.find(x => x.marker.spxId === idAlvo);
+            let pacotes = v.sugados.map(m => planilhaStopsData.find(p => p.stop === m.spxId));
+            return {
+                id: idAlvo, isVaga: true, lat: v.marker.getLatLng().lat, lon: v.marker.getLatLng().lng,
+                pacotes: pacotes, totalVol: pacotes.reduce((a, b) => a + b.pacotes, 0),
+                comercial: pacotes.some(p => p.comercial),
+                markerStyle: { radius: 10, color: '#fff', fillColor: '#007AFF', weight: 2 },
+                status: pacotes[0].status 
+            };
+        } else {
+            let p = planilhaStopsData.find(x => x.stop === idAlvo);
+            return { 
+                id: idAlvo, isVaga: false, lat: p.lat, lon: p.lon, 
+                pacotes: [p], totalVol: p.pacotes, comercial: p.comercial, obj: p,
+                markerStyle: { radius: 7, color: '#666', fillColor: p.extra ? '#FF8C00' : '#333', weight: 1 },
+                status: p.status
+            };
         }
-    } catch(e) { console.warn("Erro ao buscar contorno de rua", e); }
-    return [[lat1, lon1], [lat2, lon2]]; // Se falhar, volta pra reta
+    } else {
+        let p = rotaSpx[index];
+        return { 
+            id: p.stop, isVaga: false, lat: p.lat, lon: p.lon, 
+            pacotes: [p], totalVol: p.pacotes, comercial: p.comercial, obj: p,
+            markerStyle: { radius: 7, color: '#666', fillColor: p.extra ? '#FF8C00' : '#333', weight: 1 },
+            status: p.status
+        };
+    }
 }
 
 function iniciarInterfaceGPS() {
-    if (!mapaGPS) {
-        mapaGPS = L.map('mapa-gps', { zoomControl: false, attributionControl: false }).setView([-23.5505, -46.6333], 15);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(mapaGPS);
-        
-        // Ponto Azul Estável
-        let iconeCarro = L.divIcon({
-            className: 'icone-carro-gps',
-            html: '<div style="font-size:24px; text-align:center; filter: drop-shadow(0 0 8px #007AFF);">🔵</div>', 
-            iconSize: [30, 30],
-            iconAnchor: [15, 15]
-        });
-        markerCarro = L.marker([-23.5505, -46.6333], {icon: iconeCarro, zIndexOffset: 1000}).addTo(mapaGPS);
-    }
+    initAudio(); requestWakeLock();
     
-    if (typeof window.destinoSalvo === 'undefined') window.destinoSalvo = 0;
+    if (!horaInicioExpediente) horaInicioExpediente = new Date();
 
-    if (navigator.geolocation) {
-        watchIdGPS = navigator.geolocation.watchPosition(atualizarGPS, erroGPS, {
-            enableHighAccuracy: true,
-            maximumAge: 1000, 
-            timeout: 5000
-        });
-    } else {
-        alert("GPS não suportado.");
+    if (!mapGps) {
+        mapGps = L.map('mapa-gps', { zoomControl: false, attributionControl: false }).setView([-23.615, -46.575], 16);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(mapGps);
+        camadaFundoGps.addTo(mapGps);
+        
+        trilhaMestreGps = L.polyline([], { color: '#000000', weight: 4, opacity: 0.6, dashArray: '6, 6' }).addTo(mapGps);
+        proximaPernaGps = L.polyline([], { color: '#9d00ff', weight: 6, opacity: 0.9 }).addTo(mapGps);
+        rotaRealGps = L.polyline([], { color: '#007AFF', weight: 6, opacity: 0.9 }).addTo(mapGps);
     }
 
-    atualizarPainelTopo();
-    desenharRotaRestante();
-}
-
-function atualizarGPS(pos) {
-    let lat = pos.coords.latitude;
-    let lon = pos.coords.longitude;
+    camadaFundoGps.clearLayers();
     
-    markerCarro.setLatLng([lat, lon]);
+    for (let i = 0; i < rotaSpx.length; i++) {
+        let alvo = getAlvoData(i);
+        let fillColor = alvo.status === 'concluido' ? '#888' : (alvo.status === 'pendente' ? '#ff0000' : alvo.markerStyle.fillColor);
 
-    let containerMapa = document.getElementById('mapa-gps');
+        let marker = L.circleMarker([alvo.lat, alvo.lon], { 
+            radius: alvo.markerStyle.radius, color: alvo.markerStyle.color, 
+            fillColor: fillColor, fillOpacity: 1, weight: alvo.markerStyle.weight 
+        }).bindTooltip(alvo.isVaga ? alvo.id : (alvo.obj.extra ? "Extra" : "Stop " + alvo.id), { permanent: true, direction: 'top', className: 'stop-label' }).addTo(camadaFundoGps);
 
-    if (window.isCameraTravada) {
-        mapaGPS.setView([lat, lon], 18, {animate: true, duration: 0.5});
-        
-        if (ultimaLatCamera !== null && ultimaLonCamera !== null) {
-            let distMovida = dist(ultimaLatCamera, ultimaLonCamera, lat, lon);
+        if(isRotaManual) {
+            if (alvo.isVaga) vagasCriadas.find(x => x.marker.spxId === alvo.id).gpsMarker = marker;
+            else planilhaStopsData.find(x => x.stop === alvo.id).gpsMarker = marker;
             
-            // FILTRO DE RUÍDO: Só roda se o carro andou de verdade (6 metros), mata o "Bêbado"
-            if (distMovida > 6) {
-                let novoAngulo = calcularBearing(ultimaLatCamera, ultimaLonCamera, lat, lon);
-                let diferenca = Math.abs(novoAngulo - anguloAtual);
-                if (diferenca > 180) diferenca = 360 - diferenca;
-                
-                // Zona Morta: Só ajusta a câmera se mudar mais de 10 graus
-                if (diferenca > 10) {
-                    anguloAtual = novoAngulo;
-                }
-                ultimaLatCamera = lat;
-                ultimaLonCamera = lon;
+            // Correção Vital: Busca as coordenadas corretas na base para não quebrar a tela de GPS na restauração
+            if (alvo.isVaga) {
+                let v = vagasCriadas.find(x => x.marker.spxId === alvo.id);
+                if(v.sugados) v.sugados.forEach(m => {
+                    let pData = planilhaStopsData.find(x => x.stop === m.spxId);
+                    let mLat = pData ? [pData.lat, pData.lon] : (m.getLatLng ? m.getLatLng() : [0,0]);
+                    L.circleMarker(mLat, { radius: 5, color: '#007AFF', fillColor: '#111', fillOpacity: 0.6, weight: 1, dashArray: '2,2' }).addTo(camadaFundoGps);
+                });
             }
         } else {
-            ultimaLatCamera = lat;
-            ultimaLonCamera = lon;
+            rotaSpx[i].gpsMarker = marker;
         }
-
-        if(containerMapa) containerMapa.style.transform = `rotate(${-anguloAtual}deg)`;
-        mapaGPS.dragging.disable(); 
-    } else {
-        if(containerMapa) containerMapa.style.transform = `rotate(0deg)`; 
-        mapaGPS.dragging.enable(); 
     }
 
-    if (window.destinoSalvo < rotaSpx.length) {
-        let alvo = rotaSpx[window.destinoSalvo];
-        let d = dist(lat, lon, alvo.lat, alvo.lon);
+    idxDestino = typeof window.destinoSalvo !== 'undefined' ? window.destinoSalvo : 0;
+    
+    desenharTrilhaMestreFixaCompleta();
+    atualizarProximaPernaRoxa();
+    ativarRastreamentoGeolocalizacaoAtiva();
+    
+    if (typeof salvarEstadoRota === "function") salvarEstadoRota();
+}
+
+async function desenharTrilhaMestreFixaCompleta() {
+    try {
+        let urlCoords = rotaSpx.map((_, i) => `${getAlvoData(i).lon},${getAlvoData(i).lat}`).join(';');
+        let res = await fetch(`https://router.project-osrm.org/route/v1/driving/${urlCoords}?overview=full&geometries=geojson`);
+        let data = await res.json();
+        if (data.routes?.length > 0) trilhaMestreGps.setLatLngs(data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]));
+    } catch(e){}
+}
+
+async function atualizarProximaPernaRoxa() {
+    if (idxDestino >= rotaSpx.length - 1) {
+        proximaPernaGps.setLatLngs([]); 
+        return;
+    }
+    try {
+        let alvoAtual = getAlvoData(idxDestino);
+        let alvoProx = getAlvoData(idxDestino + 1);
+        let coords = `${alvoAtual.lon},${alvoAtual.lat};${alvoProx.lon},${alvoProx.lat}`;
         
-        document.getElementById('rodape-dist').innerText = d > 1000 ? (d/1000).toFixed(1) + " km" : Math.round(d) + " m";
+        let res = await fetch(`https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson`);
+        let data = await res.json();
+        if (data.routes?.length > 0) proximaPernaGps.setLatLngs(data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]));
+    } catch(e){}
+}
+
+function ativarRastreamentoGeolocalizacaoAtiva() {
+    navigator.geolocation.watchPosition(async pos => {
+        minhaLat = pos.coords.latitude; minhaLon = pos.coords.longitude;
         
-        // Chamada Inteligente do OSRM (Só bate no servidor 1x por alvo)
-        if (alvoCacheIndex !== window.destinoSalvo && !estaBuscandoOSRM) {
-            estaBuscandoOSRM = true;
-            buscarRotaOSRM(lat, lon, alvo.lat, alvo.lon).then(coords => {
-                cacheOSRMCoords = coords;
-                alvoCacheIndex = window.destinoSalvo;
-                estaBuscandoOSRM = false;
-                desenharLinhasNavegacao(lat, lon); // Redesenha a linha nova do asfalto
-            });
-        } else {
-            desenharLinhasNavegacao(lat, lon);
+        if (pos.coords.speed && pos.coords.speed > 2 && pos.coords.heading !== null) headingCarro = Math.round(pos.coords.heading);
+        else if (latAntGps !== null && lonAntGps !== null) {
+            if (dist(latAntGps, lonAntGps, minhaLat, minhaLon) > 5) headingCarro = Math.round((Math.atan2(minhaLon - lonAntGps, minhaLat - latAntGps) * 180 / Math.PI + 360) % 360);
+        }
+        latAntGps = minhaLat; lonAntGps = minhaLon;
+
+        if (!markerUserGps) markerUserGps = L.circleMarker([minhaLat, minhaLon], { color: '#007AFF', fillOpacity: 1, radius: 8, zIndexOffset: 1000 }).addTo(mapGps);
+        else markerUserGps.setLatLng([minhaLat, minhaLon]);
+
+        if (listaRadares.length > 0) {
+            let radarProx = null, mDist = Infinity;
+            listaRadares.forEach(r => { let dR = dist(minhaLat, minhaLon, r.lat, r.lon); if (dR <= 75 && dR < mDist) { mDist = dR; radarProx = r; } });
+            let domAlert = document.getElementById('radar-alert');
+            if (radarProx) { if (radarAtivo !== radarProx) { radarAtivo = radarProx; playBipeRadar(); domAlert.innerHTML = `📸 RADAR ${radarProx.speed ? radarProx.speed+'km/h':''}`; domAlert.style.display = 'flex'; } } 
+            else { radarAtivo = null; domAlert.style.display = 'none'; }
         }
 
-        let painelAcoes = document.getElementById('painel-acoes');
-        if (d < 30) {
-            painelAcoes.style.display = 'flex';
-        } else {
-            painelAcoes.style.display = 'none';
+        const desviouDoTrilho = ultimaLatReq && dist(minhaLat, minhaLon, ultimaLatReq, ultimaLonReq) > 30;
+        if (idxDestino < rotaSpx.length && !aguardandoConfirmacao) {
+            if (passosNavegacao.length === 0 || desviouDoTrilho) {
+                await recalcularRotaGpsTaticaProximoAlvo();
+                ultimaLatReq = minhaLat; ultimaLonReq = minhaLon;
+            }
+            processarLogicaGuiamentoNavegacao();
         }
-    }
+        mapGps.panTo([minhaLat, minhaLon]);
+    }, () => {}, { enableHighAccuracy: true });
 }
 
-window.alternarModoCamera = function() {
-    window.isCameraTravada = !window.isCameraTravada;
-    let btn = document.getElementById('btn-trava-camera');
+async function recalcularRotaGpsTaticaProximoAlvo() {
+    if (idxDestino >= rotaSpx.length) return;
+    let alvo = getAlvoData(idxDestino);
     
-    if (window.isCameraTravada) {
-        mapaGPS.setView(markerCarro.getLatLng(), 18);
-        btn.innerText = "📍 FOCAR ROTA";
-        btn.style.background = "#007AFF";
-    } else {
-        btn.innerText = "🗺️ MODO LIVRE";
-        btn.style.background = "#FF8C00";
-    }
-}
-
-function desenharRotaRestante() {
-    if (!mapaGPS || !rotaSpx || rotaSpx.length === 0) return;
-    if (polylinePreta) mapaGPS.removeLayer(polylinePreta);
-    
-    let pontos = rotaSpx.slice(window.destinoSalvo).map(p => [p.lat, p.lon]);
-    polylinePreta = L.polyline(pontos, {color: '#555', weight: 4, dashArray: '5, 10'}).addTo(mapaGPS);
-}
-
-function desenharLinhasNavegacao(carLat, carLon) {
-    if (!mapaGPS || !rotaSpx || window.destinoSalvo >= rotaSpx.length) return;
-    
-    if (polylineAzul) mapaGPS.removeLayer(polylineAzul);
-    if (polylineRoxa) mapaGPS.removeLayer(polylineRoxa);
-
-    let alvoAtual = rotaSpx[window.destinoSalvo];
-    
-    // Liga o carro à linha do OSRM
-    let coordsAzul = cacheOSRMCoords && cacheOSRMCoords.length > 0 
-                     ? [[carLat, carLon], ...cacheOSRMCoords] 
-                     : [[carLat, carLon], [alvoAtual.lat, alvoAtual.lon]];
-
-    polylineAzul = L.polyline(coordsAzul, {color: '#007AFF', weight: 6}).addTo(mapaGPS);
-
-    if (window.destinoSalvo + 1 < rotaSpx.length) {
-        let proxAlvo = rotaSpx[window.destinoSalvo + 1];
-        polylineRoxa = L.polyline([[alvoAtual.lat, alvoAtual.lon], [proxAlvo.lat, proxAlvo.lon]], {color: '#9d00ff', weight: 5, dashArray: '10, 5'}).addTo(mapaGPS);
-    }
-}
-
-function atualizarPainelTopo() {
-    if (window.destinoSalvo >= rotaSpx.length) return;
-    let alvo = rotaSpx[window.destinoSalvo];
-    document.getElementById('stop-badge').innerText = `STOP ${window.destinoSalvo + 1} (${alvo.Volume || 1} vol)`;
-    
-    let conteudoRua = "";
+    let txtEnderecos = "";
     if (alvo.isVaga) {
-        conteudoRua = `VAGA: ${alvo.sugados.length} PACOTES A PÉ`;
-        document.getElementById('rodape-rua').innerText = "ESTACIONE (COMBO A PÉ)";
-        montarChecklistVaga(alvo);
+        txtEnderecos = alvo.pacotes.map(p => {
+            let volColor = getCorVolume(p.pacotes);
+            let volPill = `<span style="background:${volColor.bg}; color:${volColor.color}; padding:2px 6px; border-radius:10px; font-size:12px; margin-left:5px;">${p.pacotes} vol</span>`;
+            let endsFormatados = p.enderecos.map(end => `<div class="endereco-item" style="font-size: 14px; margin-bottom: 3px; margin-top:2px;">${end.toUpperCase().replace(/(\d+)/g, '<span class="num-box">$1</span>')}</div>`).join('');
+            return `
+            <div style="background: rgba(0,0,0,0.4); border-left: 4px solid #39FF14; padding: 8px; margin-bottom: 8px; border-radius: 5px; text-align: left;">
+                <div style="font-size: 15px; color: #39FF14; font-weight: bold; margin-bottom: 5px;">🚶 STOP ${p.stop} ${volPill}</div>
+                ${endsFormatados}
+            </div>`;
+        }).join('');
     } else {
-        // BLINDAGEM CONTRA O "DESCONHECIDO"
-        let enderecoBruto = alvo.Endereço || alvo.Endereco || alvo.endereco || alvo.Rua || alvo.rua || alvo.Logradouro || "";
-        conteudoRua = typeof extrairRuaPadrao === 'function' && enderecoBruto !== "" ? extrairRuaPadrao(enderecoBruto) : enderecoBruto;
-        
-        if (!conteudoRua || conteudoRua === "DESCONHECIDO" || conteudoRua.trim() === "") {
-            conteudoRua = "Siga a Linha Azul 📍";
-        }
-
-        document.getElementById('rodape-rua').innerText = conteudoRua;
-        document.getElementById('combo-checklist-container').innerHTML = ''; 
+        txtEnderecos = formatarEnderecos(alvo.obj.enderecos);
     }
-    document.getElementById('lista-enderecos').innerHTML = `<div style="font-weight:bold; font-size:18px;">${conteudoRua}</div>`;
+
+    let labelBadge = alvo.isVaga ? `${alvo.id} (Combo a Pé)` : (alvo.obj.extra ? `EXTRA ${alvo.id}` : `STOP ${alvo.id}`);
+    let pill = `<span style="background:${getCorVolume(alvo.totalVol).bg}; color:${getCorVolume(alvo.totalVol).color}; padding:2px 8px; border-radius:10px; font-size:13px; margin-left:5px;">${alvo.totalVol} vol</span>`;
+    
+    document.getElementById('stop-badge').innerHTML = `<span style="color:#fff;">#${idxDestino+1}</span> ➔ ${labelBadge} ${pill} ${alvo.comercial?'<span class="tag-comercial">🏢</span>':''}`;
+    document.getElementById('lista-enderecos').innerHTML = txtEnderecos;
+
+    if (markerDestGps) mapGps.removeLayer(markerDestGps);
+    markerDestGps = L.circleMarker([alvo.lat, alvo.lon], { radius: 11, color: '#fff', fillColor: '#007AFF', fillOpacity: 1, weight: 3 }).addTo(mapGps);
+
+    try {
+        let url = `https://router.project-osrm.org/route/v1/driving/${minhaLon},${minhaLat};${alvo.lon},${alvo.lat}?steps=true&overview=full&geometries=geojson`;
+        if (headingCarro !== null) url += `&bearings=${headingCarro},60;`;
+        let res = await fetch(url); let data = await res.json();
+        if (data.routes?.length > 0) {
+            const r = data.routes[0];
+            passosNavegacao = r.legs[0].steps.map(s => ({ lat: s.maneuver.location[1], lon: s.maneuver.location[0], manobra: s.maneuver.modifier || s.maneuver.type || "", rua: s.name || "Frente" }));
+            idxPasso = 0; distAnteriorCurva = Infinity;
+            rotaRealGps.setLatLngs(r.geometry.coordinates.map(c => [c[1], c[0]])); 
+        }
+    } catch(e){}
 }
 
-function montarChecklistVaga(alvo) {
-    let html = '<div style="text-align:left; max-height:100px; overflow-y:auto; margin-bottom:10px; background:#222; padding:5px; border-radius:5px;">';
-    html += '<strong style="color:#007AFF;">🛒 Sacar do carro:</strong><br>';
-    alvo.sugados.forEach((sId, i) => {
-        let pctEnd = "Pacote " + (i+1);
-        if(typeof planilhaStopsData !== 'undefined') {
-            let p = planilhaStopsData.find(x => x.spxId === sId);
-            if(p) {
-                let endP = p.Endereço || p.Endereco || p.endereco || p.Rua || "";
-                if(typeof extrairRuaPadrao === 'function' && endP !== "") pctEnd = extrairRuaPadrao(endP);
-            }
+function processarLogicaGuiamentoNavegacao() {
+    let alvo = getAlvoData(idxDestino);
+    const dFinal = dist(minhaLat, minhaLon, alvo.lat, alvo.lon);
+    
+    document.getElementById('rodape-rua').innerText = "PREVISÃO DE CHEGADA";
+    document.getElementById('rodape-dist').innerText = Math.ceil((dFinal/5.5)/60) + " min";
+
+    if (dFinal < 30) {
+        aguardandoConfirmacao = true; releaseWakeLock(); 
+        document.getElementById('painel-rodape').style.display = 'none';
+        document.getElementById('seta-flutuante').style.display = 'none';
+        document.getElementById('painel-topo').classList.add('modo-confirmacao');
+        document.getElementById('painel-acoes').style.display = 'flex'; 
+        
+        let containerCheck = document.getElementById('combo-checklist-container');
+        containerCheck.innerHTML = '';
+        
+        if (alvo.isVaga) {
+            containerCheck.style.display = 'block';
+            document.getElementById('btn-confirmar-entrega').style.display = 'none';
+            document.getElementById('btn-falhar-entrega').style.display = 'none';
+            
+            let htmlCheck = `<div style="color:#FFCC00; font-weight:bold; font-size:12px; margin-bottom:8px; text-transform:uppercase;">📦 CONCLUA O COMBO A PÉ NA RUA:</div>`;
+            alvo.pacotes.forEach(p => {
+                htmlCheck += `
+                <div class="combo-check-item">
+                    <span style="font-size:14px; font-weight:bold; color:#fff;">Stop ${p.stop}</span>
+                    <input type="checkbox" class="chk-combo-item" data-stopid="${p.stop}" onchange="verificarLiberacaoBotoesVaga()">
+                </div>`;
+            });
+            containerCheck.innerHTML = htmlCheck;
+        } else {
+            containerCheck.style.display = 'none';
+            document.getElementById('btn-confirmar-entrega').style.display = 'block';
+            document.getElementById('btn-falhar-entrega').style.display = 'block';
         }
-        html += `<div style="font-size:12px; border-bottom:1px solid #333; padding:3px 0;">${pctEnd}</div>`;
-    });
-    html += '</div>';
-    document.getElementById('combo-checklist-container').innerHTML = html;
+        
+        if (navigator.vibrate) navigator.vibrate([200, 100, 200]); return;
+    }
+
+    if (passosNavegacao.length > 0) {
+        const pAtual = passosNavegacao[idxPasso]; if (!pAtual) return;
+        const dC = dist(minhaLat, minhaLon, pAtual.lat, pAtual.lon);
+        if (dC < distAnteriorCurva) distAnteriorCurva = dC;
+        if (dC > distAnteriorCurva + 8 && distAnteriorCurva < 40) { if (idxPasso < passosNavegacao.length - 1) { idxPasso++; distAnteriorCurva = Infinity; } }
+        
+        let distSomada = 0, pLat = minhaLat, pLon = minhaLon, icone = "📦", achou = false;
+        for (let i = idxPasso; i < passosNavegacao.length; i++) {
+            let pf = passosNavegacao[i]; distSomada += dist(pLat, pLon, pf.lat, pf.lon);
+            let m = pf.manobra ? String(pf.manobra).toLowerCase() : "";
+            if (m.includes("left") || m.includes("right") || m.includes("uturn") || m.includes("back")) {
+                if (m.includes("left")) icone = "⬅️"; else if (m.includes("right")) icone = "➡️"; else icone = "↩️";
+                achou = true; break;
+            }
+            pLat = pf.lat; pLon = pf.lon;
+        }
+        if (achou) {
+            document.getElementById('seta-dist').innerText = distSomada > 1000 ? (distSomada/1000).toFixed(1) + " km" : Math.round(distSomada) + " m";
+            document.getElementById('seta-icon').innerText = icone;
+            document.getElementById('seta-flutuante').style.display = 'block';
+        } else document.getElementById('seta-flutuante').style.display = 'none';
+    }
+}
+
+function verificarLiberacaoBotoesVaga() {
+    let chks = document.querySelectorAll('.chk-combo-item');
+    if (Array.from(chks).every(c => c.checked)) {
+        document.getElementById('btn-confirmar-entrega').style.display = 'block';
+        document.getElementById('btn-falhar-entrega').style.display = 'block';
+    } else {
+        document.getElementById('btn-confirmar-entrega').style.display = 'none';
+        document.getElementById('btn-falhar-entrega').style.display = 'none';
+    }
+}
+
+function atualizarCorPinoGPS(index, status) {
+    if(isRotaManual) {
+        let id = rotaSpx[index];
+        if (id.startsWith("Vaga")) {
+            let v = vagasCriadas.find(x => x.marker.spxId === id);
+            if(v.gpsMarker) v.gpsMarker.setStyle({ fillColor: status === 'concluido' ? '#888' : '#ff0000', weight: 2 });
+        } else {
+            let p = planilhaStopsData.find(x => x.stop === id);
+            if(p.gpsMarker) p.gpsMarker.setStyle({ fillColor: status === 'concluido' ? '#888' : '#ff0000', weight: 2 });
+        }
+    } else {
+        if(rotaSpx[index].gpsMarker) rotaSpx[index].gpsMarker.setStyle({ fillColor: status === 'concluido' ? '#888' : '#ff0000', weight: 2 });
+    }
 }
 
 function finalizarParadaAtual(status) {
-    if (window.destinoSalvo >= rotaSpx.length) return;
+    let alvo = getAlvoData(idxDestino);
+    let agora = new Date();
+    let tempoGasto = historicoParadas.length === 0 ? (agora - horaInicioExpediente) : (agora - historicoParadas[historicoParadas.length - 1].hora);
+
+    alvo.pacotes.forEach(p => {
+        p.status = status;
+        historicoParadas.push({ stop: p.stop, hora: agora, ms: Math.round(tempoGasto / alvo.pacotes.length), extra: p.extra, status: status });
+    });
     
-    let alvo = rotaSpx[window.destinoSalvo];
-    alvo.statusEntrega = status;
-    if(typeof historicoParadas !== 'undefined') historicoParadas.push(alvo);
+    atualizarCorPinoGPS(idxDestino, status);
+    if (typeof salvarEstadoRota === "function") salvarEstadoRota(); // SALVA O PROGRESSO
+
+    aguardandoConfirmacao = false; requestWakeLock();
+    document.getElementById('painel-rodape').style.display = 'block';
+    document.getElementById('seta-flutuante').style.display = 'block';
+    document.getElementById('painel-topo').classList.remove('modo-confirmacao');
+    document.getElementById('combo-checklist-container').style.display = 'none';
+    document.getElementById('painel-acoes').style.display = 'none';
+
+    idxDestino++;
+    passosNavegacao = [];
     
-    window.destinoSalvo++;
-    if(typeof salvarEstadoRota === 'function') salvarEstadoRota();
-    
-    if (window.destinoSalvo >= rotaSpx.length) {
-        finalizarExpediente();
-    } else {
-        document.getElementById('painel-acoes').style.display = 'none';
-        atualizarPainelTopo();
-        desenharRotaRestante();
+    if (idxDestino < rotaSpx.length) {
+        recalcularRotaGpsTaticaProximoAlvo();
+        atualizarProximaPernaRoxa();
+    }
+    else avaliarConclusaoExpedienteTotal();
+}
+
+function abrirMenuStops() {
+    let html = '';
+    for (let i = 0; i < rotaSpx.length; i++) {
+        let alvo = getAlvoData(i);
+        let isAtivo = (i === idxDestino);
+        let corZebrada = Math.floor(i / 10) % 2 === 0 ? '#1a1a1a' : '#0a0a0a';
+        let corFundo = isAtivo ? '#003399' : corZebrada;
+        let borda = isAtivo ? 'border: 2px solid #39FF14;' : 'border: 1px solid #222;';
+
+        let statusIcon = alvo.status === 'concluido' ? '✅' : (alvo.status === 'pendente' ? '❌' : (isAtivo ? '📍' : (alvo.isVaga ? '🚙' : '📦')));
+        let corTexto = alvo.status === 'concluido' ? '#888' : (alvo.status === 'pendente' ? '#ff6666' : '#fff');
+
+        let botoesAcao = '';
+        if (alvo.status === 'neutro') {
+            botoesAcao = `
+                <div style="margin-top:12px; display:flex; gap:10px;">
+                    <button onclick="forcarBaixaMenu(event, ${i}, 'concluido')" class="btn-menu-acao btn-menu-check">✅ ENTREGUE ${alvo.isVaga ? '(TODOS)' : ''}</button>
+                    <button onclick="forcarBaixaMenu(event, ${i}, 'pendente')" class="btn-menu-acao btn-menu-fail">❌ FALHA</button>
+                </div>
+            `;
+        }
+
+        let volColor = getCorVolume(alvo.totalVol);
+        let volPill = `<span style="float:right; font-size:13px; background:${volColor.bg}; color:${volColor.color}; padding:2px 8px; border-radius:10px; font-weight:bold;">${alvo.totalVol} vol</span>`;
         
-        // Zera tudo para a câmera e o OSRM rodarem do zero na próxima parada
-        ultimaLatCamera = null;
-        ultimaLonCamera = null;
+        let tagsHtml = '';
+        if (alvo.comercial) tagsHtml += `<span class="tag-comercial" style="float:none; display:inline-block; margin-bottom:5px;">🏢 COMERCIAL</span> `;
+        if (!alvo.isVaga && alvo.obj.extra) tagsHtml += `<span class="tag-extra" style="float:none; display:inline-block; margin-bottom:5px;">❓ EXTRA</span> `;
+
+        let descInfo = '';
+        if (alvo.isVaga) {
+            let sugadosText = alvo.pacotes.map(p => {
+                let pColor = getCorVolume(p.pacotes);
+                return `Stop ${p.stop} <span style="color:${pColor.bg}; font-weight:bold;">(${p.pacotes}v)</span>`;
+            }).join(', ');
+            descInfo = `${tagsHtml}<br>Combo a pé contendo: ${sugadosText}`;
+        } else {
+            descInfo = `${tagsHtml}<br>${alvo.obj.ruaPadrao}`;
+        }
+
+        let labelPrincipal = alvo.isVaga ? alvo.id : (alvo.obj.extra ? "PACOTE EXTRA" : "Stop " + alvo.id);
+
+        html += `
+        <div style="background:${corFundo}; ${borda} border-radius:10px; padding:15px; margin-bottom:10px; text-align:left; color:${corTexto}; cursor:pointer;" onclick="pularParaStop(${i})">
+            <div style="font-size:16px; font-weight:bold; color:${isAtivo ? '#fff' : (alvo.isVaga ? '#007AFF' : '#fff')}; margin-bottom: 5px;">
+                ${statusIcon} <span style="color:#FFCC00;">#${i+1}</span> ➔ ${labelPrincipal}
+                ${volPill}
+            </div>
+            <div style="font-size:13px; opacity:0.9; margin-top:3px; line-height: 1.5;">${descInfo}</div>
+            ${botoesAcao}
+        </div>`;
+    }
+    document.getElementById('conteudo-lista-stops').innerHTML = html;
+    mostrarTela('modal-menu-stops', 'block');
+}
+
+function fecharMenuStops() { document.getElementById('modal-menu-stops').style.display = 'none'; }
+
+function forcarBaixaMenu(e, index, status) {
+    e.stopPropagation(); 
+    let alvo = getAlvoData(index);
+    let agora = new Date();
+    let tempoGasto = historicoParadas.length === 0 ? (agora - horaInicioExpediente) : (agora - historicoParadas[historicoParadas.length - 1].hora);
+
+    alvo.pacotes.forEach(p => {
+        p.status = status;
+        historicoParadas.push({ stop: p.stop, hora: agora, ms: Math.round(tempoGasto / alvo.pacotes.length), extra: p.extra, status: status });
+    });
+    
+    atualizarCorPinoGPS(index, status);
+    if (typeof salvarEstadoRota === "function") salvarEstadoRota(); // SALVA O PROGRESSO
+    abrirMenuStops(); 
+
+    if (index === idxDestino) {
+        aguardandoConfirmacao = false; requestWakeLock();
+        document.getElementById('painel-rodape').style.display = 'block';
+        document.getElementById('seta-flutuante').style.display = 'block';
+        document.getElementById('painel-topo').classList.remove('modo-confirmacao');
+        document.getElementById('combo-checklist-container').style.display = 'none';
+        document.getElementById('painel-acoes').style.display = 'none';
+        
+        idxDestino++; passosNavegacao = [];
+        
+        if (idxDestino < rotaSpx.length) {
+            recalcularRotaGpsTaticaProximoAlvo();
+            atualizarProximaPernaRoxa();
+        }
+        else avaliarConclusaoExpedienteTotal();
+    } else {
+        let tudoFinalizado = rotaSpx.every((_, i) => getAlvoData(i).status !== 'neutro');
+        if (tudoFinalizado) avaliarConclusaoExpedienteTotal();
     }
 }
 
-function finalizarExpediente() {
-    if (watchIdGPS) navigator.geolocation.clearWatch(watchIdGPS);
-    if(typeof esconderTodasTelas === 'function') esconderTodasTelas();
+function pularParaStop(index) {
+    fecharMenuStops(); idxDestino = index; passosNavegacao = []; aguardandoConfirmacao = false;
+    document.getElementById('painel-rodape').style.display = 'block';
+    document.getElementById('seta-flutuante').style.display = 'block';
+    document.getElementById('painel-acoes').style.display = 'none';
+    document.getElementById('painel-topo').classList.remove('modo-confirmacao');
+    document.getElementById('combo-checklist-container').style.display = 'none';
     
-    let relatorio = document.getElementById('modal-relatorio');
-    if(relatorio) relatorio.style.display = 'block';
+    recalcularRotaGpsTaticaProximoAlvo();
+    atualizarProximaPernaRoxa(); 
 }
 
-function abrirMenuStops() { 
-    let menu = document.getElementById('modal-menu-stops');
-    if(menu) menu.style.display = 'block'; 
-    renderizarListaStops(); 
-}
-
-function fecharMenuStops() { 
-    let menu = document.getElementById('modal-menu-stops');
-    if(menu) menu.style.display = 'none'; 
-}
-
-function erroGPS(err) { 
-    console.warn("Sinal GPS Perdido/Atrasado:", err); 
-}
-
-function renderizarListaStops() {
-    let html = '';
-    rotaSpx.forEach((alvo, idx) => {
-        let cor = (idx < window.destinoSalvo) ? 'green' : (idx === window.destinoSalvo ? '#007AFF' : '#333');
-        
-        let enderecoBruto = alvo.Endereço || alvo.Endereco || alvo.endereco || alvo.Rua || alvo.rua || alvo.Logradouro || "";
-        let textoEnd = alvo.isVaga ? '🚙 Estacionamento (Vaga)' : (typeof extrairRuaPadrao === 'function' && enderecoBruto !== "" ? extrairRuaPadrao(enderecoBruto) : enderecoBruto);
-        if (!textoEnd || textoEnd === "DESCONHECIDO" || textoEnd.trim() === "") textoEnd = "Siga a Linha Azul 📍";
-
-        html += `<div style="padding: 15px; margin: 10px; background: ${cor}; border-radius: 8px;" onclick="forcarPuloPara(${idx})">
-            <strong>Stop ${idx + 1}</strong><br>${textoEnd}
-        </div>`;
+function avaliarConclusaoExpedienteTotal() {
+    releaseWakeLock();
+    esconderTodasTelas();
+    
+    let totalMs = new Date() - horaInicioExpediente; if (totalMs <= 0) totalMs = 1000;
+    
+    let concluidos = 0, totalVols = 0;
+    rotaSpx.forEach((_, i) => {
+        let alvo = getAlvoData(i);
+        totalVols += alvo.totalVol;
+        if(alvo.status === 'concluido') concluidos += alvo.totalVol;
     });
-    let container = document.getElementById('conteudo-lista-stops');
-    if(container) container.innerHTML = html;
-}
-
-function forcarPuloPara(idx) {
-    window.destinoSalvo = idx;
-    if(typeof salvarEstadoRota === 'function') salvarEstadoRota();
-    fecharMenuStops();
-    atualizarPainelTopo();
-    desenharRotaRestante();
     
-    ultimaLatCamera = null;
-    ultimaLonCamera = null;
+    let taxa = totalVols > 0 ? ((concluidos / totalVols) * 100).toFixed(1) : 0;
+    let ritmo = totalMs > 0 ? Math.round(concluidos / (totalMs / 3600000)) : 0;
+
+    let rapida = historicoParadas.sort((a,b) => a.ms - b.ms)[0];
+    let txtRapida = rapida ? `${Math.floor(rapida.ms/60000)}m ${Math.floor((rapida.ms%60000)/1000)}s (Stop ${rapida.stop})` : '--';
+
+    document.getElementById('rel-total').innerText = Math.floor(totalMs/3600000) + "h " + Math.floor((totalMs%3600000)/60000) + "m";
+    document.getElementById('rel-ritmo').innerText = ritmo + " vol/h";
+    document.getElementById('rel-sucesso').innerText = taxa + "%";
+    document.getElementById('rel-raiox').innerText = `${rotaSpx.length} Paradas | ${totalVols} Vol`;
+    document.getElementById('rel-rapida').innerText = txtRapida;
+
+    if (isRotaManual) {
+        document.querySelectorAll('.auto-metric').forEach(el => el.style.display = 'none');
+    } else {
+        document.querySelectorAll('.auto-metric').forEach(el => el.style.display = 'flex');
+        document.getElementById('rel-km-otim').innerText = globalKmOtimizada.toFixed(2) + " km";
+        let economia = (globalKmPadrao - globalKmOtimizada).toFixed(2);
+        document.getElementById('rel-km-poupado').innerText = (economia < 0 ? 0 : economia) + " km";
+    }
+
+    mostrarTela('modal-relatorio');
 }
