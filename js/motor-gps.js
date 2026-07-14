@@ -334,6 +334,46 @@ function abrirMenuStops() {
             `;
         }
 
+        // --- RESGATE DA LÓGICA DE TAGS E VOLUMES RICA ---
+        
+        // 1. Pílula de Calor (Volume Total) flutuando à direita
+        let volColor = getCorVolume(alvo.totalVol);
+        let volPill = `<span style="float:right; font-size:13px; background:${volColor.bg}; color:${volColor.color}; padding:2px 8px; border-radius:10px; font-weight:bold;">${alvo.totalVol} vol</span>`;
+        
+        // 2. Tags Inteligentes (Comercial / Extra)
+        let tagsHtml = '';
+        if (alvo.comercial) tagsHtml += `<span class="tag-comercial" style="float:none; display:inline-block; margin-bottom:5px;">🏢 COMERCIAL</span> `;
+        if (!alvo.isVaga && alvo.obj.extra) tagsHtml += `<span class="tag-extra" style="float:none; display:inline-block; margin-bottom:5px;">❓ EXTRA</span> `;
+
+        // 3. Descritivo (Mostra a rua ou o detalhamento dos pacotes na Vaga)
+        let descInfo = '';
+        if (alvo.isVaga) {
+            let sugadosText = alvo.pacotes.map(p => {
+                let pColor = getCorVolume(p.pacotes);
+                return `Stop ${p.stop} <span style="color:${pColor.bg}; font-weight:bold;">(${p.pacotes}v)</span>`;
+            }).join(', ');
+            descInfo = `${tagsHtml}<br>Combo a pé contendo: ${sugadosText}`;
+        } else {
+            descInfo = `${tagsHtml}<br>${alvo.obj.ruaPadrao}`;
+        }
+
+        let labelPrincipal = alvo.isVaga ? alvo.id : (alvo.obj.extra ? "PACOTE EXTRA" : "Stop " + alvo.id);
+
+        // 4. Montagem do Card na Lista
+        html += `
+        <div style="background:${corFundo}; ${borda} border-radius:10px; padding:15px; margin-bottom:10px; text-align:left; color:${corTexto}; cursor:pointer;" onclick="pularParaStop(${i})">
+            <div style="font-size:16px; font-weight:bold; color:${isAtivo ? '#fff' : (alvo.isVaga ? '#007AFF' : '#fff')}; margin-bottom: 5px;">
+                ${statusIcon} <span style="color:#FFCC00;">#${i+1}</span> ➔ ${labelPrincipal}
+                ${volPill}
+            </div>
+            <div style="font-size:13px; opacity:0.9; margin-top:3px; line-height: 1.5;">${descInfo}</div>
+            ${botoesAcao}
+        </div>`;
+    }
+    document.getElementById('conteudo-lista-stops').innerHTML = html;
+    mostrarTela('modal-menu-stops', 'block');
+}
+
         let descInfo = alvo.isVaga 
             ? `Combo a pé contendo: ${alvo.pacotes.map(p => 'Stop ' + p.stop + ' (' + p.pacotes + ' vol)').join(', ')}`
             : alvo.obj.ruaPadrao;
