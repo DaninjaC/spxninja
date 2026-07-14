@@ -146,11 +146,11 @@ async function baixarRadaresDaRegiao(rota) { if (!rota || rota.length === 0) ret
 function iniciarModoAutomatico() { esconderTodasTelas(); if (typeof roteirizarModoAutomatico === "function") roteirizarModoAutomatico(); else alert("O motor automático ainda não foi carregado."); }
 function iniciarModoManual() { esconderTodasTelas(); if (typeof iniciarMapeamentoManual === "function") iniciarMapeamentoManual(); else alert("O motor manual ainda não foi carregado."); }
 
-// --- FORMULÁRIO DE CONTATO (COM ENVIO REAL) ---
+// --- FORMULÁRIO DE CONTATO (COM ENVIO REAL E SEM CAPTCHA) ---
 function enviarContato(event) {
-    event.preventDefault(); // Impede a página de piscar/recarregar
+    event.preventDefault(); 
     
-    // 1. ⬅️ COLOQUE SEU E-MAIL REAL AQUI EMBAIXO
+    // O seu código secreto ativado!
     let seuEmailPessoal = "22415a1827e214478c05b0e774d99d72"; 
     
     let nome = document.getElementById('contato-nome').value;
@@ -158,12 +158,10 @@ function enviarContato(event) {
     let mensagem = document.getElementById('contato-mensagem').value;
     let btnSubmit = event.target.querySelector('button[type="submit"]');
 
-    // Feedback visual para o motorista não clicar duas vezes
     let textoOriginal = btnSubmit.innerText;
     btnSubmit.innerText = "⏳ ENVIANDO...";
     btnSubmit.disabled = true;
 
-    // 2. Chama o "Carteiro" gratuito (FormSubmit) via código (AJAX)
     fetch(`https://formsubmit.co/ajax/${seuEmailPessoal}`, {
         method: "POST",
         headers: { 
@@ -174,25 +172,24 @@ function enviarContato(event) {
             Nome: nome,
             Email_Motorista: email,
             Mensagem: mensagem,
-            _subject: "Nova Mensagem do App SPX Ninja!" // Assunto do E-mail
+            _subject: "Nova Mensagem do App SPX Ninja!", 
+            _captcha: "false" // ⬅️ A MÁGICA QUE DESLIGA O TESTE DO ROBÔ
         })
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) throw new Error("Falha na comunicação com o carteiro.");
+        return response.json();
+    })
     .then(data => {
-        // Deu tudo certo!
         alert(`Obrigado, ${nome}! Sua mensagem foi enviada com sucesso para a nossa equipe.`);
-        document.getElementById('form-contato').reset(); // Limpa o formulário
-        event.target.parentElement.parentElement.classList.remove('active'); // Fecha a sanfona
+        document.getElementById('form-contato').reset(); 
+        event.target.parentElement.parentElement.classList.remove('active'); 
     })
     .catch(error => {
-        // Se a internet cair ou o serviço falhar
         alert("Ocorreu um erro ao enviar sua mensagem. Verifique sua conexão e tente novamente.");
     })
     .finally(() => {
-        // Devolve o botão ao estado normal
         btnSubmit.innerText = textoOriginal;
         btnSubmit.disabled = false;
     });
 }
-
-
