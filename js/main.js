@@ -151,7 +151,7 @@ function enviarContato(event) {
     event.preventDefault(); // Impede a página de piscar/recarregar
     
     // 1. ⬅️ COLOQUE SEU E-MAIL REAL AQUI EMBAIXO
-    let seuEmailPessoal = "daninja@gmail.com"; 
+    let seuEmailPessoal = "22415a1827e214478c05b0e774d99d72@gmail.com"; 
     
     let nome = document.getElementById('contato-nome').value;
     let email = document.getElementById('contato-email').value;
