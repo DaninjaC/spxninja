@@ -114,26 +114,23 @@ input[type="file"] { display: none; }
 /* NOVA CÂMERA DO GPS (ROTAÇÃO E VISÃO GERAL)*/
 /* ========================================= */
 
-/* 1. Oculta as bordas que "vazam" quando o mapa gira */
 #map-wrapper {
     overflow: hidden !important;
     position: relative;
 }
 
-/* 2. Deixa o mapa "gigante" para que, ao girar, os cantos não fiquem vazios */
 #mapa-gps.mapa-janela {
     width: 150vw !important;
     height: 150vh !important;
     top: -25vh !important;
     left: -25vw !important;
-    transition: transform 0.5s ease-in-out; /* A mágica do giro suave e sem trancos */
+    transition: transform 0.5s linear; /* Giro mega macio */
     transform-origin: center center;
 }
 
-/* 3. Estilo do nosso novo botão flutuante de Trava da Câmera */
 #btn-trava-camera {
     position: absolute;
-    bottom: 90px; /* Fica estrategicamente acima do painel de endereço e ações */
+    bottom: 90px;
     right: 20px;
     z-index: 5000;
     background: #007AFF;
@@ -150,8 +147,6 @@ input[type="file"] { display: none; }
     align-items: center;
     gap: 8px;
 }
-
-/* Efeitinho de clique no botão */
 #btn-trava-camera:active {
     transform: scale(0.95);
 }
