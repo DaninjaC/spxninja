@@ -34,22 +34,27 @@
         
         <div id="loading-msg" style="display:none;">⏳ Processando Pacotes...<br><small>Lendo coordenadas da base.</small></div>
 
-        <!-- FAQ Unificado (Automático + Manual) -->
+        <!-- RESUMO GERAL DO APLICATIVO -->
         <div class="faq-container" id="faq-box">
-            <div class="faq-titulo">Guia SPX Ninja</div>
+            <div class="faq-titulo">Sobre o SPX Ninja</div>
+            
             <div class="faq-item" onclick="toggleFaq(this)">
-                <div class="faq-header">🤖 Modo Automático <span class="faq-icon">+</span></div>
-                <div class="faq-body">O robô agrupa pacotes extras, cria o efeito zíper nas ruas e calcula a rota mais barata automaticamente.</div>
+                <div class="faq-header">🎯 O que é o app? <span class="faq-icon">+</span></div>
+                <div class="faq-body">O SPX Ninja é um roteirizador tático de alta precisão feito para quem vive o dia a dia das entregas. Ele transforma a sua planilha bruta em uma estratégia visual, projetada para economizar asfalto, tempo e combustível.</div>
             </div>
             <div class="faq-item" onclick="toggleFaq(this)">
-                <div class="faq-header">✏️ Modo Manual (Desenho) <span class="faq-icon">+</span></div>
-                <div class="faq-body">Você arrasta o dedo na tela para ditar o sentido da via. Toque na rua vazia para criar Vagas (Combos a Pé).</div>
+                <div class="faq-header">📦 Organização Ninja <span class="faq-icon">+</span></div>
+                <div class="faq-body">O app fatia sua carga em "Bags" virtuais, colore cada pacote pelo volume (Mapa de Calor) e já te avisa se a entrega é comercial, residencial ou um pacote extra. Nada de perder tempo caçando caixas no porta-malas.</div>
+            </div>
+            <div class="faq-item" onclick="toggleFaq(this)">
+                <div class="faq-header">🧭 Navegação em 3 Camadas <span class="faq-icon">+</span></div>
+                <div class="faq-body">O mapa de GPS trabalha com linhas inteligentes para limpar a sua visão: mostra de forma sutil o que ficou para trás, destaca o seu alvo atual em azul e já desenha a sua próxima perna em roxo. Tudo com alerta integrado de radares.</div>
             </div>
         </div>
     </div>
 
     <!-- ========================================== -->
-    <!-- 2. TELA DE ESCOLHA DE MODO (NOVO)          -->
+    <!-- 2. TELA DE ESCOLHA DE MODO                 -->
     <!-- ========================================== -->
     <div id="modal-escolha-modo" class="modal-fullscreen">
         <h2>ESTRATÉGIA DE ROTA</h2>
@@ -64,6 +69,21 @@
             ✏️ MODO MANUAL<br>
             <span style="font-weight:normal; font-size:13px;">Eu mesmo vou desenhar o trajeto na tela</span>
         </button>
+
+        <!-- EXPLICAÇÃO DETALHADA DAS ESTRATÉGIAS -->
+        <div class="faq-container" style="margin: 30px auto 0 auto;">
+            <div class="faq-titulo">Entenda os Modos</div>
+            
+            <div class="faq-item" onclick="toggleFaq(this)">
+                <div class="faq-header">🤖 Como funciona o Automático? <span class="faq-icon">+</span></div>
+                <div class="faq-body">Deixe a inteligência do Ninja trabalhar por você. O robô aplica o Efeito Zíper para evitar zig-zags entre as calçadas, agrupa os pacotes da mesma rua de uma vez só (Modo Varal) e penaliza o trajeto caso tente te fazer voltar para uma rua já entregue. Além disso, ele encaixa magicamente os pacotes 'Extras' (sem numeração) junto ao vizinho mais próximo. No final, você compara a métrica do app com a da transportadora e vê a economia real.</div>
+            </div>
+            
+            <div class="faq-item" onclick="toggleFaq(this)">
+                <div class="faq-header">✏️ Como funciona o Manual? <span class="faq-icon">+</span></div>
+                <div class="faq-body">Controle tático na ponta dos seus dedos. Se você já conhece o bairro como a palma da mão, arraste o dedo pela tela para criar um "laço" e ditar a sua própria sequência de entregas, contornando o trânsito e o sentido das vias. Com um toque rápido no asfalto vazio, você agrupa pacotes vizinhos para criar uma "Vaga" (Combo a Pé), estacionando o carro uma única vez para zerar o quarteirão caminhando.</div>
+            </div>
+        </div>
     </div>
 
     <!-- ========================================== -->
@@ -102,9 +122,9 @@
     <!-- Info Rota Otimizada -->
     <div id="modal-info-otimizada" class="modal-fullscreen">
         <h2>🚀 GUIA DA ROTA NINJA</h2>
-        <img src="assets/docaninja.jpeg" alt="Guia Dokan" class="guia-img">
+        <img src="assets/docaninja.jpeg" alt="Guia Dokan" class="guia-img" onerror="this.style.display='none'">
         <div class="info-container" style="font-size: 14px;">
-            <p>🎒 <strong>Sistema de Bags:</strong> Sua carga foi fatiada em lotes de 10.</p>
+            <p>🎒 <strong>Sistema de Bags:</strong> Sua carga foi fatiada em lotes de 10 pacotes.</p>
         </div>
         <button class="btn-modo btn-otimizada" onclick="avancarParaDocaOtimizada()">IR PARA SEPARAÇÃO (BAGS) 📦</button>
     </div>
@@ -192,7 +212,6 @@
             <div class="rel-dado"><span>Ritmo (Vol/h)</span><strong id="rel-ritmo">--</strong></div>
             <div class="rel-dado"><span>Taxa de Sucesso</span><strong id="rel-sucesso" class="rel-destaque">--%</strong></div>
             <div class="rel-dado"><span>Carga Raio-X</span><strong id="rel-raiox">--</strong></div>
-            <!-- Exclusivos da Rota Automática (O JS oculta se for manual) -->
             <div class="rel-dado auto-metric"><span>Sua Rota (KM)</span><strong id="rel-km-otim">-- km</strong></div>
             <div class="rel-dado auto-metric"><span>Asfalto Poupado</span><strong id="rel-km-poupado" style="color:#39FF14;">-- km</strong></div>
             <div class="rel-dado rel-full"><span>Recorde da Entrega Mais Rápida ⚡</span><strong id="rel-rapida">--:--</strong></div>
@@ -204,7 +223,6 @@
     <!-- 6. NOSSOS SCRIPTS FATIADOS                 -->
     <!-- ========================================== -->
     
-    <!-- Script PWA -->
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
@@ -213,10 +231,7 @@
         }
     </script>
 
-    <!-- O Regente das Telas e Variáveis Globais -->
     <script src="js/main.js"></script>
-    
-    <!-- Módulos da Operação -->
     <script src="js/leitor.js"></script>
     <script src="js/motor-auto.js"></script>
     <script src="js/motor-manual.js"></script>
