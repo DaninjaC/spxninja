@@ -100,28 +100,53 @@ function continuarRotaSalva() {
 function esconderTodasTelas() {
     const telas = [
         'controles-iniciais', 'modal-escolha-modo', 'modal-auditoria', 
-        'modal-info-padrao', 'modal-info-otimizada', 'modal-desenho-manual', 
+        'modal-info-padrao', 'modal-info-otimizada', 'modal-guia-manual', 'modal-desenho-manual', 
         'modal-doca', 'modal-guia-gps', 'tela-navegacao', 
         'modal-menu-stops', 'modal-relatorio'
     ];
     telas.forEach(id => { let el = document.getElementById(id); if(el) el.style.display = 'none'; });
 }
 
+// Lógica de Entrada no Modo Manual (Com Onboarding)
+function iniciarModoManual() { 
+    esconderTodasTelas(); 
+    if (localStorage.getItem('spx_ninja_hide_manual_guide') === 'true') {
+        avancarParaDesenhoManual(true);
+    } else {
+        mostrarTela('modal-guia-manual', 'block');
+    }
+}
+
+function avancarParaDesenhoManual(isSilent = false) {
+    if (!isSilent) {
+        let chk = document.getElementById('chk-nao-mostrar-manual');
+        if (chk && chk.checked) {
+            localStorage.setItem('spx_ninja_hide_manual_guide', 'true');
+        }
+    }
+    
+    esconderTodasTelas();
+    
+    if (typeof iniciarMapeamentoManual === "function") {
+        iniciarMapeamentoManual(); 
+    } else {
+        alert("O motor manual ainda não foi carregado.");
+    }
+}
+
+// Lógica de Entrada no GPS (Com Onboarding)
 function prepararIdaParaGPS() {
     esconderTodasTelas();
-    // Verifica se o motorista marcou a caixinha no passado
     if (localStorage.getItem('spx_ninja_hide_guide') === 'true') {
-        avancarParaMapaReal(true); // Pula direto pro mapa
+        avancarParaMapaReal(true);
     } else {
-        mostrarTela('modal-guia-gps', 'block'); // Mostra a nova tela
+        mostrarTela('modal-guia-gps', 'block');
     }
 }
 
 function avancarParaMapaReal(isSilent = false) {
-    // Se o clique veio do botão "BORA PRA RUA" e não do pulo silencioso
     if (!isSilent) {
         let chk = document.getElementById('chk-nao-mostrar-gps');
-        // Se ele clicou na caixinha, salva o segredo no cofre do navegador
         if (chk && chk.checked) {
             localStorage.setItem('spx_ninja_hide_guide', 'true');
         }
@@ -130,10 +155,16 @@ function avancarParaMapaReal(isSilent = false) {
     esconderTodasTelas();
     mostrarTela('tela-navegacao');
     
-    // Dispara a ignição do motor GPS
     if (typeof iniciarInterfaceGPS === "function") {
         iniciarInterfaceGPS();
     }
+}
+
+// Botão de Entrada no Automático (S/ Onboarding pq ele já tem a tela de auditoria)
+function iniciarModoAutomatico() { 
+    esconderTodasTelas(); 
+    if (typeof roteirizarModoAutomatico === "function") roteirizarModoAutomatico(); 
+    else alert("O motor automático ainda não foi carregado."); 
 }
 
 function mostrarTela(id, displayType = 'flex') {
@@ -177,10 +208,6 @@ function initAudio() { try { window.AudioContext = window.AudioContext || window
 function playBipeRadar() { if (!audioCtx) return; try { let osc = audioCtx.createOscillator(); let gain = audioCtx.createGain(); osc.connect(gain); gain.connect(audioCtx.destination); osc.type = 'square'; osc.frequency.value = 880; gain.gain.setValueAtTime(0.2, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3); osc.start(audioCtx.currentTime); osc.stop(audioCtx.currentTime + 0.3); } catch(e) {} }
 async function baixarRadaresDaRegiao(rota) { if (!rota || rota.length === 0) return; try { let lats = rota.map(p => p.lat), lons = rota.map(p => p.lon); let minLat = Math.min(...lats) - 0.015, maxLat = Math.max(...lats) + 0.015, minLon = Math.min(...lons) - 0.015, maxLon = Math.max(...lons) + 0.015; let query = `[out:json][timeout:15];node["highway"="speed_camera"](${minLat},${minLon},${maxLat},${maxLon});out;`; let res = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`); let data = await res.json(); if (data && data.elements) listaRadares = data.elements.map(e => ({ lat: e.lat, lon: e.lon, speed: e.tags.maxspeed || "" })); } catch(e) {} }
 
-// --- TRANSIÇÃO DE MÓDULOS ---
-function iniciarModoAutomatico() { esconderTodasTelas(); if (typeof roteirizarModoAutomatico === "function") roteirizarModoAutomatico(); else alert("O motor automático ainda não foi carregado."); }
-function iniciarModoManual() { esconderTodasTelas(); if (typeof iniciarMapeamentoManual === "function") iniciarMapeamentoManual(); else alert("O motor manual ainda não foi carregado."); }
-
 // --- FORMULÁRIO DE CONTATO (COM ENVIO REAL E SEM CAPTCHA) ---
 async function enviarContato(event) {
     event.preventDefault(); 
@@ -215,19 +242,16 @@ async function enviarContato(event) {
 
         if (!response.ok) throw new Error("Falha na comunicação com o servidor.");
 
-        // 1º: Limpamos a tela ANTES do alerta para não congelar o celular
         btnSubmit.innerText = textoOriginal;
         btnSubmit.disabled = false;
         document.getElementById('form-contato').reset(); 
         event.target.parentElement.parentElement.classList.remove('active'); 
 
-        // 2º: Disparamos o alerta com um leve atraso para a tela ter tempo de atualizar
         setTimeout(() => {
             alert(`Obrigado, ${nome}! Sua mensagem foi enviada com sucesso para a nossa equipe.`);
         }, 150);
 
     } catch (error) {
-        // Se der erro, destrava o botão antes de avisar
         btnSubmit.innerText = textoOriginal;
         btnSubmit.disabled = false;
         
