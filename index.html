@@ -34,9 +34,9 @@
         
         <div id="loading-msg" style="display:none;">⏳ Processando Pacotes...<br><small>Lendo coordenadas da base.</small></div>
 
-<!-- RESUMO GERAL DO APLICATIVO -->
+        <!-- RESUMO GERAL DO APLICATIVO -->
         <div class="faq-container" id="faq-box">
-            <div class="faq-titulo">Sobre o SPX Ninja</div>
+            <div class="faq-titulo">SOBRE O SPX NINJA</div>
             
             <div class="faq-item">
                 <div class="faq-header" onclick="this.parentElement.classList.toggle('active')">🎯 Qual a missão do app? <span class="faq-icon">+</span></div>
@@ -58,7 +58,7 @@
                 <div class="faq-body">Uma tela feita para não te distrair. O mapa exibe seu trajeto em 3 camadas (o que passou, o alvo atual em azul e o próximo destino em roxo), possui alerta de radares e avança automaticamente para o próximo cliente após a baixa.</div>
             </div>
 
-            <!-- NOVO: Tópico 5 com Formulário -->
+            <!-- Tópico 5 com Formulário de Contato -->
             <div class="faq-item">
                 <div class="faq-header" onclick="this.parentElement.classList.toggle('active')">💬 Dúvidas e Sugestões <span class="faq-icon">+</span></div>
                 <div class="faq-body" style="padding-bottom: 20px;">
@@ -72,6 +72,7 @@
                 </div>
             </div>
         </div>
+    </div>
 
     <!-- ========================================== -->
     <!-- 2. TELA DE ESCOLHA DE MODO                 -->
@@ -109,7 +110,6 @@
     <!-- ========================================== -->
     <!-- 3. MODO AUTOMÁTICO (TELAS DO ROBÔ)         -->
     <!-- ========================================== -->
-    <!-- Tela de Auditoria e Comparação de KM -->
     <div id="modal-auditoria" class="modal-fullscreen">
         <h2>ESCOLHA A ROTA (TESTE DE CAMPO)</h2>
         <div class="grid-mapas">
@@ -130,7 +130,6 @@
         </div>
     </div>
 
-    <!-- Info Rota Padrão -->
     <div id="modal-info-padrao" class="modal-fullscreen">
         <h2>▶️ MODO: ROTA PADRÃO</h2>
         <div class="info-container">
@@ -139,7 +138,6 @@
         <button class="btn-modo btn-padrao" onclick="avancarParaGPSPadrao()">INICIAR VIAGEM 🚀</button>
     </div>
 
-    <!-- Info Rota Otimizada -->
     <div id="modal-info-otimizada" class="modal-fullscreen">
         <h2>🚀 GUIA DA ROTA NINJA</h2>
         <img src="assets/docaninja.jpeg" alt="Guia Dokan" class="guia-img" onerror="this.style.display='none'">
@@ -180,15 +178,12 @@
     <!-- ========================================== -->
     <!-- 5. COMPARTILHADOS (DOCA, GPS E RELATÓRIO)  -->
     <!-- ========================================== -->
-    
-    <!-- Modo Doca -->
     <div id="modal-doca" class="modal-fullscreen">
         <h2>📦 MODO DOCA - SEPARAÇÃO</h2>
         <div id="lista-bags"></div>
         <button class="btn-modo btn-otimizada" style="margin-top:10px; margin-bottom:40px;" onclick="iniciarGPSPosDoca()">INICIAR VIAGEM 🚀</button>
     </div>
 
-    <!-- Menu Lateral (Stops) -->
     <div id="modal-menu-stops" class="modal-fullscreen" style="z-index: 4000;">
         <div class="header-menu-stops">
             <h2 style="margin: 0;">📋 LISTA DE PARADAS</h2>
@@ -197,7 +192,6 @@
         <div id="conteudo-lista-stops" style="padding-bottom: 30px;"></div>
     </div>
 
-    <!-- Interface GPS Principal -->
     <div id="tela-navegacao">
         <div id="radar-alert">📸 RADAR à frente</div> 
         <div id="painel-topo">
@@ -223,7 +217,6 @@
         </div>
     </div>
 
-    <!-- Relatório Final -->
     <div id="modal-relatorio" class="modal-fullscreen" style="z-index: 5000;">
         <h2>🏆 EXPEDIENTE FINALIZADO!</h2>
         <p>Ótimo trabalho, Ninja! Veja abaixo os resultados da sua rota:</p>
@@ -242,7 +235,6 @@
     <!-- ========================================== -->
     <!-- 6. NOSSOS SCRIPTS FATIADOS                 -->
     <!-- ========================================== -->
-    
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
