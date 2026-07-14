@@ -34,13 +34,14 @@
         
         <div id="loading-msg" style="display:none;">⏳ Processando Pacotes...<br><small>Lendo coordenadas da base.</small></div>
 
-        <!-- RESUMO GERAL DO APLICATIVO -->
+
+<!-- RESUMO GERAL DO APLICATIVO -->
         <div class="faq-container" id="faq-box" style="margin-top: 30px;">
             
             <!-- MENU 1: SOBRE O APP -->
             <div class="faq-item">
                 <div class="faq-header" onclick="this.parentElement.classList.toggle('active')">🥷 Sobre o SPX Ninja <span class="faq-icon">+</span></div>
-                <div class="faq-body" style="padding-bottom: 20px; line-height: 1.5; font-size: 14px; color: #ccc;">
+                <div class="faq-body" style="line-height: 1.5; font-size: 14px; color: #ccc;">
                     <p style="margin-top: 5px;"><strong>🎯 Qual a missão do app?</strong><br>
                     Chegar em casa mais cedo e com mais dinheiro no bolso. O aplicativo pega a sua planilha bruta e cria uma estratégia visual avançada para eliminar o zig-zag, reduzir as manobras e poupar o seu asfalto e combustível.</p>
                     
@@ -58,7 +59,7 @@
             <!-- MENU 2: FORMULÁRIO DE CONTATO -->
             <div class="faq-item">
                 <div class="faq-header" onclick="this.parentElement.classList.toggle('active')">💬 Dúvidas e Sugestões <span class="faq-icon">+</span></div>
-                <div class="faq-body" style="padding-bottom: 20px;">
+                <div class="faq-body">
                     <p style="margin-top: 10px; margin-bottom: 15px; font-size: 14px; color: #ccc;">Encontrou um bug ou tem uma ideia para melhorar o Ninja? Mande pra gente!</p>
                     <form id="form-contato" onsubmit="enviarContato(event)" style="display: flex; flex-direction: column; gap: 10px;">
                         <input type="text" id="contato-nome" placeholder="Seu Nome" required style="padding: 12px; border-radius: 6px; border: 1px solid #444; background: #111; color: #fff; font-family: sans-serif; font-size: 14px;">
@@ -70,6 +71,7 @@
             </div>
             
         </div>
+        
     </div> <!-- AQUI ESTÁ A DIV SALVADORA QUE FALTAVA! -->
 
     <!-- ========================================== -->
