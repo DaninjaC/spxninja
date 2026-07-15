@@ -8,6 +8,7 @@ let historicoDeRoteamento = [[]];
 
 let mapDesenho;
 let linhaDedoDesenho, rotaRealDesenho;
+let camadaPinosManual = L.layerGroup(); // CORREÇÃO: Camada leve para agrupamento
 let modoDesenho = false, desenhando = false;
 let startX = 0, startY = 0, mudouDeLugar = false, houveCapturaNesteCiclo = false;
 
@@ -27,7 +28,10 @@ function montarMapaDesenho() {
         rotaRealDesenho = L.polyline([], { color: '#007AFF', weight: 5, opacity: 0.9 }).addTo(mapDesenho);
     }
 
-    marcadoresDesenho.forEach(m => mapDesenho.removeLayer(m));
+    // CORREÇÃO: Limpando todos os pinos de uma vez da memória com Garbage Collection
+    camadaPinosManual.addTo(mapDesenho);
+    camadaPinosManual.clearLayers();
+
     marcadoresDesenho = []; sequenciaSelecionada = []; historicoDeRoteamento = [[]]; 
     
     // Zeramos as vagas globais para um novo mapeamento limpo
@@ -39,7 +43,7 @@ function montarMapaDesenho() {
         let cor = p.extra ? '#FF8C00' : '#555';
         let marker = L.circleMarker([p.lat, p.lon], { radius: 8, color: '#fff', fillColor: cor, fillOpacity: 1, weight: 2 })
             .bindTooltip(p.stop, { permanent: true, direction: 'top', className: 'stop-label', offset: [0, -5] })
-            .addTo(mapDesenho);
+            .addTo(camadaPinosManual); // CORREÇÃO: Pinos injetados na Camada, não direto no Mapa
         
         marker.spxId = p.stop; marker.spxLatLng = L.latLng(p.lat, p.lon);
         marker.corOriginal = cor; marker.isGrouped = false;
@@ -121,7 +125,8 @@ function encaixarVagaNoAsfalto(latlng) {
             vagaCount++;
             let vId = "Vaga " + vagaCount;
             let marker = L.circleMarker(rLatLng, { radius: 10, color: '#fff', fillColor: '#007AFF', fillOpacity: 1, weight: 3 })
-                .bindTooltip(vId, { permanent: true, direction: 'top', className: 'vaga-label', offset: [0, -5] }).addTo(mapDesenho);
+                .bindTooltip(vId, { permanent: true, direction: 'top', className: 'vaga-label', offset: [0, -5] })
+                .addTo(camadaPinosManual); // CORREÇÃO: Pino de Vaga Injetado na Camada
             
             marker.spxId = vId; marker.spxLatLng = rLatLng; marker.corOriginal = '#007AFF'; marker.isGrouped = false;
             marcadoresDesenho.push(marker);
@@ -170,7 +175,7 @@ function desfazerUltimoRisco() {
 function desfazerUltimaVaga() {
     if (vagasCriadas.length > 0) {
         let v = vagasCriadas.pop();
-        mapDesenho.removeLayer(v.marker);
+        camadaPinosManual.removeLayer(v.marker); // CORREÇÃO: Remove a Vaga da Camada
         marcadoresDesenho = marcadoresDesenho.filter(m => m !== v.marker);
         sequenciaSelecionada = sequenciaSelecionada.filter(id => id !== v.marker.spxId);
         v.conectoras.forEach(l => mapDesenho.removeLayer(l));
