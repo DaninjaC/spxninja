@@ -67,7 +67,6 @@ input[type="file"] { display: none; }
     color: #fff !important;
     font-weight: 900 !important;
     font-size: 14px !important;
-    /* Borda preta em volta da letra para dar leitura sem estragar o mapa */
     text-shadow:
         -1px -1px 0 #000, 1px -1px 0 #000,
         -1px  1px 0 #000, 1px  1px 0 #000,
@@ -75,7 +74,7 @@ input[type="file"] { display: none; }
 }
 .leaflet-tooltip-left::before, .leaflet-tooltip-right::before,
 .leaflet-tooltip-top::before, .leaflet-tooltip-bottom::before {
-    display: none !important; /* Remove a setinha branca chata */
+    display: none !important; 
 }
 
 /* ========================================= */
@@ -86,8 +85,8 @@ input[type="file"] { display: none; }
 .bag-item { 
     padding: 15px 20px; 
     display: flex; justify-content: space-between; align-items: center; 
-    background: rgba(255, 255, 255, 0.05); /* Fundo cinza chumbo de destaque */
-    margin: 6px 10px; /* Descola as bags umas das outras */
+    background: rgba(255, 255, 255, 0.05); 
+    margin: 6px 10px; 
     border-radius: 8px;
     border: 1px solid rgba(255, 255, 255, 0.1);
 }
@@ -111,7 +110,7 @@ input[type="file"] { display: none; }
     background: rgba(9, 9, 11, 0.95); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
     padding: 20px 15px 5px 15px; text-align: center; z-index: 1001; 
     border-bottom: 1px solid var(--surface-border); box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-    max-height: 35vh; /* TRAVA O PAINEL: 35% DA TELA NO MÁXIMO */
+    max-height: 45vh; /* TRAVA O PAINEL EXPANDIDA: De 35% para 45% DA TELA */
     display: flex; flex-direction: column;
 }
 .modo-confirmacao { background: rgba(255, 140, 0, 0.95) !important; border-bottom: none !important; }
@@ -130,24 +129,26 @@ input[type="file"] { display: none; }
     flex: 1; padding-right: 5px; margin-top: 10px; padding-bottom: 10px;
 }
 
-/* A CAIXINHA DE ENDEREÇO (QUADRICULADO) */
+/* A CAIXINHA DE ENDEREÇO (COMPACTADA) */
 .endereco-item { 
-    font-size: 14px !important; 
+    font-size: 12px !important; /* Fonte reduzida para caber mais ruas */
     color: var(--text-primary); 
     font-weight: 700; text-transform: uppercase; text-align: left; 
-    border: 1px solid rgba(255, 255, 255, 0.25); /* Contorno Branco Fininho */
-    padding: 10px !important; border-radius: 8px; 
-    background: rgba(255, 255, 255, 0.05); /* Leve realce no fundo */
-    margin-bottom: 8px !important; line-height: 1.4; 
+    border: 1px solid rgba(255, 255, 255, 0.25); 
+    padding: 6px 10px !important; /* Espaço interno espremido */
+    border-radius: 8px; 
+    background: rgba(255, 255, 255, 0.05); 
+    margin-bottom: 5px !important; /* Ruas mais juntinhas */
+    line-height: 1.3; 
 }
 
-/* DESTAQUE ABSOLUTO NOS NÚMEROS DAS CASAS */
+/* DESTAQUE ABSOLUTO NOS NÚMEROS DAS CASAS (MANTIDO GIGANTE) */
 .num-box { 
     background: rgba(255, 204, 0, 0.15); 
-    padding: 2px 6px; border-radius: 4px; 
-    color: #FFCC00; /* Amarelo Vivo */
-    font-weight: 900; font-size: 17px; /* Aumentado */
-    border: 1px solid rgba(255, 204, 0, 0.5); /* Bordinha amarela */
+    padding: 1px 5px; border-radius: 4px; 
+    color: #FFCC00; 
+    font-weight: 900; font-size: 17px; 
+    border: 1px solid rgba(255, 204, 0, 0.5); 
 }
 
 #btn-menu-stops { position: absolute; top: 15px; right: 15px; width: 45px; height: 45px; background: var(--surface-color); border: 1px solid var(--surface-border); border-radius: 12px; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 1005; backdrop-filter: blur(10px); }
@@ -161,14 +162,14 @@ input[type="file"] { display: none; }
 /* ========================================= */
 #seta-flutuante { 
     position: absolute; top: 15px; left: 15px; z-index: 1000; 
-    background: rgba(10, 10, 10, 0.95); /* Preto Elegante */
+    background: rgba(10, 10, 10, 0.95); 
     backdrop-filter: blur(10px);
-    border-radius: 16px; padding: 15px 25px; text-align: center; color: white; 
-    border: 2px solid #444; /* Borda visível */
-    min-width: 100px; display: none; box-shadow: 0 8px 30px rgba(0,0,0,0.7); 
+    border-radius: 16px; padding: 10px 20px; text-align: center; color: white; /* Ajuste no acolchoamento */
+    border: 2px solid #444; 
+    min-width: 90px; display: none; box-shadow: 0 8px 30px rgba(0,0,0,0.7); 
 }
-#seta-icon { font-size: 60px; margin-bottom: 5px; line-height: 1; } /* GIGANTE */
-#seta-dist { font-size: 24px; font-weight: 900; color: var(--success-color); } /* VERDE NEON */
+#seta-icon { font-size: 80px; margin-bottom: 2px; line-height: 1; } /* SETA GIGANTE */
+#seta-dist { font-size: 18px; font-weight: 900; color: var(--success-color); } /* DISTÂNCIA MENOR E VERDE NEON */
 
 #painel-rodape { background: rgba(9, 9, 11, 0.95); backdrop-filter: blur(15px); padding: 20px; text-align: center; z-index: 1001; border-top: 1px solid var(--surface-border); }
 #rodape-rua { color: var(--text-secondary); font-weight: 700; font-size: 13px; text-transform: uppercase; margin-bottom: 5px; letter-spacing: 1px; }
@@ -176,7 +177,6 @@ input[type="file"] { display: none; }
 
 #painel-acoes { display: none; gap: 15px; padding: 20px; background: #000; justify-content: center; z-index: 1002; flex-direction: column; border-top: 1px solid var(--surface-border); }
 
-/* BOTÕES 3D DO RODA-PÉ DO GPS */
 .btn-status { 
     padding: 18px; border-radius: 16px; font-size: 16px; font-weight: 800; text-transform: uppercase; 
     letter-spacing: 1px; transition: transform 0.1s ease, box-shadow 0.1s ease; position: relative; 
