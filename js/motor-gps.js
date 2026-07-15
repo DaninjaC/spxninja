@@ -7,6 +7,8 @@ let trilhaMestreGps, rotaRealGps, proximaPernaGps;
 let markerUserGps, markerDestGps;
 let camadaFundoGps = L.layerGroup();
 
+let idRastreadorGps = null; // CORREÇÃO: Variável para controlar o sinal do GPS
+
 let idxDestino = 0, idxPasso = 0;
 let minhaLat, minhaLon, ultimaLatReq, ultimaLonReq;
 let passosNavegacao = [], distAnteriorCurva = Infinity;
@@ -125,7 +127,8 @@ async function atualizarProximaPernaRoxa() {
 }
 
 function ativarRastreamentoGeolocalizacaoAtiva() {
-    navigator.geolocation.watchPosition(async pos => {
+    // CORREÇÃO: A requisição do GPS agora é salva na variável idRastreadorGps
+    idRastreadorGps = navigator.geolocation.watchPosition(async pos => {
         minhaLat = pos.coords.latitude; minhaLon = pos.coords.longitude;
         
         if (pos.coords.speed && pos.coords.speed > 2 && pos.coords.heading !== null) headingCarro = Math.round(pos.coords.heading);
@@ -426,6 +429,9 @@ function pularParaStop(index) {
 }
 
 function avaliarConclusaoExpedienteTotal() {
+    // CORREÇÃO: Desligar o rastreador de GPS antes de encerrar
+    if (idRastreadorGps !== null) navigator.geolocation.clearWatch(idRastreadorGps);
+
     releaseWakeLock();
     esconderTodasTelas();
     
