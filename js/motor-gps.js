@@ -7,7 +7,7 @@ let trilhaMestreGps, rotaRealGps, proximaPernaGps;
 let markerUserGps, markerDestGps;
 let camadaFundoGps = L.layerGroup();
 
-let idRastreadorGps = null; // CORREÇÃO: Variável para controlar o sinal do GPS
+let idRastreadorGps = null;
 
 let idxDestino = 0, idxPasso = 0;
 let minhaLat, minhaLon, ultimaLatReq, ultimaLonReq;
@@ -78,7 +78,6 @@ function iniciarInterfaceGPS() {
             if (alvo.isVaga) vagasCriadas.find(x => x.marker.spxId === alvo.id).gpsMarker = marker;
             else planilhaStopsData.find(x => x.stop === alvo.id).gpsMarker = marker;
             
-            // Correção Vital: Busca as coordenadas corretas na base para não quebrar a tela de GPS na restauração
             if (alvo.isVaga) {
                 let v = vagasCriadas.find(x => x.marker.spxId === alvo.id);
                 if(v.sugados) v.sugados.forEach(m => {
@@ -127,7 +126,6 @@ async function atualizarProximaPernaRoxa() {
 }
 
 function ativarRastreamentoGeolocalizacaoAtiva() {
-    // CORREÇÃO: A requisição do GPS agora é salva na variável idRastreadorGps
     idRastreadorGps = navigator.geolocation.watchPosition(async pos => {
         minhaLat = pos.coords.latitude; minhaLon = pos.coords.longitude;
         
@@ -180,10 +178,12 @@ async function recalcularRotaGpsTaticaProximoAlvo() {
         txtEnderecos = formatarEnderecos(alvo.obj.enderecos);
     }
 
+    /* CORREÇÃO DAS CORES: A cor da palavra 'STOP X' agora acompanha a cor da bag! */
+    let corVol = getCorVolume(alvo.totalVol);
     let labelBadge = alvo.isVaga ? `${alvo.id} (Combo a Pé)` : (alvo.obj.extra ? `EXTRA ${alvo.id}` : `STOP ${alvo.id}`);
-    let pill = `<span style="background:${getCorVolume(alvo.totalVol).bg}; color:${getCorVolume(alvo.totalVol).color}; padding:2px 8px; border-radius:10px; font-size:13px; margin-left:5px;">${alvo.totalVol} vol</span>`;
+    let pill = `<span style="background:${corVol.bg}; color:${corVol.color}; padding:2px 8px; border-radius:10px; font-size:13px; margin-left:5px;">${alvo.totalVol} vol</span>`;
     
-    document.getElementById('stop-badge').innerHTML = `<span style="color:#fff;">#${idxDestino+1}</span> ➔ ${labelBadge} ${pill} ${alvo.comercial?'<span class="tag-comercial">🏢</span>':''}`;
+    document.getElementById('stop-badge').innerHTML = `<span style="color:#fff;">#${idxDestino+1}</span> ➔ <span style="color:${corVol.bg};">${labelBadge}</span> ${pill} ${alvo.comercial?'<span class="tag-comercial">🏢</span>':''}`;
     document.getElementById('lista-enderecos').innerHTML = txtEnderecos;
 
     if (markerDestGps) mapGps.removeLayer(markerDestGps);
@@ -303,7 +303,7 @@ function finalizarParadaAtual(status) {
     });
     
     atualizarCorPinoGPS(idxDestino, status);
-    if (typeof salvarEstadoRota === "function") salvarEstadoRota(); // SALVA O PROGRESSO
+    if (typeof salvarEstadoRota === "function") salvarEstadoRota();
 
     aguardandoConfirmacao = false; requestWakeLock();
     document.getElementById('painel-rodape').style.display = 'block';
@@ -327,9 +327,12 @@ function abrirMenuStops() {
     for (let i = 0; i < rotaSpx.length; i++) {
         let alvo = getAlvoData(i);
         let isAtivo = (i === idxDestino);
-        let corZebrada = Math.floor(i / 10) % 2 === 0 ? '#1a1a1a' : '#0a0a0a';
-        let corFundo = isAtivo ? '#003399' : corZebrada;
-        let borda = isAtivo ? 'border: 2px solid #39FF14;' : 'border: 1px solid #222;';
+        
+        /* CORREÇÃO DO CONTRASTE: Intercala cinza chumbo com cinza escuro linha sim, linha não */
+        let corZebrada = i % 2 === 0 ? '#262626' : '#1a1a1a'; 
+        /* Item ativo recebe um azul luminoso */
+        let corFundo = isAtivo ? 'linear-gradient(135deg, #0055ff, #003399)' : corZebrada;
+        let borda = isAtivo ? 'border: 2px solid #39FF14;' : 'border: 1px solid #333;';
 
         let statusIcon = alvo.status === 'concluido' ? '✅' : (alvo.status === 'pendente' ? '❌' : (isAtivo ? '📍' : (alvo.isVaga ? '🚙' : '📦')));
         let corTexto = alvo.status === 'concluido' ? '#888' : (alvo.status === 'pendente' ? '#ff6666' : '#fff');
@@ -366,7 +369,7 @@ function abrirMenuStops() {
 
         html += `
         <div style="background:${corFundo}; ${borda} border-radius:10px; padding:15px; margin-bottom:10px; text-align:left; color:${corTexto}; cursor:pointer;" onclick="pularParaStop(${i})">
-            <div style="font-size:16px; font-weight:bold; color:${isAtivo ? '#fff' : (alvo.isVaga ? '#007AFF' : '#fff')}; margin-bottom: 5px;">
+            <div style="font-size:16px; font-weight:bold; color:${isAtivo ? '#fff' : (alvo.isVaga ? '#39FF14' : '#fff')}; margin-bottom: 5px;">
                 ${statusIcon} <span style="color:#FFCC00;">#${i+1}</span> ➔ ${labelPrincipal}
                 ${volPill}
             </div>
@@ -392,7 +395,7 @@ function forcarBaixaMenu(e, index, status) {
     });
     
     atualizarCorPinoGPS(index, status);
-    if (typeof salvarEstadoRota === "function") salvarEstadoRota(); // SALVA O PROGRESSO
+    if (typeof salvarEstadoRota === "function") salvarEstadoRota(); 
     abrirMenuStops(); 
 
     if (index === idxDestino) {
@@ -429,7 +432,6 @@ function pularParaStop(index) {
 }
 
 function avaliarConclusaoExpedienteTotal() {
-    // CORREÇÃO: Desligar o rastreador de GPS antes de encerrar
     if (idRastreadorGps !== null) navigator.geolocation.clearWatch(idRastreadorGps);
 
     releaseWakeLock();
