@@ -8,8 +8,6 @@
     --text-primary: #f8fafc;
     --text-secondary: #94a3b8;
     --brand-primary: #ff8c00;
-    --brand-gradient: linear-gradient(135deg, #ff8c00, #ff4500);
-    --glow-shadow: 0 8px 32px rgba(255, 140, 0, 0.25);
     --success-color: #39FF14;
     --danger-color: #dc3545;
     --info-color: #007AFF;
@@ -24,7 +22,6 @@
 
 body {
     background-color: var(--bg-color);
-    /* Efeito de luzes suaves no fundo */
     background-image: 
         radial-gradient(circle at 15% 20%, rgba(255, 140, 0, 0.05) 0%, transparent 25%),
         radial-gradient(circle at 85% 80%, rgba(255, 69, 0, 0.05) 0%, transparent 25%);
@@ -35,23 +32,15 @@ body {
     -webkit-font-smoothing: antialiased;
 }
 
-/* Tipografia */
-h1, h2, h3 { 
-    color: var(--text-primary); 
-    font-weight: 800; 
-    letter-spacing: -0.5px; 
-}
-h2 { 
-    font-size: 22px; 
-    margin-bottom: 20px; 
-    text-align: center; 
-}
+h1, h2, h3 { color: var(--text-primary); font-weight: 800; letter-spacing: -0.5px; }
+h2 { font-size: 22px; margin-bottom: 20px; text-align: center; }
 
-/* Botões Globais */
+/* ========================================= */
+/* BOTÕES 3D (ASPECTO FÍSICO E CLICÁVEL)     */
+/* ========================================= */
 button, .btn-ini { 
     font-family: var(--font-main); 
     cursor: pointer; 
-    border: none; 
     outline: none; 
 }
 
@@ -60,39 +49,43 @@ button, .btn-ini {
     align-items: center;
     justify-content: center;
     text-align: center;
-    font-weight: 700;
-    transition: all 0.3s ease;
-    border-radius: 12px;
+    font-weight: 800;
+    transition: transform 0.1s ease, box-shadow 0.1s ease; /* Transição rápida de clique */
+    border-radius: 16px; /* Canto mais redondinho */
     padding: 16px 24px;
     width: 100%;
     max-width: 400px;
+    letter-spacing: 0.5px;
+    position: relative;
 }
 
-/* Botão Laranja Premium (Estilo da Landing Page) */
+/* Botão Laranja 3D (Modo Manual, Iniciar) */
 .btn-padrao, .btn-ini, #btn-continuar {
-    background: var(--brand-gradient) !important;
+    background: linear-gradient(135deg, #f97316, #c2410c) !important;
     color: #fff !important;
-    box-shadow: var(--glow-shadow) !important;
-    border: none !important;
+    border: 1px solid #fdba74 !important; /* Borda de luz */
+    box-shadow: 0 6px 0 #9a3412, 0 10px 20px rgba(249, 115, 22, 0.4) !important; /* Relevo e Sombra */
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
 }
-.btn-padrao:hover, .btn-ini:hover, #btn-continuar:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 12px 40px rgba(255, 140, 0, 0.4) !important;
+.btn-padrao:active, .btn-ini:active, #btn-continuar:active {
+    transform: translateY(6px); /* Afunda ao clicar */
+    box-shadow: 0 0px 0 #9a3412, 0 2px 5px rgba(249, 115, 22, 0.4) !important;
 }
 
-/* Botão Secundário (Estilo Vidro/Neon) */
+/* Botão Verde 3D (Modo Automático) */
 .btn-otimizada {
-    background: rgba(57, 255, 20, 0.1) !important;
-    color: var(--success-color) !important;
-    border: 1px solid rgba(57, 255, 20, 0.3) !important;
-    box-shadow: 0 8px 32px rgba(57, 255, 20, 0.1) !important;
+    background: linear-gradient(135deg, #22c55e, #166534) !important;
+    color: #fff !important;
+    border: 1px solid #86efac !important;
+    box-shadow: 0 6px 0 #14532d, 0 10px 20px rgba(34, 197, 94, 0.3) !important;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
 }
-.btn-otimizada:hover {
-    background: rgba(57, 255, 20, 0.2) !important;
-    transform: translateY(-2px);
+.btn-otimizada:active {
+    transform: translateY(6px);
+    box-shadow: 0 0px 0 #14532d, 0 2px 5px rgba(34, 197, 94, 0.3) !important;
 }
 
 /* Tags e Badges Modernos */
 .tag-comercial { background: #FFCC00; color: #000; padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 800; }
 .tag-extra { background: var(--brand-primary); color: #fff; padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 800; }
-.num-box { background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; color: var(--brand-primary); }
+.num-box { background: rgba(255,255,255,0.2); padding: 2px 6px; border-radius: 4px; color: #fff; font-weight: bold; }
