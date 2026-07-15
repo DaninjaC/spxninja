@@ -57,10 +57,40 @@ input[type="file"] { display: none; }
 .btn-undo-vermelho { background: rgba(220, 53, 69, 0.1); color: var(--danger-color); border: 1px solid rgba(220, 53, 69, 0.3); border-radius: 8px; padding: 6px 12px; font-size: 11px; font-weight: bold; }
 #ordem-selecionada-desenho { font-size: 15px; color: var(--brand-primary); font-weight: 700; line-height: 1.5; }
 
+/* ========================================= */
+/* BALÕES DO MAPA - TEXTO TRANSPARENTE VAZADO */
+/* ========================================= */
+.stop-label, .vaga-label {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    color: #fff !important;
+    font-weight: 900 !important;
+    font-size: 14px !important;
+    /* Borda preta em volta da letra para dar leitura sem estragar o mapa */
+    text-shadow:
+        -1px -1px 0 #000, 1px -1px 0 #000,
+        -1px  1px 0 #000, 1px  1px 0 #000,
+         0px  3px 5px rgba(0,0,0,0.9) !important;
+}
+.leaflet-tooltip-left::before, .leaflet-tooltip-right::before,
+.leaflet-tooltip-top::before, .leaflet-tooltip-bottom::before {
+    display: none !important; /* Remove a setinha branca chata */
+}
+
+/* ========================================= */
+/* DOCA / BAGS E LISTA DE PARADAS            */
+/* ========================================= */
 .bag-container { padding: 0; overflow: hidden; }
 .bag-container h3 { background: rgba(255, 140, 0, 0.1); color: var(--brand-primary); margin: 0; padding: 15px 20px; font-size: 15px; text-align: center; border-bottom: 1px solid var(--surface-border); }
-.bag-item { padding: 15px 20px; border-bottom: 1px solid var(--surface-border); display: flex; justify-content: space-between; align-items: center; background: transparent; }
-.bag-item:last-child { border-bottom: none; }
+.bag-item { 
+    padding: 15px 20px; 
+    display: flex; justify-content: space-between; align-items: center; 
+    background: rgba(255, 255, 255, 0.05); /* Fundo cinza chumbo de destaque */
+    margin: 6px 10px; /* Descola as bags umas das outras */
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
 .bag-item strong { font-size: 15px; color: var(--text-primary); }
 .bag-item small { color: var(--text-secondary); font-size: 12px; margin-top: 4px; }
 .bag-vol { border-radius: 8px; font-weight: 800; font-size: 12px; padding: 4px 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
@@ -97,25 +127,27 @@ input[type="file"] { display: none; }
 /* Lista Rola por dentro, sem empurrar o mapa */
 #lista-enderecos {
     overflow-y: auto; 
-    flex: 1;
-    padding-right: 5px;
-    margin-top: 10px;
-    padding-bottom: 10px;
+    flex: 1; padding-right: 5px; margin-top: 10px; padding-bottom: 10px;
 }
 
 /* A CAIXINHA DE ENDEREÇO (QUADRICULADO) */
 .endereco-item { 
     font-size: 14px !important; 
     color: var(--text-primary); 
-    font-weight: 700; 
-    text-transform: uppercase; 
-    text-align: left; 
+    font-weight: 700; text-transform: uppercase; text-align: left; 
     border: 1px solid rgba(255, 255, 255, 0.25); /* Contorno Branco Fininho */
-    padding: 10px !important; 
-    border-radius: 8px; 
+    padding: 10px !important; border-radius: 8px; 
     background: rgba(255, 255, 255, 0.05); /* Leve realce no fundo */
-    margin-bottom: 8px !important; 
-    line-height: 1.4; 
+    margin-bottom: 8px !important; line-height: 1.4; 
+}
+
+/* DESTAQUE ABSOLUTO NOS NÚMEROS DAS CASAS */
+.num-box { 
+    background: rgba(255, 204, 0, 0.15); 
+    padding: 2px 6px; border-radius: 4px; 
+    color: #FFCC00; /* Amarelo Vivo */
+    font-weight: 900; font-size: 17px; /* Aumentado */
+    border: 1px solid rgba(255, 204, 0, 0.5); /* Bordinha amarela */
 }
 
 #btn-menu-stops { position: absolute; top: 15px; right: 15px; width: 45px; height: 45px; background: var(--surface-color); border: 1px solid var(--surface-border); border-radius: 12px; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 1005; backdrop-filter: blur(10px); }
@@ -124,14 +156,19 @@ input[type="file"] { display: none; }
 #map-wrapper { flex: 1; position: relative; width: 100%; }
 .mapa-janela { width: 100%; height: 100%; background: #000; }
 
+/* ========================================= */
+/* A SETA MESTRA DO GPS (FOCO TOTAL)         */
+/* ========================================= */
 #seta-flutuante { 
     position: absolute; top: 15px; left: 15px; z-index: 1000; 
-    background: rgba(0, 122, 255, 0.9); backdrop-filter: blur(10px);
-    border-radius: 16px; padding: 15px; text-align: center; color: white; 
-    border: 1px solid rgba(255,255,255,0.2); min-width: 90px; display: none; box-shadow: 0 8px 25px rgba(0,0,0,0.4); 
+    background: rgba(10, 10, 10, 0.95); /* Preto Elegante */
+    backdrop-filter: blur(10px);
+    border-radius: 16px; padding: 15px 25px; text-align: center; color: white; 
+    border: 2px solid #444; /* Borda visível */
+    min-width: 100px; display: none; box-shadow: 0 8px 30px rgba(0,0,0,0.7); 
 }
-#seta-icon { font-size: 40px; margin-bottom: 5px; line-height: 1; }
-#seta-dist { font-size: 20px; font-weight: 800; }
+#seta-icon { font-size: 60px; margin-bottom: 5px; line-height: 1; } /* GIGANTE */
+#seta-dist { font-size: 24px; font-weight: 900; color: var(--success-color); } /* VERDE NEON */
 
 #painel-rodape { background: rgba(9, 9, 11, 0.95); backdrop-filter: blur(15px); padding: 20px; text-align: center; z-index: 1001; border-top: 1px solid var(--surface-border); }
 #rodape-rua { color: var(--text-secondary); font-weight: 700; font-size: 13px; text-transform: uppercase; margin-bottom: 5px; letter-spacing: 1px; }
