@@ -14,6 +14,11 @@ let wakeLock = null;
 let globalKmPadrao = 0;
 let globalKmOtimizada = 0;
 
+// Novas variáveis para relatórios e controles de tempo/deslocamento
+let globalTempoOcioso = 0;
+let globalTempoMovimento = 0;
+let globalKmRealPercorrida = 0;
+
 let vagasCriadas = []; 
 let vagaCount = 0;
 
@@ -52,6 +57,9 @@ function salvarEstadoRota() {
         idxDestino: (typeof idxDestino !== 'undefined' ? idxDestino : 0),
         globalKmPadrao: globalKmPadrao,
         globalKmOtimizada: globalKmOtimizada,
+        globalTempoOcioso: globalTempoOcioso,
+        globalTempoMovimento: globalTempoMovimento,
+        globalKmRealPercorrida: globalKmRealPercorrida,
         historicoParadas: historicoParadas,
         planilha: planilhaStopsData.map(p => ({...p, gpsMarker: null, marker: null})),
         rotaSpx: rotaSpx.map(r => (typeof r === 'object' ? {...r, gpsMarker: null, marker: null} : r)),
@@ -71,6 +79,9 @@ function continuarRotaSalva() {
     window.destinoSalvo = estado.idxDestino; 
     globalKmPadrao = estado.globalKmPadrao;
     globalKmOtimizada = estado.globalKmOtimizada;
+    globalTempoOcioso = estado.globalTempoOcioso || 0;
+    globalTempoMovimento = estado.globalTempoMovimento || 0;
+    globalKmRealPercorrida = estado.globalKmRealPercorrida || 0;
     historicoParadas = estado.historicoParadas;
     planilhaStopsData = estado.planilha;
     rotaSpx = estado.rotaSpx;
@@ -212,8 +223,29 @@ function extrairRuaPadrao(enderecoBruto) {
     for (let p in abrevs) limpo = limpo.replace(new RegExp(p, 'g'), abrevs[p]);
     return limpo.trim();
 }
-function formatarEnderecos(listaEnderecos) {
-    return listaEnderecos.map(end => `<div class="endereco-item">${end.toUpperCase().replace(/(\d+)/g, '<span class="num-box">$1</span>')}</div>`).join('');
+
+// FORMATAR ENDEREÇOS COM CLIQUE INVISÍVEL PARA FOTO STREET VIEW
+function formatarEnderecos(listaEnderecos, lat, lon) {
+    let latVal = lat || 0;
+    let lonVal = lon || 0;
+    return listaEnderecos.map(end => {
+        let endEscaped = end.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+        return `<div class="endereco-item endereco-clicavel" onclick="abrirFotoStreetView('${endEscaped}', ${latVal}, ${lonVal})">${end.toUpperCase().replace(/(\d+)/g, '<span class="num-box">$1</span>')}</div>`;
+    }).join('');
+}
+
+function abrirFotoStreetView(endereco, lat, lon) {
+    let imgEl = document.getElementById('street-view-img');
+    let modalEl = document.getElementById('modal-street-view');
+    if (!imgEl || !modalEl) return;
+
+    if (lat && lon && lat !== 0 && lon !== 0) {
+        imgEl.src = `https://maps.googleapis.com/maps/api/streetview?size=600x600&location=${lat},${lon}&fov=90&heading=235&pitch=10`;
+    } else {
+        let query = encodeURIComponent(endereco);
+        imgEl.src = `https://maps.googleapis.com/maps/api/streetview?size=600x600&location=${query}&fov=90&heading=235&pitch=10`;
+    }
+    modalEl.style.display = 'flex';
 }
 
 async function requestWakeLock() { try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch (err) {} }
@@ -247,7 +279,7 @@ async function enviarContato(event) {
                 Nome: nome,
                 Email_Motorista: email,
                 Mensagem: mensagem,
-                _subject: "Nova Mensagem do App Rota Ninja!", // AQUI FOI ALTERADO!
+                _subject: "Nova Mensagem do App Rota Ninja!", 
                 _captcha: "false" 
             })
         });
