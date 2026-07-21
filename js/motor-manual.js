@@ -8,7 +8,7 @@ let historicoDeRoteamento = [[]];
 
 let mapDesenho;
 let linhaDedoDesenho, rotaRealDesenho;
-let camadaPinosManual = L.layerGroup(); // CORREÇÃO: Camada leve para agrupamento
+let camadaPinosManual = L.layerGroup(); 
 let modoDesenho = false, desenhando = false;
 let startX = 0, startY = 0, mudouDeLugar = false, houveCapturaNesteCiclo = false;
 
@@ -28,13 +28,11 @@ function montarMapaDesenho() {
         rotaRealDesenho = L.polyline([], { color: '#007AFF', weight: 5, opacity: 0.9 }).addTo(mapDesenho);
     }
 
-    // CORREÇÃO: Limpando todos os pinos de uma vez da memória com Garbage Collection
     camadaPinosManual.addTo(mapDesenho);
     camadaPinosManual.clearLayers();
 
     marcadoresDesenho = []; sequenciaSelecionada = []; historicoDeRoteamento = [[]]; 
     
-    // Zeramos as vagas globais para um novo mapeamento limpo
     vagasCriadas = []; 
     vagaCount = 0;
 
@@ -43,7 +41,7 @@ function montarMapaDesenho() {
         let cor = p.extra ? '#FF8C00' : '#555';
         let marker = L.circleMarker([p.lat, p.lon], { radius: 8, color: '#fff', fillColor: cor, fillOpacity: 1, weight: 2 })
             .bindTooltip(p.stop, { permanent: true, direction: 'top', className: 'stop-label', offset: [0, -5] })
-            .addTo(camadaPinosManual); // CORREÇÃO: Pinos injetados na Camada, não direto no Mapa
+            .addTo(camadaPinosManual); 
         
         marker.spxId = p.stop; marker.spxLatLng = L.latLng(p.lat, p.lon);
         marker.corOriginal = cor; marker.isGrouped = false;
@@ -109,6 +107,8 @@ function verificarCapturaManual(latlng) {
                 m.setStyle({ fillColor: '#39FF14', color: '#000', weight: 3 });
                 houveCapturaNesteCiclo = true;
                 document.getElementById('ordem-selecionada-desenho').innerHTML = txtOrdemLegenda();
+                /* CORREÇÃO: Auto-scroll para a direita */
+                document.getElementById('ordem-selecionada-desenho').scrollLeft = 99999;
             }
         }
     });
@@ -126,7 +126,7 @@ function encaixarVagaNoAsfalto(latlng) {
             let vId = "Vaga " + vagaCount;
             let marker = L.circleMarker(rLatLng, { radius: 10, color: '#fff', fillColor: '#007AFF', fillOpacity: 1, weight: 3 })
                 .bindTooltip(vId, { permanent: true, direction: 'top', className: 'vaga-label', offset: [0, -5] })
-                .addTo(camadaPinosManual); // CORREÇÃO: Pino de Vaga Injetado na Camada
+                .addTo(camadaPinosManual); 
             
             marker.spxId = vId; marker.spxLatLng = rLatLng; marker.corOriginal = '#007AFF'; marker.isGrouped = false;
             marcadoresDesenho.push(marker);
@@ -146,6 +146,8 @@ function encaixarVagaNoAsfalto(latlng) {
             document.getElementById('btn-undo-vaga').style.display = 'inline-block';
             document.getElementById('status-texto-desenho').innerText = `✅ ${vId} fixada!`;
             document.getElementById('ordem-selecionada-desenho').innerHTML = txtOrdemLegenda();
+            /* CORREÇÃO: Auto-scroll para a direita */
+            document.getElementById('ordem-selecionada-desenho').scrollLeft = 99999;
             atualizarTratamentoAsfaltoManual();
         });
 }
@@ -168,6 +170,7 @@ function desfazerUltimoRisco() {
         marcadoresDesenho.forEach(m => { if(!m.isGrouped) m.setStyle({ fillColor: m.corOriginal, color: '#fff', weight: 2 }); });
         marcadoresDesenho.forEach(m => { if(sequenciaSelecionada.includes(m.spxId)) m.setStyle({ fillColor: '#39FF14', color: '#000', weight: 3 }); });
         document.getElementById('ordem-selecionada-desenho').innerHTML = txtOrdemLegenda();
+        document.getElementById('ordem-selecionada-desenho').scrollLeft = 99999;
         atualizarTratamentoAsfaltoManual();
     }
 }
@@ -175,7 +178,7 @@ function desfazerUltimoRisco() {
 function desfazerUltimaVaga() {
     if (vagasCriadas.length > 0) {
         let v = vagasCriadas.pop();
-        camadaPinosManual.removeLayer(v.marker); // CORREÇÃO: Remove a Vaga da Camada
+        camadaPinosManual.removeLayer(v.marker);
         marcadoresDesenho = marcadoresDesenho.filter(m => m !== v.marker);
         sequenciaSelecionada = sequenciaSelecionada.filter(id => id !== v.marker.spxId);
         v.conectoras.forEach(l => mapDesenho.removeLayer(l));
@@ -183,6 +186,7 @@ function desfazerUltimaVaga() {
         vagaCount--;
         if (vagasCriadas.length === 0) document.getElementById('btn-undo-vaga').style.display = 'none';
         document.getElementById('ordem-selecionada-desenho').innerHTML = txtOrdemLegenda();
+        document.getElementById('ordem-selecionada-desenho').scrollLeft = 99999;
         atualizarTratamentoAsfaltoManual();
     }
 }
