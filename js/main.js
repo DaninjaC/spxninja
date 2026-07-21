@@ -239,11 +239,14 @@ function abrirFotoStreetView(endereco, lat, lon) {
     let modalEl = document.getElementById('modal-street-view');
     if (!imgEl || !modalEl) return;
 
+    // ⚠️ ATENÇÃO: Substitua o texto abaixo pela sua Chave de API real do Google Cloud
+    let suaChaveAPI = "COLOQUE_SUA_CHAVE_AQUI"; 
+
     if (lat && lon && lat !== 0 && lon !== 0) {
-        imgEl.src = `https://maps.googleapis.com/maps/api/streetview?size=600x600&location=${lat},${lon}&fov=90&heading=235&pitch=10`;
+        imgEl.src = `https://maps.googleapis.com/maps/api/streetview?size=600x600&location=${lat},${lon}&fov=90&heading=235&pitch=10&key=${suaChaveAPI}`;
     } else {
         let query = encodeURIComponent(endereco);
-        imgEl.src = `https://maps.googleapis.com/maps/api/streetview?size=600x600&location=${query}&fov=90&heading=235&pitch=10`;
+        imgEl.src = `https://maps.googleapis.com/maps/api/streetview?size=600x600&location=${query}&fov=90&heading=235&pitch=10&key=${suaChaveAPI}`;
     }
     modalEl.style.display = 'flex';
 }
