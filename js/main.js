@@ -224,14 +224,22 @@ function extrairRuaPadrao(enderecoBruto) {
     return limpo.trim();
 }
 
-// FORMATAR ENDEREÇOS COM CLIQUE INVISÍVEL PARA FOTO STREET VIEW
+// --- FORMATADOR DE ENDEREÇOS ---
 function formatarEnderecos(listaEnderecos, lat, lon) {
+    /* 
+    ========================================================================
+    [STANDBY PREMIUM] - DESCOMENTE ESTE BLOCO NO FUTURO PARA ATIVAR AS FOTOS
     let latVal = lat || 0;
     let lonVal = lon || 0;
     return listaEnderecos.map(end => {
         let endEscaped = end.replace(/'/g, "\\'").replace(/"/g, '&quot;');
         return `<div class="endereco-item endereco-clicavel" onclick="abrirFotoStreetView('${endEscaped}', ${latVal}, ${lonVal})">${end.toUpperCase().replace(/(\d+)/g, '<span class="num-box">$1</span>')}</div>`;
     }).join('');
+    ========================================================================
+    */
+
+    // CÓDIGO ATUAL (GRATUITO E ESTÁTICO): Apenas exibe o texto sem clique
+    return listaEnderecos.map(end => `<div class="endereco-item">${end.toUpperCase().replace(/(\d+)/g, '<span class="num-box">$1</span>')}</div>`).join('');
 }
 
 function abrirFotoStreetView(endereco, lat, lon) {
