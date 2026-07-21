@@ -71,6 +71,12 @@
             </div>
             
         </div>
+
+        <!-- LINKS DE PRIVACIDADE E TERMOS PARA O ADSENSE -->
+        <div style="margin-top: 20px; margin-bottom: 10px; text-align: center; font-size: 12px; color: #666;">
+            <a href="#" onclick="mostrarTela('modal-termos', 'flex')" style="color: #888; text-decoration: underline;">Termos de Uso</a> &nbsp;|&nbsp;
+            <a href="#" onclick="mostrarTela('modal-privacidade', 'flex')" style="color: #888; text-decoration: underline;">Política de Privacidade</a>
+        </div>
     </div>
 
     <!-- ========================================== -->
@@ -311,7 +317,7 @@
             </div>
 
             <!-- DICA NINJA INSERIDA AQUI -->
-<div style="background: rgba(255, 204, 0, 0.1); border-left: 4px solid #FFCC00; padding: 12px; border-radius: 6px; margin-bottom: 12px;">
+            <div style="background: rgba(255, 204, 0, 0.1); border-left: 4px solid #FFCC00; padding: 12px; border-radius: 6px; margin-bottom: 12px;">
                 <strong style="color: #FFCC00;">📱 O Painel Superior</strong><br>
                 <span style="color: #ddd;">Lá em cima ficam os dados do alvo atual. Você verá o número da Parada, o volume total, e a rua com os <b>números das casas em destaque</b>. Precisa pular um cliente ou forçar uma baixa manual? Clique no ícone de prancheta (📋) para abrir o Menu completo.</span>
                 
@@ -391,6 +397,46 @@
     <div id="modal-street-view" onclick="this.style.display='none'">
         <div class="btn-fechar-sv">✕</div>
         <img id="street-view-img" src="" alt="Foto do Portão" onclick="event.stopPropagation()">
+    </div>
+
+    <!-- ========================================== -->
+    <!-- 8. MODAIS JURÍDICOS (PRIVACIDADE / TERMOS) -->
+    <!-- ========================================== -->
+    <div id="modal-termos" class="modal-fullscreen" style="z-index: 6000; background: rgba(0,0,0,0.95); justify-content: center;">
+        <div style="width: 100%; max-width: 500px; background: #111; padding: 20px; border-radius: 12px; border: 1px solid #333; position: relative;">
+            <div class="btn-fechar-sv" style="position: absolute; top: 10px; right: 10px; width: 35px; height: 35px; font-size: 18px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.3); color: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer;" onclick="document.getElementById('modal-termos').style.display='none'">✕</div>
+            <h3 style="color: #FFCC00; margin-top: 0;">📜 Termos de Uso</h3>
+            <div style="font-size: 13px; color: #ccc; line-height: 1.6; max-height: 60vh; overflow-y: auto; padding-right: 10px; text-align: left;">
+                <p>Bem-vindo ao <strong>Rota Ninja</strong>. Esta ferramenta foi criada exclusivamente como auxílio visual e roteirização autônoma para facilitar a logística do dia a dia.</p>
+                <p><strong>1. Isenção de Responsabilidade de Trânsito:</strong> O aplicativo utiliza algoritmos para sugerir conexões visuais entre endereços. No entanto, o motorista é integralmente responsável por seguir a sinalização das vias. O Rota Ninja não se responsabiliza por infrações, conversões proibidas ou acesso a áreas de risco.</p>
+                <p><strong>2. Uso do Celular ao Volante:</strong> A interação física com o aplicativo deve ser feita estritamente com o veículo estacionado. A tela de navegação possui automação desenhada para exigir o mínimo de interação durante o movimento.</p>
+                <p><strong>3. Dados Inseridos:</strong> A qualidade da roteirização depende da clareza da planilha de endereços fornecida pelo usuário, eximindo a ferramenta de falhas em localizações imprecisas.</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-privacidade" class="modal-fullscreen" style="z-index: 6000; background: rgba(0,0,0,0.95); justify-content: center;">
+        <div style="width: 100%; max-width: 500px; background: #111; padding: 20px; border-radius: 12px; border: 1px solid #333; position: relative;">
+            <div class="btn-fechar-sv" style="position: absolute; top: 10px; right: 10px; width: 35px; height: 35px; font-size: 18px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.3); color: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer;" onclick="document.getElementById('modal-privacidade').style.display='none'">✕</div>
+            <h3 style="color: #39FF14; margin-top: 0;">🔒 Política de Privacidade</h3>
+            <div style="font-size: 13px; color: #ccc; line-height: 1.6; max-height: 60vh; overflow-y: auto; padding-right: 10px; text-align: left;">
+                <p>A proteção da sua operação é o nosso princípio básico.</p>
+                <p><strong>1. Dados da Planilha de Entregas:</strong> Todo o conteúdo da planilha carregada é processado localmente na memória do seu próprio celular (LocalStorage). <strong>Nenhum dado é transferido ou armazenado em nossos servidores.</strong></p>
+                <p><strong>2. Localização (GPS):</strong> O acesso ao GPS é solicitado única e exclusivamente para a renderização do seu trajeto em tempo real. Não armazenamos ou comercializamos histórico de rotas.</p>
+                <p><strong>3. Cookies e Terceiros:</strong> Utilizamos recursos públicos de mapas e ferramentas do Google AdSense para exibir anúncios. Esses parceiros utilizam cookies para otimização e personalização. Ao utilizar o app, você aceita essa comunicação.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- 9. A BARRINHA DE CONSENTIMENTO (ADSENSE)   -->
+    <!-- ========================================== -->
+    <div id="aviso-consentimento" style="display: none; position: fixed; bottom: 0; left: 0; width: 100%; background: rgba(17, 17, 17, 0.95); backdrop-filter: blur(10px); border-top: 1px solid #333; padding: 15px 20px; z-index: 9999; box-sizing: border-box; flex-direction: column; align-items: center; text-align: center;">
+        <p style="color: #ccc; font-size: 12px; margin: 0 0 10px 0; line-height: 1.4; max-width: 500px;">
+            Usamos cookies para personalizar anúncios e precisamos do GPS para a navegação. Seus dados não saem do seu celular. Ao prosseguir, você concorda com nossos 
+            <a href="#" onclick="document.getElementById('modal-termos').style.display='flex'" style="color: #007AFF; font-weight:bold; text-decoration:none;">Termos</a> e <a href="#" onclick="document.getElementById('modal-privacidade').style.display='flex'" style="color: #007AFF; font-weight:bold; text-decoration:none;">Privacidade</a>.
+        </p>
+        <button onclick="aceitarTermosAdSense()" style="background: #39FF14; color: #000; font-weight: bold; border: none; padding: 10px 30px; border-radius: 8px; font-size: 14px; cursor: pointer;">ENTENDI E ACEITO</button>
     </div>
 
     <!-- ========================================== -->
