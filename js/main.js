@@ -22,7 +22,7 @@ let globalKmRealPercorrida = 0;
 let vagasCriadas = []; 
 let vagaCount = 0;
 
-// --- RECUPERAÇÃO DO ESTADO SALVO (AO ABRIR O APP) ---
+// --- RECUPERAÇÃO DO ESTADO SALVO (AO ABRIR O APP) E VERIFICAÇÃO DO CONSENTIMENTO ---
 window.addEventListener('load', function() {
     let estadoStr = localStorage.getItem('spx_ninja_estado');
     if (estadoStr) {
@@ -34,7 +34,19 @@ window.addEventListener('load', function() {
             localStorage.removeItem('spx_ninja_estado');
         }
     }
+
+    // Verificação da barrinha de aceite do AdSense (Única vez)
+    if (!localStorage.getItem('spx_ninja_termos_aceitos')) {
+        let barra = document.getElementById('aviso-consentimento');
+        if (barra) barra.style.display = 'flex';
+    }
 });
+
+function aceitarTermosAdSense() {
+    localStorage.setItem('spx_ninja_termos_aceitos', 'true');
+    let barra = document.getElementById('aviso-consentimento');
+    if (barra) barra.style.display = 'none';
+}
 
 // --- SALVAMENTO E CARREGAMENTO DE ROTAS ---
 function salvarEstadoRota() {
