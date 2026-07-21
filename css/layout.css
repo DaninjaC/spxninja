@@ -49,7 +49,18 @@ input[type="file"] { display: none; }
 #instrucao-desenho { color: var(--text-secondary); font-size: 13px; margin: 8px 0 15px 0; }
 #map-container-desenho { flex: 1; position: relative; width: 100%; height: 50vh; }
 #camada-desenho { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2000; display: none; cursor: crosshair; touch-action: none; }
-#painel-resultado-desenho { background: var(--bg-color); padding: 20px; border-top: 1px solid var(--surface-border); box-shadow: 0 -10px 30px rgba(0,0,0,0.5); z-index: 3500; }
+#painel-resultado-desenho { 
+    background: var(--bg-color); 
+    padding: 20px; 
+    border-top: 1px solid var(--surface-border); 
+    box-shadow: 0 -10px 30px rgba(0,0,0,0.5); 
+    z-index: 3500; 
+    
+    /* 👇 AS 3 REGRAS NOVAS PARA TRAVAR A CAIXA NA TELA 👇 */
+    width: 100vw; 
+    max-width: 100%;
+    box-sizing: border-box; 
+}
 .header-resultado { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
 #status-texto-desenho { font-size: 13px; color: var(--text-secondary); font-weight: 600; }
 .botoes-acao-desenho { display: flex; gap: 8px; }
