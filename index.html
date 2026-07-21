@@ -316,14 +316,9 @@
                 </span>
             </div>
 
-            <!-- DICA NINJA INSERIDA AQUI -->
             <div style="background: rgba(255, 204, 0, 0.1); border-left: 4px solid #FFCC00; padding: 12px; border-radius: 6px; margin-bottom: 12px;">
                 <strong style="color: #FFCC00;">📱 O Painel Superior</strong><br>
                 <span style="color: #ddd;">Lá em cima ficam os dados do alvo atual. Você verá o número da Parada, o volume total, e a rua com os <b>números das casas em destaque</b>. Precisa pular um cliente ou forçar uma baixa manual? Clique no ícone de prancheta (📋) para abrir o Menu completo.</span>
-                
-                <!-- [STANDBY PREMIUM] DICA NINJA OCULTA:
-                <b>Dica Ninja: Toque na caixa do endereço para ver a foto do portão (Street View)!</b> 
-                -->
             </div>
 
             <div style="background: rgba(57, 255, 20, 0.1); border-left: 4px solid #39FF14; padding: 12px; border-radius: 6px; margin-bottom: 12px;">
@@ -375,7 +370,6 @@
         </div>
     </div>
 
-    <!-- PAINEL DE RELATÓRIO 2.0 INSERIDO AQUI -->
     <div id="modal-relatorio" class="modal-fullscreen" style="z-index: 5000;">
         <h2>🏆 EXPEDIENTE FINALIZADO!</h2>
         <p>Ótimo trabalho, Ninja! Veja abaixo os resultados da sua rota:</p>
@@ -393,7 +387,6 @@
         <button class="btn-modo btn-otimizada" style="margin-top: 30px;" onclick="limparERecarregar()">CARREGAR NOVA PLANILHA</button>
     </div>
 
-    <!-- MODAL STREET VIEW INSERIDO AQUI (Invisível até o clique) -->
     <div id="modal-street-view" onclick="this.style.display='none'">
         <div class="btn-fechar-sv">✕</div>
         <img id="street-view-img" src="" alt="Foto do Portão" onclick="event.stopPropagation()">
@@ -405,12 +398,14 @@
     <div id="modal-termos" class="modal-fullscreen" style="z-index: 6000; background: rgba(0,0,0,0.95); justify-content: center;">
         <div style="width: 100%; max-width: 500px; background: #111; padding: 20px; border-radius: 12px; border: 1px solid #333; position: relative;">
             <div class="btn-fechar-sv" style="position: absolute; top: 10px; right: 10px; width: 35px; height: 35px; font-size: 18px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.3); color: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer;" onclick="document.getElementById('modal-termos').style.display='none'">✕</div>
-            <h3 style="color: #FFCC00; margin-top: 0;">📜 Termos de Uso</h3>
+            <h3 style="color: #FFCC00; margin-top: 0;">📜 Termos de Uso e Isenção de Responsabilidade</h3>
             <div style="font-size: 13px; color: #ccc; line-height: 1.6; max-height: 60vh; overflow-y: auto; padding-right: 10px; text-align: left;">
-                <p>Bem-vindo ao <strong>Rota Ninja</strong>. Esta ferramenta foi criada exclusivamente como auxílio visual e roteirização autônoma para facilitar a logística do dia a dia.</p>
-                <p><strong>1. Isenção de Responsabilidade de Trânsito:</strong> O aplicativo utiliza algoritmos para sugerir conexões visuais entre endereços. No entanto, o motorista é integralmente responsável por seguir a sinalização das vias. O Rota Ninja não se responsabiliza por infrações, conversões proibidas ou acesso a áreas de risco.</p>
-                <p><strong>2. Uso do Celular ao Volante:</strong> A interação física com o aplicativo deve ser feita estritamente com o veículo estacionado. A tela de navegação possui automação desenhada para exigir o mínimo de interação durante o movimento.</p>
-                <p><strong>3. Dados Inseridos:</strong> A qualidade da roteirização depende da clareza da planilha de endereços fornecida pelo usuário, eximindo a ferramenta de falhas em localizações imprecisas.</p>
+                <p>O <strong>Rota Ninja</strong> é uma ferramenta independente criada exclusivamente para otimizar a rotina de trabalho na logística urbana, melhorando o desempenho, a segurança visual e a eficiência operacional dos entregadores.</p>
+                <p><strong>1. Propósito do Aplicativo e Gratuidade:</strong> O Rota Ninja é uma plataforma disponibilizada de forma 100% gratuita para os usuários, feita para apoiar o dia a dia dos profissionais de entrega e reduzir o tempo de para-brisa. O aplicativo não cobra taxas de assinatura, mensalidades ou comissões por rotas executadas. A eventual exibição de anúncios serve unicamente para custear a manutenção técnica e os servidores do projeto.</p>
+                <p><strong>2. Autonomia e Condução no Trânsito:</strong> O aplicativo sugere sequências e conexões geográficas táticas com base em mapas públicos. O motorista é o único e exclusivo responsável por obedecer às leis de trânsito locais, sinalizações, sentidos de vias e limites de velocidade. O Rota Ninja não se responsabiliza por multas, acidentes, conversões indevidas ou acesso a áreas de risco.</p>
+                <p><strong>3. Isenção sobre Cargas e Operações de Logística:</strong> O Rota Ninja é uma ferramenta de suporte visual e não possui qualquer vínculo empregatício, comercial ou contratual com transportadoras, aplicativos de entrega ou contratantes do usuário. O aplicativo não se responsabiliza por atrasos nas entregas, avarias, extravios, roubos de carga ou divergências de valores operacionais.</p>
+                <p><strong>4. Uso Consciente do Dispositivo:</strong> A manipulação manual do aplicativo (desenho de rotas, edições ou toques contínuos) deve ser realizada obrigatoriamente com o veículo estacionado em local seguro.</p>
+                <p><strong>5. Propriedade Intelectual:</strong> A interface, algoritmos de agrupamento ("Combos a Pé", "Bags"), identidade visual e conceitos do Rota Ninja são protegidos por direitos autorais, sendo proibida a cópia, reprodução ou engenharia reversa do software.</p>
             </div>
         </div>
     </div>
@@ -418,12 +413,13 @@
     <div id="modal-privacidade" class="modal-fullscreen" style="z-index: 6000; background: rgba(0,0,0,0.95); justify-content: center;">
         <div style="width: 100%; max-width: 500px; background: #111; padding: 20px; border-radius: 12px; border: 1px solid #333; position: relative;">
             <div class="btn-fechar-sv" style="position: absolute; top: 10px; right: 10px; width: 35px; height: 35px; font-size: 18px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.3); color: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer;" onclick="document.getElementById('modal-privacidade').style.display='none'">✕</div>
-            <h3 style="color: #39FF14; margin-top: 0;">🔒 Política de Privacidade</h3>
+            <h3 style="color: #39FF14; margin-top: 0;">🔒 Política de Privacidade e Proteção de Dados (LGPD)</h3>
             <div style="font-size: 13px; color: #ccc; line-height: 1.6; max-height: 60vh; overflow-y: auto; padding-right: 10px; text-align: left;">
-                <p>A proteção da sua operação é o nosso princípio básico.</p>
-                <p><strong>1. Dados da Planilha de Entregas:</strong> Todo o conteúdo da planilha carregada é processado localmente na memória do seu próprio celular (LocalStorage). <strong>Nenhum dado é transferido ou armazenado em nossos servidores.</strong></p>
-                <p><strong>2. Localização (GPS):</strong> O acesso ao GPS é solicitado única e exclusivamente para a renderização do seu trajeto em tempo real. Não armazenamos ou comercializamos histórico de rotas.</p>
-                <p><strong>3. Cookies e Terceiros:</strong> Utilizamos recursos públicos de mapas e ferramentas do Google AdSense para exibir anúncios. Esses parceiros utilizam cookies para otimização e personalização. Ao utilizar o app, você aceita essa comunicação.</p>
+                <p>Sua privacidade e a segurança das suas informações de trabalho são prioridades absolutas no <strong>Rota Ninja</strong>.</p>
+                <p><strong>1. Tratamento de Dados da Planilha:</strong> Todos os arquivos (.xlsx, .csv) e endereços importados para o aplicativo são processados estritamente de forma local no navegador/dispositivo do próprio usuário (tecnologia <em>Client-Side / LocalStorage</em>). <strong>Nenhum dado de destinatário, endereço ou encomenda é enviado, copiado ou armazenado em servidores externos ou bancos de dados do Rota Ninja.</strong></p>
+                <p><strong>2. Acesso à Localização (GPS):</strong> O acesso ao GPS do seu dispositivo é solicitado única e exclusivamente para calcular distâncias em tempo real, renderizar a sua navegação e computar métricas operacionais (como odômetro e tempo em movimento). Não rastreamos e não vendemos seu histórico de movimentação geográfica.</p>
+                <p><strong>3. Cookies e Anúncios de Terceiros (Google AdSense):</strong> Utilizamos serviços de terceiros, como o Google AdSense, para exibir anúncios e monetizar a plataforma. O Google pode utilizar <em>cookies</em> e/ou identificadores para veicular anúncios com base nas visitas anteriores do usuário a este ou a outros sites. O usuário pode gerenciar ou desativar o uso de cookies personalizados nas configurações da sua conta Google.</p>
+                <p><strong>4. Alterações nesta Política:</strong> Reservamo-nos o direito de atualizar esta política periodicamente para manter a conformidade legal e com as diretrizes das redes de anúncios.</p>
             </div>
         </div>
     </div>
