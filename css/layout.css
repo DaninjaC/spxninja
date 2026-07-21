@@ -55,7 +55,24 @@ input[type="file"] { display: none; }
 .botoes-acao-desenho { display: flex; gap: 8px; }
 .btn-undo-azul { background: rgba(0, 122, 255, 0.1); color: var(--info-color); border: 1px solid rgba(0, 122, 255, 0.3); border-radius: 8px; padding: 6px 12px; font-size: 11px; font-weight: bold; display: none; }
 .btn-undo-vermelho { background: rgba(220, 53, 69, 0.1); color: var(--danger-color); border: 1px solid rgba(220, 53, 69, 0.3); border-radius: 8px; padding: 6px 12px; font-size: 11px; font-weight: bold; }
-#ordem-selecionada-desenho { font-size: 15px; color: var(--brand-primary); font-weight: 700; line-height: 1.5; }
+
+/* --------------------------------------------------- */
+/* CORREÇÃO: LEGENDA DO MANUAL TRAVADA EM UMA LINHA    */
+/* --------------------------------------------------- */
+#ordem-selecionada-desenho { 
+    font-size: 15px; 
+    color: var(--brand-primary); 
+    font-weight: 700; 
+    line-height: 1.5; 
+    white-space: nowrap; 
+    overflow-x: auto;    
+    display: block;
+    width: 100%;
+    padding-bottom: 8px; 
+    scroll-behavior: smooth;
+}
+#ordem-selecionada-desenho::-webkit-scrollbar { height: 4px; }
+#ordem-selecionada-desenho::-webkit-scrollbar-thumb { background: rgba(255, 140, 0, 0.4); border-radius: 4px; }
 
 /* ========================================= */
 /* BALÕES DO MAPA - TEXTO TRANSPARENTE VAZADO */
@@ -110,7 +127,7 @@ input[type="file"] { display: none; }
     background: rgba(9, 9, 11, 0.95); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
     padding: 20px 15px 5px 15px; text-align: center; z-index: 1001; 
     border-bottom: 1px solid var(--surface-border); box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-    max-height: 45vh; /* TRAVA O PAINEL EXPANDIDA: De 35% para 45% DA TELA */
+    max-height: 45vh;
     display: flex; flex-direction: column;
 }
 .modo-confirmacao { background: rgba(255, 140, 0, 0.95) !important; border-bottom: none !important; }
@@ -123,26 +140,29 @@ input[type="file"] { display: none; }
     display: inline-block; border: 1px solid rgba(255, 140, 0, 0.3);
 }
 
-/* Lista Rola por dentro, sem empurrar o mapa */
 #lista-enderecos {
     overflow-y: auto; 
     flex: 1; padding-right: 5px; margin-top: 10px; padding-bottom: 10px;
 }
 
-/* A CAIXINHA DE ENDEREÇO (COMPACTADA) */
+/* --------------------------------------------------- */
+/* ATUALIZAÇÃO: ENDEREÇO CLICÁVEL (FOTO STREET VIEW)   */
+/* --------------------------------------------------- */
 .endereco-item { 
-    font-size: 12px !important; /* Fonte reduzida para caber mais ruas */
+    font-size: 12px !important; 
     color: var(--text-primary); 
     font-weight: 700; text-transform: uppercase; text-align: left; 
     border: 1px solid rgba(255, 255, 255, 0.25); 
-    padding: 6px 10px !important; /* Espaço interno espremido */
+    padding: 6px 10px !important; 
     border-radius: 8px; 
     background: rgba(255, 255, 255, 0.05); 
-    margin-bottom: 5px !important; /* Ruas mais juntinhas */
+    margin-bottom: 5px !important; 
     line-height: 1.3; 
+    position: relative; /* Necessário para efeito visual */
 }
+.endereco-clicavel { cursor: pointer; transition: background 0.2s; }
+.endereco-clicavel:active { background: rgba(255, 255, 255, 0.15) !important; border-color: var(--brand-primary); }
 
-/* DESTAQUE ABSOLUTO NOS NÚMEROS DAS CASAS (MANTIDO GIGANTE) */
 .num-box { 
     background: rgba(255, 204, 0, 0.15); 
     padding: 1px 5px; border-radius: 4px; 
@@ -158,18 +178,18 @@ input[type="file"] { display: none; }
 .mapa-janela { width: 100%; height: 100%; background: #000; }
 
 /* ========================================= */
-/* A SETA MESTRA DO GPS (FOCO TOTAL)         */
+/* A SETA MESTRA DO GPS                      */
 /* ========================================= */
 #seta-flutuante { 
     position: absolute; top: 15px; left: 15px; z-index: 1000; 
     background: rgba(10, 10, 10, 0.95); 
     backdrop-filter: blur(10px);
-    border-radius: 16px; padding: 10px 20px; text-align: center; color: white; /* Ajuste no acolchoamento */
+    border-radius: 16px; padding: 10px 20px; text-align: center; color: white; 
     border: 2px solid #444; 
     min-width: 90px; display: none; box-shadow: 0 8px 30px rgba(0,0,0,0.7); 
 }
-#seta-icon { font-size: 80px; margin-bottom: 2px; line-height: 1; } /* SETA GIGANTE */
-#seta-dist { font-size: 18px; font-weight: 900; color: var(--success-color); } /* DISTÂNCIA MENOR E VERDE NEON */
+#seta-icon { font-size: 80px; margin-bottom: 2px; line-height: 1; }
+#seta-dist { font-size: 18px; font-weight: 900; color: var(--success-color); }
 
 #painel-rodape { background: rgba(9, 9, 11, 0.95); backdrop-filter: blur(15px); padding: 20px; text-align: center; z-index: 1001; border-top: 1px solid var(--surface-border); }
 #rodape-rua { color: var(--text-secondary); font-weight: 700; font-size: 13px; text-transform: uppercase; margin-bottom: 5px; letter-spacing: 1px; }
@@ -205,3 +225,23 @@ input[type="file"] { display: none; }
 .rel-dado strong { font-size: 20px; color: var(--text-primary); font-weight: 800; }
 .rel-destaque { color: var(--brand-primary) !important; }
 .rel-full { grid-column: span 2; }
+
+/* --------------------------------------------------- */
+/* MODAL DO STREET VIEW (TELA CHEIA)                   */
+/* --------------------------------------------------- */
+#modal-street-view {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.95); z-index: 9999;
+    display: none; flex-direction: column; align-items: center; justify-content: center;
+    backdrop-filter: blur(10px);
+}
+#street-view-img {
+    width: 100%; max-width: 500px; max-height: 80vh; object-fit: contain;
+    border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+}
+.btn-fechar-sv {
+    position: absolute; top: 20px; right: 20px;
+    background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.3);
+    color: #fff; font-size: 24px; width: 45px; height: 45px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
+}
