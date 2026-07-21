@@ -15,6 +15,9 @@ let passosNavegacao = [], distAnteriorCurva = Infinity;
 let latAntGps = null, lonAntGps = null, headingCarro = null;
 let aguardandoConfirmacao = false;
 
+// NOVA VARIÁVEL: Cronômetro de tempo de volante
+let ultimaHoraMovimento = null;
+
 function getAlvoData(index) {
     if (isRotaManual) {
         let idAlvo = rotaSpx[index];
@@ -52,9 +55,12 @@ function iniciarInterfaceGPS() {
     initAudio(); requestWakeLock();
     
     if (!horaInicioExpediente) horaInicioExpediente = new Date();
+    
+    // Inicia o cronômetro de movimento assim que abre o GPS
+    ultimaHoraMovimento = new Date();
 
     if (!mapGps) {
-        mapGps = L.map('mapa-gps', { zoomControl: false, attributionControl: false }).setView([-23.615, -46.575], 16);
+        mapGps = L.map('mapa-gps', { zoomControl: false, attributionControl: false }).setView([-23.615, -46.575], 18);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(mapGps);
         camadaFundoGps.addTo(mapGps);
         
@@ -129,9 +135,15 @@ function ativarRastreamentoGeolocalizacaoAtiva() {
     idRastreadorGps = navigator.geolocation.watchPosition(async pos => {
         minhaLat = pos.coords.latitude; minhaLon = pos.coords.longitude;
         
-        if (pos.coords.speed && pos.coords.speed > 2 && pos.coords.heading !== null) headingCarro = Math.round(pos.coords.heading);
-        else if (latAntGps !== null && lonAntGps !== null) {
-            if (dist(latAntGps, lonAntGps, minhaLat, minhaLon) > 5) headingCarro = Math.round((Math.atan2(minhaLon - lonAntGps, minhaLat - latAntGps) * 180 / Math.PI + 360) % 360);
+        // --- ODÔMETRO REAL: Soma a quilometragem percorrida ---
+        if (latAntGps !== null && lonAntGps !== null) {
+            let distPercorrida = dist(latAntGps, lonAntGps, minhaLat, minhaLon);
+            // Ignora tremidas de sinal menores que 2 metros ou saltos absurdos maiores que 150m no mesmo segundo
+            if (distPercorrida > 2 && distPercorrida < 150) {
+                globalKmRealPercorrida += (distPercorrida / 1000);
+            }
+            if (pos.coords.speed && pos.coords.speed > 2 && pos.coords.heading !== null) headingCarro = Math.round(pos.coords.heading);
+            else if (distPercorrida > 5) headingCarro = Math.round((Math.atan2(minhaLon - lonAntGps, minhaLat - latAntGps) * 180 / Math.PI + 360) % 360);
         }
         latAntGps = minhaLat; lonAntGps = minhaLon;
 
@@ -154,7 +166,12 @@ function ativarRastreamentoGeolocalizacaoAtiva() {
             }
             processarLogicaGuiamentoNavegacao();
         }
+
+        // --- ZOOM DINÂMICO ---
+        let zoomDesejado = aguardandoConfirmacao ? 16 : 18;
+        if (mapGps.getZoom() !== zoomDesejado) mapGps.setZoom(zoomDesejado);
         mapGps.panTo([minhaLat, minhaLon]);
+
     }, () => {}, { enableHighAccuracy: true });
 }
 
@@ -167,7 +184,8 @@ async function recalcularRotaGpsTaticaProximoAlvo() {
         txtEnderecos = alvo.pacotes.map(p => {
             let volColor = getCorVolume(p.pacotes);
             let volPill = `<span style="background:${volColor.bg}; color:${volColor.color}; padding:2px 6px; border-radius:10px; font-size:12px; margin-left:5px;">${p.pacotes} vol</span>`;
-            let endsFormatados = p.enderecos.map(end => `<div class="endereco-item" style="font-size: 14px; margin-bottom: 3px; margin-top:2px;">${end.toUpperCase().replace(/(\d+)/g, '<span class="num-box">$1</span>')}</div>`).join('');
+            // ATUALIZAÇÃO: Usa a função formatarEnderecos que tem o botão invisível da câmera
+            let endsFormatados = formatarEnderecos(p.enderecos, p.lat, p.lon);
             return `
             <div style="background: rgba(0,0,0,0.4); border-left: 4px solid #39FF14; padding: 8px; margin-bottom: 8px; border-radius: 5px; text-align: left;">
                 <div style="font-size: 15px; color: #39FF14; font-weight: bold; margin-bottom: 5px;">🚶 STOP ${p.stop} ${volPill}</div>
@@ -175,10 +193,9 @@ async function recalcularRotaGpsTaticaProximoAlvo() {
             </div>`;
         }).join('');
     } else {
-        txtEnderecos = formatarEnderecos(alvo.obj.enderecos);
+        txtEnderecos = formatarEnderecos(alvo.obj.enderecos, alvo.lat, alvo.lon);
     }
 
-    /* CORREÇÃO DAS CORES: A cor da palavra 'STOP X' agora acompanha a cor da bag! */
     let corVol = getCorVolume(alvo.totalVol);
     let labelBadge = alvo.isVaga ? `${alvo.id} (Combo a Pé)` : (alvo.obj.extra ? `EXTRA ${alvo.id}` : `STOP ${alvo.id}`);
     let pill = `<span style="background:${corVol.bg}; color:${corVol.color}; padding:2px 8px; border-radius:10px; font-size:13px; margin-left:5px;">${alvo.totalVol} vol</span>`;
@@ -209,37 +226,48 @@ function processarLogicaGuiamentoNavegacao() {
     document.getElementById('rodape-rua').innerText = "PREVISÃO DE CHEGADA";
     document.getElementById('rodape-dist').innerText = Math.ceil((dFinal/5.5)/60) + " min";
 
+    // --- ENTRADA NA ZONA DE 30 METROS ---
     if (dFinal < 30) {
-        aguardandoConfirmacao = true; releaseWakeLock(); 
-        document.getElementById('painel-rodape').style.display = 'none';
-        document.getElementById('seta-flutuante').style.display = 'none';
-        document.getElementById('painel-topo').classList.add('modo-confirmacao');
-        document.getElementById('painel-acoes').style.display = 'flex'; 
-        
-        let containerCheck = document.getElementById('combo-checklist-container');
-        containerCheck.innerHTML = '';
-        
-        if (alvo.isVaga) {
-            containerCheck.style.display = 'block';
-            document.getElementById('btn-confirmar-entrega').style.display = 'none';
-            document.getElementById('btn-falhar-entrega').style.display = 'none';
+        if (!aguardandoConfirmacao) {
+            aguardandoConfirmacao = true; 
+            releaseWakeLock(); 
             
-            let htmlCheck = `<div style="color:#FFCC00; font-weight:bold; font-size:12px; margin-bottom:8px; text-transform:uppercase;">📦 CONCLUA O COMBO A PÉ NA RUA:</div>`;
-            alvo.pacotes.forEach(p => {
-                htmlCheck += `
-                <div class="combo-check-item">
-                    <span style="font-size:14px; font-weight:bold; color:#fff;">Stop ${p.stop}</span>
-                    <input type="checkbox" class="chk-combo-item" data-stopid="${p.stop}" onchange="verificarLiberacaoBotoesVaga()">
-                </div>`;
-            });
-            containerCheck.innerHTML = htmlCheck;
-        } else {
-            containerCheck.style.display = 'none';
-            document.getElementById('btn-confirmar-entrega').style.display = 'block';
-            document.getElementById('btn-falhar-entrega').style.display = 'block';
+            // Pausa o cronômetro de movimento, pois agora o motorista desceu do carro
+            if (ultimaHoraMovimento) {
+                globalTempoMovimento += (new Date() - ultimaHoraMovimento);
+            }
+            
+            document.getElementById('painel-rodape').style.display = 'none';
+            document.getElementById('seta-flutuante').style.display = 'none';
+            document.getElementById('painel-topo').classList.add('modo-confirmacao');
+            document.getElementById('painel-acoes').style.display = 'flex'; 
+            
+            let containerCheck = document.getElementById('combo-checklist-container');
+            containerCheck.innerHTML = '';
+            
+            if (alvo.isVaga) {
+                containerCheck.style.display = 'block';
+                document.getElementById('btn-confirmar-entrega').style.display = 'none';
+                document.getElementById('btn-falhar-entrega').style.display = 'none';
+                
+                let htmlCheck = `<div style="color:#FFCC00; font-weight:bold; font-size:12px; margin-bottom:8px; text-transform:uppercase;">📦 CONCLUA O COMBO A PÉ NA RUA:</div>`;
+                alvo.pacotes.forEach(p => {
+                    htmlCheck += `
+                    <div class="combo-check-item">
+                        <span style="font-size:14px; font-weight:bold; color:#fff;">Stop ${p.stop}</span>
+                        <input type="checkbox" class="chk-combo-item" data-stopid="${p.stop}" onchange="verificarLiberacaoBotoesVaga()">
+                    </div>`;
+                });
+                containerCheck.innerHTML = htmlCheck;
+            } else {
+                containerCheck.style.display = 'none';
+                document.getElementById('btn-confirmar-entrega').style.display = 'block';
+                document.getElementById('btn-falhar-entrega').style.display = 'block';
+            }
+            
+            if (navigator.vibrate) navigator.vibrate([200, 100, 200]); 
         }
-        
-        if (navigator.vibrate) navigator.vibrate([200, 100, 200]); return;
+        return;
     }
 
     if (passosNavegacao.length > 0) {
@@ -297,6 +325,18 @@ function finalizarParadaAtual(status) {
     let agora = new Date();
     let tempoGasto = historicoParadas.length === 0 ? (agora - horaInicioExpediente) : (agora - historicoParadas[historicoParadas.length - 1].hora);
 
+    // --- FILTRO ANTI-OCIOSIDADE ---
+    if (tempoGasto > 45 * 60 * 1000) { 
+        let excesso = tempoGasto - (15 * 60 * 1000); 
+        globalTempoOcioso += excesso;
+        tempoGasto = 15 * 60 * 1000; 
+    }
+
+    // Se ele forçou a baixa pelo menu longe do cliente, computa o movimento aqui
+    if (!aguardandoConfirmacao && ultimaHoraMovimento) {
+        globalTempoMovimento += (agora - ultimaHoraMovimento);
+    }
+
     alvo.pacotes.forEach(p => {
         p.status = status;
         historicoParadas.push({ stop: p.stop, hora: agora, ms: Math.round(tempoGasto / alvo.pacotes.length), extra: p.extra, status: status });
@@ -306,6 +346,9 @@ function finalizarParadaAtual(status) {
     if (typeof salvarEstadoRota === "function") salvarEstadoRota();
 
     aguardandoConfirmacao = false; requestWakeLock();
+    // Reinicia o relógio do movimento para a próxima perna da viagem
+    ultimaHoraMovimento = new Date(); 
+
     document.getElementById('painel-rodape').style.display = 'block';
     document.getElementById('seta-flutuante').style.display = 'block';
     document.getElementById('painel-topo').classList.remove('modo-confirmacao');
@@ -328,9 +371,7 @@ function abrirMenuStops() {
         let alvo = getAlvoData(i);
         let isAtivo = (i === idxDestino);
         
-        /* CORREÇÃO DO CONTRASTE: Intercala cinza chumbo com cinza escuro linha sim, linha não */
         let corZebrada = i % 2 === 0 ? '#262626' : '#1a1a1a'; 
-        /* Item ativo recebe um azul luminoso */
         let corFundo = isAtivo ? 'linear-gradient(135deg, #0055ff, #003399)' : corZebrada;
         let borda = isAtivo ? 'border: 2px solid #39FF14;' : 'border: 1px solid #333;';
 
@@ -389,6 +430,17 @@ function forcarBaixaMenu(e, index, status) {
     let agora = new Date();
     let tempoGasto = historicoParadas.length === 0 ? (agora - horaInicioExpediente) : (agora - historicoParadas[historicoParadas.length - 1].hora);
 
+    // --- FILTRO ANTI-OCIOSIDADE ---
+    if (tempoGasto > 45 * 60 * 1000) { 
+        let excesso = tempoGasto - (15 * 60 * 1000); 
+        globalTempoOcioso += excesso;
+        tempoGasto = 15 * 60 * 1000; 
+    }
+
+    if (!aguardandoConfirmacao && ultimaHoraMovimento) {
+        globalTempoMovimento += (agora - ultimaHoraMovimento);
+    }
+
     alvo.pacotes.forEach(p => {
         p.status = status;
         historicoParadas.push({ stop: p.stop, hora: agora, ms: Math.round(tempoGasto / alvo.pacotes.length), extra: p.extra, status: status });
@@ -400,6 +452,8 @@ function forcarBaixaMenu(e, index, status) {
 
     if (index === idxDestino) {
         aguardandoConfirmacao = false; requestWakeLock();
+        ultimaHoraMovimento = new Date();
+
         document.getElementById('painel-rodape').style.display = 'block';
         document.getElementById('seta-flutuante').style.display = 'block';
         document.getElementById('painel-topo').classList.remove('modo-confirmacao');
@@ -421,6 +475,10 @@ function forcarBaixaMenu(e, index, status) {
 
 function pularParaStop(index) {
     fecharMenuStops(); idxDestino = index; passosNavegacao = []; aguardandoConfirmacao = false;
+    
+    if (ultimaHoraMovimento) globalTempoMovimento += (new Date() - ultimaHoraMovimento);
+    ultimaHoraMovimento = new Date();
+
     document.getElementById('painel-rodape').style.display = 'block';
     document.getElementById('seta-flutuante').style.display = 'block';
     document.getElementById('painel-acoes').style.display = 'none';
@@ -437,8 +495,16 @@ function avaliarConclusaoExpedienteTotal() {
     releaseWakeLock();
     esconderTodasTelas();
     
-    let totalMs = new Date() - horaInicioExpediente; if (totalMs <= 0) totalMs = 1000;
+    // Calcula o tempo bruto total do app aberto e desconta as pausas pesadas (almoço, soneca)
+    let totalMsBruto = new Date() - horaInicioExpediente; 
+    let totalMs = totalMsBruto - globalTempoOcioso; 
+    if (totalMs <= 0) totalMs = 1000;
     
+    // Calcula Tempo de Porta (Pausado) e Tempo de Volante (Movimento)
+    let totalMovimento = globalTempoMovimento;
+    let totalPausado = totalMsBruto - totalMovimento; 
+    if (totalPausado < 0) totalPausado = 0;
+
     let concluidos = 0, totalVols = 0;
     rotaSpx.forEach((_, i) => {
         let alvo = getAlvoData(i);
@@ -449,10 +515,17 @@ function avaliarConclusaoExpedienteTotal() {
     let taxa = totalVols > 0 ? ((concluidos / totalVols) * 100).toFixed(1) : 0;
     let ritmo = totalMs > 0 ? Math.round(concluidos / (totalMs / 3600000)) : 0;
 
-    let rapida = historicoParadas.sort((a,b) => a.ms - b.ms)[0];
+    // --- CORREÇÃO DA ENTREGA RÁPIDA (Filtra "0m 0s" e bugs do dedo nervoso) ---
+    let paradasValidas = historicoParadas.filter(p => p.ms > 30000);
+    let rapida = paradasValidas.sort((a,b) => a.ms - b.ms)[0];
+    if (!rapida) rapida = historicoParadas.sort((a,b) => a.ms - b.ms)[0]; 
     let txtRapida = rapida ? `${Math.floor(rapida.ms/60000)}m ${Math.floor((rapida.ms%60000)/1000)}s (Stop ${rapida.stop})` : '--';
 
-    document.getElementById('rel-total').innerText = Math.floor(totalMs/3600000) + "h " + Math.floor((totalMs%3600000)/60000) + "m";
+    // Insere os dados nas caixinhas do HTML
+    document.getElementById('rel-movimento').innerText = Math.floor(totalMovimento/3600000) + "h " + Math.floor((totalMovimento%3600000)/60000) + "m";
+    document.getElementById('rel-ocioso').innerText = Math.floor(totalPausado/3600000) + "h " + Math.floor((totalPausado%3600000)/60000) + "m";
+    document.getElementById('rel-km-real').innerText = globalKmRealPercorrida.toFixed(1) + " km";
+    
     document.getElementById('rel-ritmo').innerText = ritmo + " vol/h";
     document.getElementById('rel-sucesso').innerText = taxa + "%";
     document.getElementById('rel-raiox').innerText = `${rotaSpx.length} Paradas | ${totalVols} Vol`;
