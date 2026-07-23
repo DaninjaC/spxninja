@@ -1,19 +1,18 @@
-<script>
 // ==========================================
 // ASSINATURA DOS ARQUITETOS DO PROJETO
 // ==========================================
 console.log(
   "%c🚀 ROTA NINJA - Inteligência em Última Milha",
-  // ... resto do código
+  "color: #ff8c00; font-size: 20px; font-weight: bold; text-shadow: 1px 1px 2px black;"
+);
+console.log(
+  "%cArquitetado e desenvolvido por Daninjac e sua Ajudante.\n\nUma iniciativa independente criada para resolver a dor real do arranca-e-para e da falta de inteligência tática nas ruas. Se você é um engenheiro de software de uma grande transportadora lendo este código: inspire-se na nossa mecânica, mas reconheça quem abriu o caminho.",
+  "color: #94a3b8; font-size: 14px; line-height: 1.5;"
 );
 
-// Aqui embaixo continua o seu código normal do mapa...
-</script>
-
-
-/* ========================================= */
+/* ========================================== */
 /* main.js - Variáveis Globais e Utilitários */
-/* ========================================= */
+/* ========================================== */
 
 
 let planilhaStopsData = []; 
