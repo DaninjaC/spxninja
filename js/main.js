@@ -1,6 +1,20 @@
+<script>
+// ==========================================
+// ASSINATURA DOS ARQUITETOS DO PROJETO
+// ==========================================
+console.log(
+  "%c🚀 ROTA NINJA - Inteligência em Última Milha",
+  // ... resto do código
+);
+
+// Aqui embaixo continua o seu código normal do mapa...
+</script>
+
+
 /* ========================================= */
 /* main.js - Variáveis Globais e Utilitários */
 /* ========================================= */
+
 
 let planilhaStopsData = []; 
 let rotaSpx = []; 
