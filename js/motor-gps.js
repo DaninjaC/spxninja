@@ -15,15 +15,20 @@ let passosNavegacao = [], distAnteriorCurva = Infinity;
 let latAntGps = null, lonAntGps = null, headingCarro = null;
 let aguardandoConfirmacao = false;
 
-// NOVA VARIÁVEL: Cronômetro de tempo de volante
+// Cronômetro de tempo de volante
 let ultimaHoraMovimento = null;
 
+// TRAVAS DE CONCORRÊNCIA PARA EVITAR RACE CONDITIONS NO GPS
+let requisicaoNavegacaoEmAndamento = false;
+let tokenNavegacaoAtual = 0;
+
 function getAlvoData(index) {
+    // Busca ultra-rápida (O(1)) utilizando os Maps criados no main.js
     if (isRotaManual) {
         let idAlvo = rotaSpx[index];
         if (idAlvo.startsWith("Vaga")) {
-            let v = vagasCriadas.find(x => x.marker.spxId === idAlvo);
-            let pacotes = v.sugados.map(m => planilhaStopsData.find(p => p.stop === m.spxId));
+            let v = indiceVagasPorId.get(idAlvo);
+            let pacotes = v.sugados.map(m => indicePlanilhaPorStop.get(m.spxId));
             return {
                 id: idAlvo, isVaga: true, lat: v.marker.getLatLng().lat, lon: v.marker.getLatLng().lng,
                 pacotes: pacotes, totalVol: pacotes.reduce((a, b) => a + b.pacotes, 0),
@@ -32,7 +37,7 @@ function getAlvoData(index) {
                 status: pacotes[0].status 
             };
         } else {
-            let p = planilhaStopsData.find(x => x.stop === idAlvo);
+            let p = indicePlanilhaPorStop.get(idAlvo);
             return { 
                 id: idAlvo, isVaga: false, lat: p.lat, lon: p.lon, 
                 pacotes: [p], totalVol: p.pacotes, comercial: p.comercial, obj: p,
@@ -51,17 +56,20 @@ function getAlvoData(index) {
     }
 }
 
-function iniciarInterfaceGPS() {
+function iniciarInterfaceGPS(idxInicial = 0) {
     initAudio(); requestWakeLock();
     
     if (!horaInicioExpediente) horaInicioExpediente = new Date();
-    
-    // Inicia o cronômetro de movimento assim que abre o GPS
     ultimaHoraMovimento = new Date();
+    
+    reconstruirIndices(); 
 
     if (!mapGps) {
         mapGps = L.map('mapa-gps', { zoomControl: false, attributionControl: false }).setView([-23.615, -46.575], 18);
+        
+        // MAPA COLORIDO ORIGINAL COM NOME DAS RUAS (OpenStreetMap)
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(mapGps);
+        
         camadaFundoGps.addTo(mapGps);
         
         trilhaMestreGps = L.polyline([], { color: '#000000', weight: 4, opacity: 0.6, dashArray: '6, 6' }).addTo(mapGps);
@@ -81,13 +89,13 @@ function iniciarInterfaceGPS() {
         }).bindTooltip(alvo.isVaga ? alvo.id : (alvo.obj.extra ? "Extra" : "Stop " + alvo.id), { permanent: true, direction: 'top', className: 'stop-label' }).addTo(camadaFundoGps);
 
         if(isRotaManual) {
-            if (alvo.isVaga) vagasCriadas.find(x => x.marker.spxId === alvo.id).gpsMarker = marker;
-            else planilhaStopsData.find(x => x.stop === alvo.id).gpsMarker = marker;
+            if (alvo.isVaga) indiceVagasPorId.get(alvo.id).gpsMarker = marker;
+            else indicePlanilhaPorStop.get(alvo.id).gpsMarker = marker;
             
             if (alvo.isVaga) {
-                let v = vagasCriadas.find(x => x.marker.spxId === alvo.id);
+                let v = indiceVagasPorId.get(alvo.id);
                 if(v.sugados) v.sugados.forEach(m => {
-                    let pData = planilhaStopsData.find(x => x.stop === m.spxId);
+                    let pData = indicePlanilhaPorStop.get(m.spxId);
                     let mLat = pData ? [pData.lat, pData.lon] : (m.getLatLng ? m.getLatLng() : [0,0]);
                     L.circleMarker(mLat, { radius: 5, color: '#007AFF', fillColor: '#111', fillOpacity: 0.6, weight: 1, dashArray: '2,2' }).addTo(camadaFundoGps);
                 });
@@ -97,7 +105,7 @@ function iniciarInterfaceGPS() {
         }
     }
 
-    idxDestino = typeof window.destinoSalvo !== 'undefined' ? window.destinoSalvo : 0;
+    idxDestino = idxInicial;
     
     desenharTrilhaMestreFixaCompleta();
     atualizarProximaPernaRoxa();
@@ -106,13 +114,27 @@ function iniciarInterfaceGPS() {
     if (typeof salvarEstadoRota === "function") salvarEstadoRota();
 }
 
+function pararRastreamentoGps() {
+    if (idRastreadorGps !== null) {
+        navigator.geolocation.clearWatch(idRastreadorGps);
+        idRastreadorGps = null;
+    }
+}
+
 async function desenharTrilhaMestreFixaCompleta() {
+    if (rotaSpx.length <= 1) return;
     try {
-        let urlCoords = rotaSpx.map((_, i) => `${getAlvoData(i).lon},${getAlvoData(i).lat}`).join(';');
-        let res = await fetch(`https://router.project-osrm.org/route/v1/driving/${urlCoords}?overview=full&geometries=geojson`);
-        let data = await res.json();
-        if (data.routes?.length > 0) trilhaMestreGps.setLatLngs(data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]));
-    } catch(e){}
+        let todasCoords = rotaSpx.map((_, i) => {
+            let alvo = getAlvoData(i);
+            return [alvo.lon, alvo.lat];
+        });
+        
+        // Usa o fatiador em lotes (main.js) para evitar Rate Limit
+        let coordsCompletas = await requisitarRotaHibrida(todasCoords);
+        if (coordsCompletas.length > 0) {
+            trilhaMestreGps.setLatLngs(coordsCompletas);
+        }
+    } catch(e) {} 
 }
 
 async function atualizarProximaPernaRoxa() {
@@ -123,22 +145,24 @@ async function atualizarProximaPernaRoxa() {
     try {
         let alvoAtual = getAlvoData(idxDestino);
         let alvoProx = getAlvoData(idxDestino + 1);
-        let coords = `${alvoAtual.lon},${alvoAtual.lat};${alvoProx.lon},${alvoProx.lat}`;
         
-        let res = await fetch(`https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson`);
-        let data = await res.json();
-        if (data.routes?.length > 0) proximaPernaGps.setLatLngs(data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]));
-    } catch(e){}
+        let coordsCompletas = await requisitarRotaHibrida([
+            [alvoAtual.lon, alvoAtual.lat], 
+            [alvoProx.lon, alvoProx.lat]
+        ]);
+        
+        if (coordsCompletas.length > 0) {
+            proximaPernaGps.setLatLngs(coordsCompletas);
+        }
+    } catch(e) {}
 }
 
 function ativarRastreamentoGeolocalizacaoAtiva() {
     idRastreadorGps = navigator.geolocation.watchPosition(async pos => {
         minhaLat = pos.coords.latitude; minhaLon = pos.coords.longitude;
         
-        // --- ODÔMETRO REAL: Soma a quilometragem percorrida ---
         if (latAntGps !== null && lonAntGps !== null) {
             let distPercorrida = dist(latAntGps, lonAntGps, minhaLat, minhaLon);
-            // Ignora tremidas de sinal menores que 2 metros ou saltos absurdos maiores que 150m no mesmo segundo
             if (distPercorrida > 2 && distPercorrida < 150) {
                 globalKmRealPercorrida += (distPercorrida / 1000);
             }
@@ -167,7 +191,6 @@ function ativarRastreamentoGeolocalizacaoAtiva() {
             processarLogicaGuiamentoNavegacao();
         }
 
-        // --- ZOOM DINÂMICO ---
         let zoomDesejado = aguardandoConfirmacao ? 16 : 18;
         if (mapGps.getZoom() !== zoomDesejado) mapGps.setZoom(zoomDesejado);
         mapGps.panTo([minhaLat, minhaLon]);
@@ -176,7 +199,12 @@ function ativarRastreamentoGeolocalizacaoAtiva() {
 }
 
 async function recalcularRotaGpsTaticaProximoAlvo() {
+    if (requisicaoNavegacaoEmAndamento) return; 
     if (idxDestino >= rotaSpx.length) return;
+
+    requisicaoNavegacaoEmAndamento = true;
+    const meuToken = ++tokenNavegacaoAtual;
+
     let alvo = getAlvoData(idxDestino);
     
     let txtEnderecos = "";
@@ -184,7 +212,6 @@ async function recalcularRotaGpsTaticaProximoAlvo() {
         txtEnderecos = alvo.pacotes.map(p => {
             let volColor = getCorVolume(p.pacotes);
             let volPill = `<span style="background:${volColor.bg}; color:${volColor.color}; padding:2px 6px; border-radius:10px; font-size:12px; margin-left:5px;">${p.pacotes} vol</span>`;
-            // ATUALIZAÇÃO: Usa a função formatarEnderecos que tem o botão invisível da câmera
             let endsFormatados = formatarEnderecos(p.enderecos, p.lat, p.lon);
             return `
             <div style="background: rgba(0,0,0,0.4); border-left: 4px solid #39FF14; padding: 8px; margin-bottom: 8px; border-radius: 5px; text-align: left;">
@@ -207,16 +234,50 @@ async function recalcularRotaGpsTaticaProximoAlvo() {
     markerDestGps = L.circleMarker([alvo.lat, alvo.lon], { radius: 11, color: '#fff', fillColor: '#007AFF', fillOpacity: 1, weight: 3 }).addTo(mapGps);
 
     try {
-        let url = `https://router.project-osrm.org/route/v1/driving/${minhaLon},${minhaLat};${alvo.lon},${alvo.lat}?steps=true&overview=full&geometries=geojson`;
-        if (headingCarro !== null) url += `&bearings=${headingCarro},60;`;
-        let res = await fetch(url); let data = await res.json();
-        if (data.routes?.length > 0) {
+        let strCoords = `${minhaLon},${minhaLat};${alvo.lon},${alvo.lat}`;
+        let params = `&steps=true&overview=full&geometries=geojson`;
+        if (headingCarro !== null) params += `&bearings=${headingCarro},60;`;
+
+        let res, data;
+        let usouLocationIQ = false;
+
+        if (!usarLocationIQComChave && Date.now() > proximaTentativaLocationIQ) {
+            usarLocationIQComChave = true;
+        }
+
+        if (usarLocationIQComChave) {
+            try {
+                res = await fetchComTimeout(`https://us1.locationiq.com/v1/directions/driving/${strCoords}?key=${LOCATIONIQ_KEY}${params}`, {}, 6000);
+                data = await res.json();
+                if (data.code === "Ok" && data.routes?.length > 0) {
+                    usouLocationIQ = true;
+                } else if (data.error) {
+                    throw { status: 403 };
+                }
+            } catch(e) { 
+                usarLocationIQComChave = false;
+                if (e.status === 429) proximaTentativaLocationIQ = Date.now() + 30000;
+                else if (e.status === 403 || e.status === 401) proximaTentativaLocationIQ = Date.now() + 300000;
+                else proximaTentativaLocationIQ = Date.now() + 15000;
+            }
+        }
+
+        if (!usouLocationIQ) {
+            res = await fetchComTimeout(`https://router.project-osrm.org/route/v1/driving/${strCoords}?${params.substring(1)}`, {}, 8000);
+            data = await res.json();
+        }
+
+        if (meuToken !== tokenNavegacaoAtual) return;
+
+        if (data && data.routes?.length > 0) {
             const r = data.routes[0];
             passosNavegacao = r.legs[0].steps.map(s => ({ lat: s.maneuver.location[1], lon: s.maneuver.location[0], manobra: s.maneuver.modifier || s.maneuver.type || "", rua: s.name || "Frente" }));
             idxPasso = 0; distAnteriorCurva = Infinity;
             rotaRealGps.setLatLngs(r.geometry.coordinates.map(c => [c[1], c[0]])); 
         }
-    } catch(e){}
+    } catch(e) {} finally {
+        requisicaoNavegacaoEmAndamento = false; 
+    }
 }
 
 function processarLogicaGuiamentoNavegacao() {
@@ -226,13 +287,11 @@ function processarLogicaGuiamentoNavegacao() {
     document.getElementById('rodape-rua').innerText = "PREVISÃO DE CHEGADA";
     document.getElementById('rodape-dist').innerText = Math.ceil((dFinal/5.5)/60) + " min";
 
-    // --- ENTRADA NA ZONA DE 30 METROS ---
     if (dFinal < 30) {
         if (!aguardandoConfirmacao) {
             aguardandoConfirmacao = true; 
             releaseWakeLock(); 
             
-            // Pausa o cronômetro de movimento, pois agora o motorista desceu do carro
             if (ultimaHoraMovimento) {
                 globalTempoMovimento += (new Date() - ultimaHoraMovimento);
             }
@@ -309,11 +368,11 @@ function atualizarCorPinoGPS(index, status) {
     if(isRotaManual) {
         let id = rotaSpx[index];
         if (id.startsWith("Vaga")) {
-            let v = vagasCriadas.find(x => x.marker.spxId === id);
-            if(v.gpsMarker) v.gpsMarker.setStyle({ fillColor: status === 'concluido' ? '#888' : '#ff0000', weight: 2 });
+            let v = indiceVagasPorId.get(id);
+            if(v && v.gpsMarker) v.gpsMarker.setStyle({ fillColor: status === 'concluido' ? '#888' : '#ff0000', weight: 2 });
         } else {
-            let p = planilhaStopsData.find(x => x.stop === id);
-            if(p.gpsMarker) p.gpsMarker.setStyle({ fillColor: status === 'concluido' ? '#888' : '#ff0000', weight: 2 });
+            let p = indicePlanilhaPorStop.get(id);
+            if(p && p.gpsMarker) p.gpsMarker.setStyle({ fillColor: status === 'concluido' ? '#888' : '#ff0000', weight: 2 });
         }
     } else {
         if(rotaSpx[index].gpsMarker) rotaSpx[index].gpsMarker.setStyle({ fillColor: status === 'concluido' ? '#888' : '#ff0000', weight: 2 });
@@ -325,14 +384,12 @@ function finalizarParadaAtual(status) {
     let agora = new Date();
     let tempoGasto = historicoParadas.length === 0 ? (agora - horaInicioExpediente) : (agora - historicoParadas[historicoParadas.length - 1].hora);
 
-    // --- FILTRO ANTI-OCIOSIDADE ---
     if (tempoGasto > 45 * 60 * 1000) { 
         let excesso = tempoGasto - (15 * 60 * 1000); 
         globalTempoOcioso += excesso;
         tempoGasto = 15 * 60 * 1000; 
     }
 
-    // Se ele forçou a baixa pelo menu longe do cliente, computa o movimento aqui
     if (!aguardandoConfirmacao && ultimaHoraMovimento) {
         globalTempoMovimento += (agora - ultimaHoraMovimento);
     }
@@ -346,7 +403,6 @@ function finalizarParadaAtual(status) {
     if (typeof salvarEstadoRota === "function") salvarEstadoRota();
 
     aguardandoConfirmacao = false; requestWakeLock();
-    // Reinicia o relógio do movimento para a próxima perna da viagem
     ultimaHoraMovimento = new Date(); 
 
     document.getElementById('painel-rodape').style.display = 'block';
@@ -356,6 +412,7 @@ function finalizarParadaAtual(status) {
     document.getElementById('painel-acoes').style.display = 'none';
 
     idxDestino++;
+    tokenNavegacaoAtual++; // Invalida pendentes
     passosNavegacao = [];
     
     if (idxDestino < rotaSpx.length) {
@@ -430,7 +487,6 @@ function forcarBaixaMenu(e, index, status) {
     let agora = new Date();
     let tempoGasto = historicoParadas.length === 0 ? (agora - horaInicioExpediente) : (agora - historicoParadas[historicoParadas.length - 1].hora);
 
-    // --- FILTRO ANTI-OCIOSIDADE ---
     if (tempoGasto > 45 * 60 * 1000) { 
         let excesso = tempoGasto - (15 * 60 * 1000); 
         globalTempoOcioso += excesso;
@@ -460,7 +516,9 @@ function forcarBaixaMenu(e, index, status) {
         document.getElementById('combo-checklist-container').style.display = 'none';
         document.getElementById('painel-acoes').style.display = 'none';
         
-        idxDestino++; passosNavegacao = [];
+        idxDestino++; 
+        tokenNavegacaoAtual++; 
+        passosNavegacao = [];
         
         if (idxDestino < rotaSpx.length) {
             recalcularRotaGpsTaticaProximoAlvo();
@@ -485,22 +543,21 @@ function pularParaStop(index) {
     document.getElementById('painel-topo').classList.remove('modo-confirmacao');
     document.getElementById('combo-checklist-container').style.display = 'none';
     
+    tokenNavegacaoAtual++;
     recalcularRotaGpsTaticaProximoAlvo();
     atualizarProximaPernaRoxa(); 
 }
 
 function avaliarConclusaoExpedienteTotal() {
-    if (idRastreadorGps !== null) navigator.geolocation.clearWatch(idRastreadorGps);
+    pararRastreamentoGps();
 
     releaseWakeLock();
     esconderTodasTelas();
     
-    // Calcula o tempo bruto total do app aberto e desconta as pausas pesadas (almoço, soneca)
     let totalMsBruto = new Date() - horaInicioExpediente; 
     let totalMs = totalMsBruto - globalTempoOcioso; 
     if (totalMs <= 0) totalMs = 1000;
     
-    // Calcula Tempo de Porta (Pausado) e Tempo de Volante (Movimento)
     let totalMovimento = globalTempoMovimento;
     let totalPausado = totalMsBruto - totalMovimento; 
     if (totalPausado < 0) totalPausado = 0;
@@ -515,13 +572,11 @@ function avaliarConclusaoExpedienteTotal() {
     let taxa = totalVols > 0 ? ((concluidos / totalVols) * 100).toFixed(1) : 0;
     let ritmo = totalMs > 0 ? Math.round(concluidos / (totalMs / 3600000)) : 0;
 
-    // --- CORREÇÃO DA ENTREGA RÁPIDA (Filtra "0m 0s" e bugs do dedo nervoso) ---
     let paradasValidas = historicoParadas.filter(p => p.ms > 30000);
     let rapida = paradasValidas.sort((a,b) => a.ms - b.ms)[0];
     if (!rapida) rapida = historicoParadas.sort((a,b) => a.ms - b.ms)[0]; 
     let txtRapida = rapida ? `${Math.floor(rapida.ms/60000)}m ${Math.floor((rapida.ms%60000)/1000)}s (Stop ${rapida.stop})` : '--';
 
-    // Insere os dados nas caixinhas do HTML
     document.getElementById('rel-movimento').innerText = Math.floor(totalMovimento/3600000) + "h " + Math.floor((totalMovimento%3600000)/60000) + "m";
     document.getElementById('rel-ocioso').innerText = Math.floor(totalPausado/3600000) + "h " + Math.floor((totalPausado%3600000)/60000) + "m";
     document.getElementById('rel-km-real').innerText = globalKmRealPercorrida.toFixed(1) + " km";
