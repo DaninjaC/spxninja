@@ -59,12 +59,18 @@ function roteirizarModoAutomatico() {
 function iniciarMapasAuditoria() {
     if (!mapPadrao) {
         mapPadrao = L.map('mapa-padrao', { zoomControl: false }).setView([-23.61, -46.57], 14);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(mapPadrao);
+        // Mapa escuro original COM NOMES de ruas
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            maxZoom: 20
+        }).addTo(mapPadrao);
         layerPadrao.addTo(mapPadrao);
     }
     if (!mapOtimizado) {
         mapOtimizado = L.map('mapa-otimizado', { zoomControl: false }).setView([-23.61, -46.57], 14);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(mapOtimizado);
+        // Mapa escuro original COM NOMES de ruas
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            maxZoom: 20
+        }).addTo(mapOtimizado);
         layerOtimizado.addTo(mapOtimizado);
     }
 }
