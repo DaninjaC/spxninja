@@ -1,8 +1,0 @@
-[{
-      "relation": ["delegate_permission/common.handle_all_urls"],
-      "target": {
-        "namespace": "android_app",
-        "package_name": "br.com.rotaninja.app",
-        "sha256_cert_fingerprints": ["6F:E6:74:1A:3F:39:E6:F7:58:F0:80:5D:26:E9:F1:A1:88:81:28:73:65:FB:EA:7B:B7:05:2E:DE:53:89:C1:E9"]
-      }
-    }]
