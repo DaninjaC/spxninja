@@ -8,16 +8,23 @@ function renderizarModoDoca() {
     let html = '', bagNum = 1, globalIndex = 1;
     let listaCompletaDoca = [];
 
-    // Tradutor de Rota (Normaliza dados do Manual e do Automático)
+    // Tradutor de Rota (Atualizado para buscar da Memória O(1) ultrarrápida do main.js)
     if (isRotaManual) {
         rotaSpx.forEach(id => {
             if (id.startsWith("Vaga")) {
-                let vObj = vagasCriadas.find(x => x.marker.spxId === id);
-                let itensInternos = vObj ? vObj.sugados.map(m => planilhaStopsData.find(p => p.stop === m.spxId)) : [];
+                let vObj = typeof indiceVagasPorId !== 'undefined' ? indiceVagasPorId.get(id) : vagasCriadas.find(x => x.marker.spxId === id);
+                
+                let itensInternos = [];
+                if (vObj) {
+                    itensInternos = vObj.sugados.map(m => {
+                        return typeof indicePlanilhaPorStop !== 'undefined' ? indicePlanilhaPorStop.get(m.spxId) : planilhaStopsData.find(p => p.stop === m.spxId);
+                    }).filter(Boolean);
+                }
+                
                 let volTotal = itensInternos.reduce((acc, current) => acc + current.pacotes, 0);
                 listaCompletaDoca.push({ id: id, isVaga: true, totalVol: volTotal, subItems: itensInternos });
             } else {
-                let pObj = planilhaStopsData.find(x => x.stop === id);
+                let pObj = typeof indicePlanilhaPorStop !== 'undefined' ? indicePlanilhaPorStop.get(id) : planilhaStopsData.find(x => x.stop === id);
                 if(pObj) listaCompletaDoca.push({ id: id, isVaga: false, obj: pObj });
             }
         });
