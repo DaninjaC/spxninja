@@ -1,4 +1,4 @@
-const CACHE_NAME = 'rota-ninja-v7';
+const CACHE_NAME = 'rota-ninja-v8';
 const FILES_TO_CACHE = [
   '/',
   '/index.html',
